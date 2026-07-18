@@ -1,0 +1,169 @@
+import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
+import { Driver } from '@/domain/entities/Driver';
+import * as authService from '@/services/authService';
+import { logger } from '@/core/utils/logger';
+
+// ─── State ────────────────────────────────────────────────────────────────────
+
+interface AuthState {
+  driver: Driver | null;
+  isLoading: boolean;
+  error: string | null;
+}
+
+const initialState: AuthState = {
+  driver: null,
+  isLoading: true, // true on boot while we restore the session
+  error: null,
+};
+
+// ─── Thunks ───────────────────────────────────────────────────────────────────
+
+/** Restore driver session from storage on app boot */
+export const initAuth = createAsyncThunk<Driver | null>(
+  'auth/init',
+  async () => {
+    logger.info('auth', 'Restoring session from storage…');
+    const driver = await authService.getStoredDriver();
+    if (driver) {
+      logger.info('auth', 'Session restored', { driverId: driver.id });
+    } else {
+      logger.info('auth', 'No stored session found');
+    }
+    return driver;
+  },
+);
+
+import { AxiosError } from 'axios';
+
+/** Login with phone + password */
+export const loginThunk = createAsyncThunk<
+  Driver,
+  { phone: string; password?: string; pin?: string },
+  { rejectValue: string }
+>('auth/login', async ({ phone, password, pin }, { rejectWithValue }) => {
+  logger.info('auth', 'Login attempt', { phone });
+  try {
+    const driver = await authService.login(phone, password, pin);
+    logger.info('auth', 'Login successful', { driverId: driver.id, name: driver.name });
+    return driver;
+  } catch (err) {
+    logger.error('auth', 'Login failed', err);
+    let errorMessage = 'Login failed';
+    if (err instanceof AxiosError && err.response?.data?.error) {
+      errorMessage = err.response.data.error;
+    } else if (err instanceof Error) {
+      errorMessage = err.message;
+    }
+    return rejectWithValue(errorMessage);
+  }
+});
+
+/** Logout and clear storage */
+export const logoutThunk = createAsyncThunk<void>(
+  'auth/logout',
+  async () => {
+    logger.info('auth', 'Driver logging out…');
+    await authService.logout();
+    logger.info('auth', 'Logout complete');
+  },
+);
+
+// ─── Slice ────────────────────────────────────────────────────────────────────
+
+export const toggleAvailability = createAsyncThunk<
+  Driver,
+  void,
+  { state: { auth: AuthState }, rejectValue: string }
+>('auth/toggleAvailability', async (_, { getState, rejectWithValue }) => {
+  const driver = getState().auth.driver;
+  if (!driver) return rejectWithValue('Driver not found');
+
+  const newStatus = driver.status === 'Available' ? 'Offline' : 'Available';
+  try {
+    const updatedDriver = await authService.updateDriverStatus(driver.id, newStatus);
+    logger.info('auth', `Availability toggled to: ${updatedDriver.status}`);
+    return updatedDriver;
+  } catch (err) {
+    logger.error('auth', 'Failed to toggle availability', err);
+    let errorMessage = 'Failed to update status';
+    if (err instanceof AxiosError && err.response?.data?.error) {
+      errorMessage = err.response.data.error;
+    } else if (err instanceof Error) {
+      errorMessage = err.message;
+    }
+    return rejectWithValue(errorMessage);
+  }
+});
+
+const authSlice = createSlice({
+  name: 'auth',
+  initialState,
+  reducers: {},
+  extraReducers: (builder) => {
+    // initAuth
+    builder
+      .addCase(initAuth.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(initAuth.fulfilled, (state, action) => {
+        state.driver = action.payload;
+        state.isLoading = false;
+      })
+      .addCase(initAuth.rejected, (state, action) => {
+        state.error = action.error.message ?? 'Failed to restore session';
+        state.isLoading = false;
+      });
+
+    // loginThunk
+    builder
+      .addCase(loginThunk.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(loginThunk.fulfilled, (state, action) => {
+        state.driver = action.payload;
+        state.isLoading = false;
+      })
+      .addCase(loginThunk.rejected, (state, action) => {
+        state.error = (action.payload as string) ?? action.error.message ?? 'Login failed';
+        state.isLoading = false;
+      });
+
+    // logoutThunk
+    builder
+      .addCase(logoutThunk.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(logoutThunk.fulfilled, (state) => {
+        state.driver = null;
+        state.isLoading = false;
+      })
+      .addCase(logoutThunk.rejected, (state, action) => {
+        state.error = action.error.message ?? 'Logout failed';
+        state.isLoading = false;
+      });
+
+    // toggleAvailability
+    builder
+      .addCase(toggleAvailability.fulfilled, (state, action) => {
+        state.driver = action.payload;
+      })
+      .addCase(toggleAvailability.rejected, (state, action) => {
+        state.error = (action.payload as string) ?? action.error.message ?? 'Failed to update status';
+      });
+  },
+});
+
+export const authReducer = authSlice.reducer;
+
+// ─── Selectors ────────────────────────────────────────────────────────────────
+
+// Use a local shape type to avoid a circular import with store/index.ts
+type StateWithAuth = { auth: AuthState };
+
+export const selectDriver = (state: StateWithAuth) => state.auth.driver;
+export const selectIsLoading = (state: StateWithAuth) => state.auth.isLoading;
+export const selectAuthError = (state: StateWithAuth) => state.auth.error;

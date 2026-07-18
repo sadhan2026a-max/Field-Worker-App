@@ -1,6 +1,28 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "strict": true
-  }
+    "strict": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@/shared/*": ["./src/shared/*"],
+      "@/features/*": ["./src/features/*"],
+      "@/store": ["./src/store/store"],
+      "@/store/*": ["./src/store/*"],
+      "@/app/*": ["./src/app/*"],
+      "@/components/*": ["./src/shared/components/*"],
+      "@/hooks/*": ["./src/features/assignment/hooks/*"],
+      "@/services/api": ["./src/shared/services/axios"],
+      "@/services/authService": ["./src/features/auth/api/authService"],
+      "@/services/assignmentService": ["./src/features/assignment/api/assignmentService"],
+      "@/core/utils/*": ["./src/shared/services/*"],
+      "@/core/theme": ["./src/shared/theme"],
+      "@/core/theme/*": ["./src/shared/theme/*"],
+      "@/domain/entities/Driver": ["./src/features/auth/types/Driver"],
+      "@/domain/entities/Assignment": ["./src/features/assignment/types/Assignment"],
+      "@/data/mock/mockDriver": ["./src/features/auth/api/mockDriver"],
+      "@/data/mock/mockAssignments": ["./src/features/assignment/api/mockAssignments"],
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]
 }
