@@ -53,8 +53,11 @@ export function ProofScreen() {
       Toast.show({ type: 'error', text1: 'Delivery photo required', text2: 'Please take a photo before continuing.' });
       return;
     }
-    if (!hasSignature) {
-      Toast.show({ type: 'error', text1: 'Customer signature required' });
+    
+    const requiresSignature = assignment.type !== 'inspection';
+
+    if (requiresSignature && (!hasSignature || !signatureData || signatureData.trim().length < 30)) {
+      Toast.show({ type: 'error', text1: 'Customer signature required', text2: 'Please provide a clearer signature.' });
       return;
     }
 
@@ -62,13 +65,14 @@ export function ProofScreen() {
       await saveProof.mutateAsync({
         id: assignment.id,
         proofPhotoUri: photoUri,
-        signatureUri: signatureData,
+        signatureUri: requiresSignature ? signatureData : undefined,
         deliveryNotes: notes,
       });
       
-      if (assignment.codAmount === 0 || assignment.type === 'pickup') {
-        await completeAssignment.mutateAsync(assignment.id);
-        safeRouter.push({ pathname: '/assignment/[id]/complete', params: { id: assignment.id } });
+      if (assignment.type === 'inspection') {
+        safeRouter.push({ pathname: '/assignment/[id]/remarks', params: { id: assignment.id } });
+      } else if (assignment.codAmount === 0 || assignment.type !== 'delivery') {
+        safeRouter.push({ pathname: '/assignment/[id]/summary', params: { id: assignment.id } });
       } else {
         safeRouter.push({ pathname: '/assignment/[id]/payment', params: { id: assignment.id } });
       }
@@ -92,6 +96,8 @@ export function ProofScreen() {
     }
   };
 
+  const requiresSignature = assignment.type !== 'inspection';
+
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: true, title: `${assignment.code} · ${assignment.customer.name}` }} />
@@ -106,29 +112,31 @@ export function ProofScreen() {
               <MaterialIcons name="photo-camera" size={32} color={colors.textSecondary} />
             )}
             <View style={styles.cameraButton}>
-              <MaterialIcons name="camera-alt" size={18} color={colors.textInverse} />
+               <MaterialIcons name="camera-alt" size={18} color={colors.textInverse} />
             </View>
           </Pressable>
         </Card>
 
-        <Card style={styles.signatureCard}>
-          <View style={styles.signatureHeader}>
-            <Text style={styles.label}>Customer Signature</Text>
-            <Pressable onPress={clearSignature}>
-              <Text style={styles.clearLabel}>Clear</Text>
-            </Pressable>
-          </View>
-          <SignaturePad
-            ref={signaturePadRef}
-            onChange={(has, data) => {
-              setHasSignature(has);
-              setSignatureData(data);
-            }}
-          />
-        </Card>
+        {requiresSignature && (
+          <Card style={styles.signatureCard}>
+            <View style={styles.signatureHeader}>
+              <Text style={styles.label}>Customer Signature</Text>
+              <Pressable onPress={clearSignature}>
+                <Text style={styles.clearLabel}>Clear</Text>
+              </Pressable>
+            </View>
+            <SignaturePad
+              ref={signaturePadRef}
+              onChange={(has, data) => {
+                setHasSignature(has);
+                setSignatureData(data);
+              }}
+            />
+          </Card>
+        )}
 
         <Input
-          label="Delivery Notes (Optional)"
+          label="Notes (Optional)"
           placeholder="Write notes here..."
           multiline
           style={styles.notesInput}

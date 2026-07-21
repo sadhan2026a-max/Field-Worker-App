@@ -20,6 +20,8 @@ interface DashboardHeaderProps {
 }
 
 export function DashboardHeader({ name, isAvailable, onToggleAvailability }: DashboardHeaderProps) {
+  const unreadCount = useAppSelector(selectUnreadCount);
+
   return (
     <View style={styles.row}>
       <View style={styles.textGroup}>
@@ -28,6 +30,15 @@ export function DashboardHeader({ name, isAvailable, onToggleAvailability }: Das
       </View>
       
       <View style={styles.rightActions}>
+        <Pressable style={styles.bellButton} onPress={() => router.push('/notifications')}>
+          <MaterialIcons name="notifications-none" size={26} color={colors.textPrimary} />
+          {unreadCount > 0 && (
+            <View style={styles.badgeContainer}>
+              <Text style={styles.badgeCount}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+            </View>
+          )}
+        </Pressable>
+
         <Pressable
           style={[styles.badge, !isAvailable && styles.badgeOffline]}
           onPress={onToggleAvailability}

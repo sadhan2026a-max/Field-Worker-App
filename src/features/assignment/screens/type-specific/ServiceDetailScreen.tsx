@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, ScrollView } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { safeRouter } from '@/shared/utils/navigation';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { ScreenFooter } from '@/components/ui/ScreenFooter';
@@ -47,7 +48,7 @@ export function ServiceDetailScreen() {
       resolutionNotes,
       partsUsed: parts.length > 0 ? parts : undefined,
     });
-    router.replace(`/assignment/${id}/proof`);
+    safeRouter.push({ pathname: '/assignment/[id]/proof', params: { id: id as string } });
   };
 
   const isFormValid = diagnosisNotes.length > 0 && resolutionNotes.length > 0;

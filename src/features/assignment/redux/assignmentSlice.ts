@@ -1,4 +1,4 @@
-import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
+import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { Assignment, PaymentMode } from '@/domain/entities/Assignment';
 import { DriverWorkspaceSummary } from '@/domain/entities/Driver';
 import * as assignmentService from '@/services/assignmentService';
@@ -46,9 +46,9 @@ export const fetchWorkspaceSummary = createAsyncThunk<DriverWorkspaceSummary, st
   (driverId) => assignmentService.getWorkspaceSummary(driverId),
 );
 
-export const fetchAssignments = createAsyncThunk<Assignment[]>(
+export const fetchAssignments = createAsyncThunk<Assignment[], string | undefined>(
   'assignment/fetchAssignments',
-  async () => assignmentService.getAssignments(),
+  async (status) => assignmentService.getAssignments(status),
 );
 
 export const fetchAssignmentById = createAsyncThunk<Assignment | undefined, string>(
@@ -66,15 +66,29 @@ export const saveDeliveryProof = createAsyncThunk<
   { id: string; proofPhotoUri?: string; signatureUri?: string; deliveryNotes?: string }
 >('assignment/saveDeliveryProof', (params) => assignmentService.saveDeliveryProof(params.id, params));
 
-export const confirmPayment = createAsyncThunk<
-  Assignment,
-  { id: string; paymentMode: PaymentMode; receivedAmount: number }
->('assignment/confirmPayment', (params) => assignmentService.confirmPayment(params.id, params));
+export const confirmPayment = createAsyncThunk(
+  'assignment/confirmPayment',
+  async (
+    params: { id: string; paymentMode: PaymentMode; receivedAmount: number; referenceNumber?: string },
+    { rejectWithValue }
+  ) => {
+    try {
+      return await assignmentService.confirmPayment(params.id, params);
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to confirm payment');
+    }
+  },
+);
 
 export const completeAssignment = createAsyncThunk<Assignment, string>(
   'assignment/completeAssignment',
   (id) => assignmentService.completeAssignment(id),
 );
+
+export const updateOrderItems = createAsyncThunk<
+  Assignment,
+  { id: string; items: { id: string; quantity: number }[] }
+>('assignment/updateOrderItems', (params) => assignmentService.updateOrderItems(params.id, params.items));
 
 export const acceptOffer = createAsyncThunk<Assignment, string>(
   'assignment/acceptOffer',
@@ -108,7 +122,18 @@ export const markArrived = createAsyncThunk<Assignment, string>(
 const assignmentSlice = createSlice({
   name: 'assignment',
   initialState,
-  reducers: {},
+  reducers: {
+    addAssignment: (state, action: PayloadAction<Assignment>) => {
+      upsertAssignment(state, action.payload);
+    },
+    clearError: (state) => {
+      state.error = null;
+    },
+    restoreAssignments: (state, action: PayloadAction<Assignment[]>) => {
+      // Restore assignments from AsyncStorage, merging with existing
+      action.payload.forEach((a) => upsertAssignment(state, a));
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchWorkspaceSummary.pending, (state) => {
@@ -182,7 +207,7 @@ const assignmentSlice = createSlice({
         state.error = action.error.message ?? 'Failed to load assignment';
       });
 
-    for (const thunk of [startAssignment, saveDeliveryProof, confirmPayment, completeAssignment]) {
+    for (const thunk of [startAssignment, saveDeliveryProof, confirmPayment, completeAssignment, updateOrderItems]) {
       builder
         .addCase(thunk.pending, (state) => {
           state.isMutating = true;
@@ -233,6 +258,7 @@ const assignmentSlice = createSlice({
 });
 
 export const assignmentReducer = assignmentSlice.reducer;
+export const { addAssignment, clearError, restoreAssignments } = assignmentSlice.actions;
 
 // ─── Selectors ────────────────────────────────────────────────────────────────
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, ScrollView, ActivityIndicator } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { safeRouter } from '@/shared/utils/navigation';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { ScreenFooter } from '@/components/ui/ScreenFooter';
@@ -27,7 +28,7 @@ export function ReturnDetailScreen() {
   const handleContinue = async () => {
     if (!selectedReasonId) return;
     await saveReturnDetail(id as string, { returnReasonOptionId: selectedReasonId, conditionNotes });
-    router.replace(`/assignment/${id}/proof`);
+    safeRouter.push({ pathname: '/assignment/[id]/proof', params: { id: id as string } });
   };
 
   if (isLoading) {

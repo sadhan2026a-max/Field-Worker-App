@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { safeRouter } from '@/shared/utils/navigation';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { ScreenFooter } from '@/components/ui/ScreenFooter';
@@ -15,9 +16,7 @@ export function InspectionRemarksScreen() {
   const [remarks, setRemarks] = useState('');
 
   const handleComplete = async () => {
-    // In a real app we'd save this to the API. For now we just go to complete step.
-    // Wait, inspection skips signature, goes to Complete.
-    router.replace(`/assignment/${id}/complete`);
+    safeRouter.push({ pathname: '/assignment/[id]/summary', params: { id: id as string } });
   };
 
   return (

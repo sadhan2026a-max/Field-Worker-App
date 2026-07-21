@@ -35,7 +35,7 @@ export function CompleteScreen() {
 
       <View style={styles.summary}>
         <Text style={styles.summaryLabel}>COD Collected</Text>
-        <Text style={styles.summaryValue}>₹{(assignment.receivedAmount ?? assignment.codAmount).toLocaleString()}</Text>
+        <Text style={styles.summaryValue}>₹{((assignment.receivedAmount ?? assignment.codAmount) ?? 0).toLocaleString()}</Text>
       </View>
       <View style={styles.summary}>
         <Text style={styles.summaryLabel}>Delivered On</Text>

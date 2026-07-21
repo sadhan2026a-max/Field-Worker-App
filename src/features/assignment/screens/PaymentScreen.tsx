@@ -1,5 +1,5 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button } from '@/components/ui/Button';
@@ -9,7 +9,8 @@ import { ScreenLoader } from '@/components/ui/ScreenLoader';
 import { ScreenFooter } from '@/components/ui/ScreenFooter';
 import { colors, radius, spacing, typography } from '@/core/theme';
 import { PaymentMode } from '@/domain/entities/Assignment';
-import { useAssignment, useCompleteAssignment, useConfirmPayment } from '@/hooks/useAssignments';
+import { useAssignment, useConfirmPayment } from '@/hooks/useAssignments';
+import { safeRouter } from '@/shared/utils/navigation';
 
 const PAYMENT_MODES: { key: PaymentMode; label: string; icon: keyof typeof MaterialIcons.glyphMap }[] = [
   { key: 'cash', label: 'Cash', icon: 'payments' },
@@ -21,10 +22,10 @@ export function PaymentScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: assignment, isLoading } = useAssignment(id);
   const confirmPayment = useConfirmPayment();
-  const completeAssignment = useCompleteAssignment();
 
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('cash');
   const [receivedAmount, setReceivedAmount] = useState<string | null>(null);
+  const [referenceNumber, setReferenceNumber] = useState('');
   const [notes, setNotes] = useState('');
 
   if (isLoading || !assignment) {
@@ -32,15 +33,18 @@ export function PaymentScreen() {
   }
 
   const amountValue = receivedAmount ?? String(assignment.codAmount);
+  const numericAmount = Number(amountValue) || 0;
+  const isPartial = numericAmount < assignment.codAmount;
 
   const onConfirmPayment = async () => {
     await confirmPayment.mutateAsync({
       id: assignment.id,
       paymentMode,
-      receivedAmount: Number(amountValue) || 0,
+      receivedAmount: numericAmount,
+      referenceNumber: paymentMode !== 'cash' ? referenceNumber : undefined,
     });
-    await completeAssignment.mutateAsync(assignment.id);
-    router.push({ pathname: '/assignment/[id]/complete', params: { id: assignment.id } });
+    
+    safeRouter.push({ pathname: '/assignment/[id]/summary', params: { id: assignment.id } });
   };
 
   return (
@@ -50,8 +54,8 @@ export function PaymentScreen() {
         <Text style={styles.sectionTitle}>Payment Collection</Text>
 
         <Card style={styles.codCard}>
-          <Text style={styles.label}>Collect COD</Text>
-          <Text style={styles.codAmount}>₹{assignment.codAmount.toLocaleString()}</Text>
+          <Text style={styles.label}>Expected COD Amount</Text>
+          <Text style={styles.codAmount}>₹{(assignment.codAmount ?? 0).toLocaleString()}</Text>
         </Card>
 
         <View>
@@ -74,11 +78,20 @@ export function PaymentScreen() {
         </View>
 
         <Input
-          label="Received Amount"
+          label="Collected Amount"
           keyboardType="numeric"
           value={amountValue}
           onChangeText={setReceivedAmount}
         />
+
+        {paymentMode !== 'cash' && (
+          <Input
+            label="Reference Number"
+            placeholder="Enter transaction ID or reference"
+            value={referenceNumber}
+            onChangeText={setReferenceNumber}
+          />
+        )}
 
         <Input
           label="Customer Notes"
@@ -92,9 +105,9 @@ export function PaymentScreen() {
 
       <ScreenFooter>
         <Button
-          label="Confirm Payment"
+          label={isPartial ? `Mark as Partially Collected (₹${numericAmount})` : 'Mark as Collected'}
           onPress={onConfirmPayment}
-          loading={confirmPayment.isPending || completeAssignment.isPending}
+          loading={confirmPayment.isPending}
         />
       </ScreenFooter>
     </View>

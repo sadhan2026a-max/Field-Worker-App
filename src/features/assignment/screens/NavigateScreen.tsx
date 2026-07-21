@@ -71,7 +71,7 @@ export function NavigateScreen() {
               </View>
               <View>
                 <Text style={styles.metaLabel}>COLLECT</Text>
-                <Text style={styles.metaValue}>₹{assignment.codAmount.toLocaleString()}</Text>
+                <Text style={styles.metaValue}>₹{(assignment.codAmount ?? 0).toLocaleString()}</Text>
               </View>
             </View>
           </View>

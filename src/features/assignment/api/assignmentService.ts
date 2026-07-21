@@ -102,6 +102,13 @@ function mapOrderDtoToAssignment(order: OrderDto, offerId?: string): Assignment 
       sortOrder: item.sortOrder,
       checkedAt: item.checkedAt,
     })),
+    items: order.items?.map((item) => ({
+      id: item.id,
+      description: item.description,
+      quantity: item.quantity,
+      unitName: item.unitName,
+      unitPrice: item.unitPrice,
+    })),
     returnDetail: order.returnDetail
       ? { returnReasonOptionId: order.returnDetail.returnReasonOptionId, conditionNotes: order.returnDetail.conditionNotes }
       : undefined,
@@ -129,8 +136,23 @@ function mapOrderDtoToAssignment(order: OrderDto, offerId?: string): Assignment 
 }
 
 async function fetchOrderAsAssignment(id: string, offerId?: string): Promise<Assignment> {
-  const response = await api.get<OrderDto>(`/api/v1/orders/${id}`);
-  return mapOrderDtoToAssignment(response.data, offerId);
+  const [orderResponse, historyResponse] = await Promise.all([
+    api.get<OrderDto>(`/api/v1/orders/${id}`),
+    api.get<any[]>(`/api/v1/orders/${id}/history`).catch((e) => {
+      logger.warn('assignment', `Failed to fetch history for order ${id}`, e);
+      return { data: [] };
+    })
+  ]);
+  
+  const assignment = mapOrderDtoToAssignment(orderResponse.data, offerId);
+  
+  assignment.timeline = (historyResponse.data || []).map((h) => ({
+    status: h.toStatus || h.fromStatus || 'Pending',
+    timestamp: h.createdAt,
+    notes: h.notes,
+  }));
+  
+  return assignment;
 }
 
 export async function getWorkspaceSummary(driverId: string): Promise<DriverWorkspaceSummary> {
@@ -165,17 +187,25 @@ export async function getWorkspaceSummary(driverId: string): Promise<DriverWorks
   return summary;
 }
 
-export async function getAssignments(status?: Assignment['status']): Promise<Assignment[]> {
+export async function getAssignments(status?: Assignment['status'] | string): Promise<Assignment[]> {
   logger.debug('assignment', 'Fetching assignments via API', { status });
 
   let offers: any[] = [];
 
   try {
-    const response = await api.get('/api/v1/driver/assignments');
+    const backendStatus = status ? status.charAt(0).toUpperCase() + status.slice(1) : undefined;
+    
+    // If asking for completed, let's try the generic orders endpoint just in case it works!
+    let url = backendStatus ? `/api/v1/driver/assignments?status=${backendStatus}` : '/api/v1/driver/assignments';
+    if (status === 'completed') {
+      url = '/api/v1/orders?status=Completed';
+    }
+    
+    const response = await api.get(url);
     offers = Array.isArray(response.data) ? response.data : (response.data?.items || []);
-    logger.debug('assignment', 'RAW OFFERS FROM API:', JSON.stringify(offers.slice(0, 2)));
-  } catch (e) {
-    logger.warn('assignment', 'Failed to fetch driver assignments (offers)', e);
+    logger.debug('assignment', `RAW OFFERS FROM API (${backendStatus || 'all'}):`, JSON.stringify(offers.slice(0, 2)));
+  } catch (e: any) {
+    logger.warn('assignment', `Failed to fetch driver assignments. Status code: ${e?.response?.status}`, e);
   }
 
   const validOffers = Array.isArray(offers) ? offers.filter((i) => i && i.id && (i.orderId || i.orderNumber)) : [];
@@ -190,9 +220,15 @@ export async function getAssignments(status?: Assignment['status']): Promise<Ass
   // GET /api/v1/orders (bulk list) is admin/dispatcher-only and 403s for a driver, so
   // each order is enriched individually via GET /api/v1/orders/{id} (self-service read),
   // which carries the real customer/type/checklist data the offers endpoint doesn't have.
+  // We only enrich if the offer is already accepted, otherwise the backend will return a 403.
   const enriched = await Promise.allSettled(
     uniqueOffers.map((offer) => {
       const orderId = offer.orderId || offer.id;
+      const os = offer.status?.toLowerCase();
+      // If it's merely offered, don't try to fetch the order detail, it will 403.
+      if (os === 'offered' || os === 'pending') {
+        return Promise.reject(new Error('Skip fetch for pending offer to avoid 403'));
+      }
       return api.get<OrderDto>(`/api/v1/orders/${orderId}`);
     })
   );
@@ -205,7 +241,10 @@ export async function getAssignments(status?: Assignment['status']): Promise<Ass
       return mapOrderDtoToAssignment(result.value.data, offer.orderId ? offer.id : undefined);
     }
 
-    logger.warn('assignment', `Failed to enrich order ${orderId} from offer`, result.reason);
+    // Only log warning if it was a real network error, not our deliberate skip
+    if (result.reason?.message !== 'Skip fetch for pending offer to avoid 403') {
+      logger.warn('assignment', `Failed to enrich order ${orderId} from offer`, result.reason);
+    }
 
     // Fallback: bare offer data only (no customer/type detail available)
     let mappedStatus: Assignment['status'] = 'pending';
@@ -356,7 +395,11 @@ export async function saveDeliveryProof(
   formData.append('Lng', '0');
 
   await api.post<ProofOfDeliveryDto>(`/api/v1/orders/${id}/proof`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+    headers: {
+      'Accept': 'application/json',
+      // DO NOT manually set Content-Type to multipart/form-data here, 
+      // as it overrides the boundary generated by React Native.
+    },
   });
 
   logger.info('assignment', 'Delivery proof saved', { id });
@@ -365,13 +408,14 @@ export async function saveDeliveryProof(
 
 export async function confirmPayment(
   id: string,
-  payment: { paymentMode: PaymentMode; receivedAmount: number },
+  payment: { paymentMode: PaymentMode; receivedAmount: number; referenceNumber?: string },
 ): Promise<Assignment> {
   logger.info('assignment', 'Confirming payment', { id, ...payment });
   await api.post(`/api/v1/orders/${id}/payment`, {
     mode: PAYMENT_MODE_MAP[payment.paymentMode],
     collectedAmount: payment.receivedAmount,
     tipAmount: 0,
+    referenceNumber: payment.referenceNumber,
   });
   logger.info('assignment', 'Payment confirmed', { id, mode: payment.paymentMode, amount: payment.receivedAmount });
   return fetchOrderAsAssignment(id);
@@ -476,4 +520,15 @@ export async function acceptOrderByQrToken(token: string): Promise<QrAcceptRespo
   logger.info('assignment', 'Accepting order by QR token');
   const response = await api.post<QrAcceptResponse>(`/api/v1/qr/${encodeURIComponent(token)}/accept`, {});
   return response.data;
+}
+
+export async function updateOrderItems(
+  id: string,
+  items: { id: string; quantity: number }[]
+): Promise<Assignment> {
+  logger.info('assignment', 'Updating order items', { id, itemCount: items.length });
+  const response = await api.patch<OrderDto>(`/api/v1/orders/${id}`, {
+    items: items,
+  });
+  return mapOrderDtoToAssignment(response.data);
 }

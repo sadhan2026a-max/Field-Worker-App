@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Assignment, PaymentMode } from '@/domain/entities/Assignment';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   completeAssignment as completeAssignmentThunk,
   confirmPayment as confirmPaymentThunk,
@@ -20,6 +21,8 @@ import {
   declineOffer as declineOfferThunk,
   startNavigation as startNavigationThunk,
   markArrived as markArrivedThunk,
+  updateOrderItems as updateOrderItemsThunk,
+  restoreAssignments,
 } from '@/features/assignment/redux/assignmentSlice';
 
 export function useWorkspaceSummary() {
@@ -45,16 +48,29 @@ export function useWorkspaceSummary() {
   return { data: summary, isLoading: status === 'idle' || status === 'loading', refetch };
 }
 
-export function useAssignments(status?: Assignment['status']) {
+export function useAssignments(status?: Assignment['status'] | string) {
   const dispatch = useAppDispatch();
   const items = useAppSelector(selectAssignments);
   const listStatus = useAppSelector(selectListStatus);
 
   useEffect(() => {
-    dispatch(fetchAssignmentsThunk());
-  }, [dispatch]);
+    // Load persisted assignments
+    AsyncStorage.getItem('persisted_assignments')
+      .then((data) => {
+        if (data) {
+          const parsed = JSON.parse(data);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            dispatch(restoreAssignments(parsed));
+          }
+        }
+      })
+      .catch(console.error)
+      .finally(() => {
+        dispatch(fetchAssignmentsThunk(status));
+      });
+  }, [dispatch, status]);
 
-  const refetch = () => dispatch(fetchAssignmentsThunk()).unwrap();
+  const refetch = () => dispatch(fetchAssignmentsThunk(status)).unwrap();
 
   const data = status ? items.filter((item) => item.status === status) : items;
   return { data, isLoading: listStatus === 'idle' || listStatus === 'loading', refetch };
@@ -127,8 +143,19 @@ export function useConfirmPayment() {
 
   return {
     isPending,
-    mutateAsync: (params: { id: string; paymentMode: PaymentMode; receivedAmount: number }) =>
+    mutateAsync: (params: { id: string; paymentMode: PaymentMode; receivedAmount: number; referenceNumber?: string }) =>
       dispatch(confirmPaymentThunk(params)).unwrap(),
+  };
+}
+
+export function useUpdateOrderItems() {
+  const dispatch = useAppDispatch();
+  const isPending = useAppSelector(selectIsMutating);
+
+  return {
+    isPending,
+    mutateAsync: (params: { id: string; items: { id: string; quantity: number }[] }) =>
+      dispatch(updateOrderItemsThunk(params)).unwrap(),
   };
 }
 

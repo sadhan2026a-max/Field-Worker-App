@@ -16,6 +16,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as SplashScreen from 'expo-splash-screen';
 import { Text, View, ScrollView, StyleSheet } from 'react-native';
 import { colors, typography, FontSize } from '@/core/theme';
+import { TabletWrapper } from '@/shared/components/ui/TabletWrapper';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -248,25 +249,27 @@ export default function RootLayout() {
           <SafeAreaProvider>
             <AppBootstrap>
               <StatusBar style="dark" />
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  headerShadowVisible: false,
-                  headerStyle: {
-                    backgroundColor: colors.background,
-                  },
-                  headerTitleStyle: {
-                    ...typography.h3,
-                    fontSize: FontSize.medium,
-                  },
-                  headerTintColor: colors.textPrimary,
-                }}
-              >
-                <Stack.Screen name="index" />
-                <Stack.Screen name="auth" />
-                <Stack.Screen name="(tabs)" />
-                <Stack.Screen name="assignment/[id]" options={{ headerShown: false }} />
-              </Stack>
+              <TabletWrapper>
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                    headerShadowVisible: false,
+                    headerStyle: {
+                      backgroundColor: colors.background,
+                    },
+                    headerTitleStyle: {
+                      ...typography.h3,
+                      fontSize: FontSize.medium,
+                    },
+                    headerTintColor: colors.textPrimary,
+                  }}
+                >
+                  <Stack.Screen name="index" />
+                  <Stack.Screen name="auth" />
+                  <Stack.Screen name="(tabs)" />
+                  <Stack.Screen name="assignment/[id]" options={{ headerShown: false }} />
+                </Stack>
+              </TabletWrapper>
               <Toast position="bottom" bottomOffset={0} config={toastConfig} />
             </AppBootstrap>
           </SafeAreaProvider>

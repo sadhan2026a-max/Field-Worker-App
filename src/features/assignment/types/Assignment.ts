@@ -69,6 +69,14 @@ export interface PartUsed {
   unitPrice: number;
 }
 
+export interface AssignmentItem {
+  id: string;
+  description: string;
+  quantity: number;
+  unitName: string;
+  unitPrice: number;
+}
+
 export interface ServiceDetail {
   complaintDescription?: string;
   productRef?: string;
@@ -113,10 +121,12 @@ export interface Assignment {
   deliveryNotes?: string;
   paymentMode?: PaymentMode;
   receivedAmount?: number;
+  paymentReferenceNumber?: string;
   returnDetail?: ReturnDetail;
   serviceDetail?: ServiceDetail;
   salesDetail?: SalesDetail;
   checklist?: ChecklistItem[];
+  items?: AssignmentItem[];
 }
 
 export interface AssignmentOffer {

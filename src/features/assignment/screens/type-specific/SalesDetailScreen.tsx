@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, ScrollView, Platform } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { safeRouter } from '@/shared/utils/navigation';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { ScreenFooter } from '@/components/ui/ScreenFooter';
@@ -12,7 +13,6 @@ import { SalesOutcome } from '@/features/assignment/types/Assignment';
 export function SalesDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: assignment } = useAssignment(id as string);
-  const completeAssignment = useCompleteAssignment();
   
   const [meetingNotes, setMeetingNotes] = useState('');
   const [outcome, setOutcome] = useState<SalesOutcome | ''>('');
@@ -37,8 +37,7 @@ export function SalesDetailScreen() {
     });
     
     // Sales skips proof/payment entirely
-    await completeAssignment.mutateAsync(id as string);
-    router.replace(`/assignment/${id}/complete`);
+    safeRouter.push({ pathname: '/assignment/[id]/summary', params: { id: id as string } });
   };
 
   const isValidDate = (dateString: string) => {
@@ -101,10 +100,9 @@ export function SalesDetailScreen() {
       
       <ScreenFooter>
         <Button 
-          label="Complete Visit" 
+          label="Review Job" 
           onPress={handleComplete} 
           disabled={!isFormValid} 
-          loading={completeAssignment.isPending}
         />
       </ScreenFooter>
     </SafeAreaView>

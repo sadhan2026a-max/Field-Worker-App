@@ -11,7 +11,9 @@ import { Card } from '@/components/ui/Card';
 import { colors, spacing, typography, palette, FontFamily, FontSize } from '@/core/theme';
 import { useAssignments } from '@/hooks/useAssignments';
 import { previewOrderByQrToken, acceptOrderByQrToken } from '@/features/assignment/api/assignmentService';
-import { QrOrderSummaryDto } from '@/features/assignment/types/Assignment';
+import { QrOrderSummaryDto, Assignment } from '@/features/assignment/types/Assignment';
+import { useAppDispatch } from '@/store/hooks';
+import { addAssignment } from '@/features/assignment/redux/assignmentSlice';
 
 /** Extracts the QR token whether the code encodes the raw token or a URL ending in it. */
 function extractToken(scanned: string): string {
@@ -24,6 +26,7 @@ function extractToken(scanned: string): string {
 export function ScanQrScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const { refetch: refetchAssignments } = useAssignments();
+  const dispatch = useAppDispatch();
 
   const [status, setStatus] = useState<'scanning' | 'loading' | 'previewing' | 'accepting'>('scanning');
   const [token, setToken] = useState<string | null>(null);
@@ -67,7 +70,32 @@ export function ScanQrScreen() {
     setStatus('accepting');
     try {
       const result = await acceptOrderByQrToken(token);
+      
+      const newAssignment = {
+        id: result.orderId,
+        code: result.orderNumber,
+        type: preview?.orderType?.toLowerCase() === 'pickup' ? 'pickup' : 'delivery',
+        status: 'accepted',
+        customer: {
+          name: 'Customer',
+          phone: 'N/A',
+          address: preview?.pickupAddress || preview?.deliveryAddress || 'Address will be available shortly',
+          location: { latitude: 0, longitude: 0 },
+        },
+        date: new Date().toISOString(),
+        distanceKm: 0,
+        amount: preview?.totalAmount,
+        codAmount: 0,
+        checklistTemplate: [],
+        items: [],
+        timeline: [],
+        createdAt: new Date().toISOString(),
+      } as Assignment;
+      
+      dispatch(addAssignment(newAssignment));
+
       Toast.show({ type: 'success', text1: 'Order assigned to you', text2: result.orderNumber });
+      // Don't rely purely on refetchAssignments because the endpoint only returns pending offers
       refetchAssignments();
       router.replace({ pathname: '/assignment/[id]', params: { id: result.orderId } });
     } catch (e: any) {
@@ -136,7 +164,7 @@ export function ScanQrScreen() {
               {(preview.deliveryAddress || preview.pickupAddress) && (
                 <Text style={styles.previewAddress}>{preview.deliveryAddress || preview.pickupAddress}</Text>
               )}
-              <Text style={styles.previewAmount}>₹{preview.totalAmount.toLocaleString('en-IN')}</Text>
+              <Text style={styles.previewAmount}>₹{(preview.totalAmount ?? 0).toLocaleString('en-IN')}</Text>
 
               <View style={styles.previewActions}>
                 <Button

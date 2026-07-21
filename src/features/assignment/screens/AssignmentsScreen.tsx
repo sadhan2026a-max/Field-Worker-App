@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { router } from 'expo-router';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,8 +7,9 @@ import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { colors, spacing, typography, palette, FontFamily, FontSize } from '@/core/theme';
 import { useAssignments } from '@/hooks/useAssignments';
-import { useAppSelector } from '@/store/hooks';
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { selectDriver } from '@/features/auth/redux/authSlice';
+import { fetchAssignments } from '@/features/assignment/redux/assignmentSlice';
 import { useCurrentLocation, calculateDistanceKm } from '@/shared/utils/location';
 import { DistanceDisplay } from '@/features/assignment/components';
 
@@ -42,9 +43,16 @@ function formatAssignmentType(type: string) {
 
 export function AssignmentsScreen() {
   const driver = useAppSelector(selectDriver);
+  const dispatch = useAppDispatch();
   const { data: assignments, isLoading, refetch } = useAssignments();
   const currentLocation = useCurrentLocation();
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'completed'>('all');
+
+  useEffect(() => {
+    if (activeTab === 'completed') {
+      dispatch(fetchAssignments('completed'));
+    }
+  }, [activeTab, dispatch]);
 
   const allAssignments = assignments ?? [];
   const pendingAssignments = allAssignments.filter(
@@ -163,7 +171,7 @@ export function AssignmentsScreen() {
                 })()}
                 <View style={styles.codContainer}>
                   <Text style={styles.codLabel}>
-                    COD: ₹{item.codAmount.toLocaleString()}
+                    COD: ₹{(item.codAmount ?? 0).toLocaleString()}
                   </Text>
                 </View>
               </View>
@@ -189,7 +197,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   title: {
-    ...typography.h1,
+    ...typography.h2,
+    color: colors.textPrimary,
   },
   onlineBadge: {
     flexDirection: 'row',

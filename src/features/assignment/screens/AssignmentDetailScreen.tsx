@@ -186,7 +186,7 @@ export function AssignmentDetailScreen() {
       if (assignment.status === 'arrived') {
         await startAssignment.mutateAsync(assignment.id);
         Toast.show({ type: 'success', text1: 'Job Started' });
-        
+
         // If type is 'other', just stay on this screen (now in_progress)
         if (assignment.type === 'other') {
           return;
@@ -348,10 +348,10 @@ export function AssignmentDetailScreen() {
         <Card style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Order Details</Text>
           <Text style={styles.orderSummary}>
-            {assignment.itemCount > 0 ? `${assignment.itemCount} items` : 'No items'} • Total ₹{assignment.totalAmount.toLocaleString()}
+            {assignment.itemCount > 0 ? `${assignment.itemCount} items` : 'No items'} • Total ₹{(assignment.totalAmount ?? 0).toLocaleString()}
           </Text>
           <Text style={styles.codSummary}>
-            COD: ₹{assignment.codAmount.toLocaleString()}
+            COD: ₹{(assignment.codAmount ?? 0).toLocaleString()}
           </Text>
         </Card>
 
@@ -362,6 +362,32 @@ export function AssignmentDetailScreen() {
             {assignment.deliveryInstructions || 'Please call before delivery.'}
           </Text>
         </Card>
+
+        {/* Order History / Timeline Card */}
+        {assignment.timeline && assignment.timeline.length > 0 && (
+          <Card style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Order History</Text>
+            <View style={styles.timelineContainer}>
+              {assignment.timeline.map((item, index) => (
+                <View key={index} style={styles.timelineItem}>
+                  <View style={styles.timelineIconContainer}>
+                    <View style={styles.timelineDot} />
+                    {index < assignment.timeline.length - 1 && <View style={styles.timelineLine} />}
+                  </View>
+                  <View style={styles.timelineContent}>
+                    <Text style={styles.timelineStatus}>{item.status}</Text>
+                    <Text style={styles.timelineTime}>
+                      {new Date(item.timestamp).toLocaleString(undefined, {
+                        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                      })}
+                    </Text>
+                    {!!item.notes && <Text style={styles.timelineNotes}>{item.notes}</Text>}
+                  </View>
+                </View>
+              ))}
+            </View>
+          </Card>
+        )}
 
         {/* Quick Actions Grid */}
         {!isAssignedToOther && (
@@ -485,6 +511,7 @@ const styles = StyleSheet.create({
   },
   customerInfo: {
     justifyContent: 'center',
+    alignItems: 'center',
     gap: 2,
   },
   customerName: {
@@ -608,5 +635,49 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: colors.textPrimary,
     textAlign: 'center',
+  },
+  timelineContainer: {
+    marginTop: spacing.sm,
+  },
+  timelineItem: {
+    flexDirection: 'row',
+  },
+  timelineIconContainer: {
+    alignItems: 'center',
+    width: 24,
+    marginRight: spacing.sm,
+  },
+  timelineDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: palette.green,
+    marginTop: 4,
+  },
+  timelineLine: {
+    flex: 1,
+    width: 2,
+    backgroundColor: palette.grey200,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  timelineContent: {
+    flex: 1,
+    paddingBottom: spacing.lg,
+  },
+  timelineStatus: {
+    ...typography.bodyMedium,
+    fontFamily: FontFamily.semiBold,
+  },
+  timelineTime: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  timelineNotes: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+    marginTop: 2,
   },
 });

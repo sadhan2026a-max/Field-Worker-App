@@ -244,6 +244,10 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
+  rightLabelContainer: {
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+  },
   inputFieldContainer: {
     flexDirection: 'row',
     alignItems: 'center',
