@@ -127,6 +127,7 @@ export interface Assignment {
   salesDetail?: SalesDetail;
   checklist?: ChecklistItem[];
   items?: AssignmentItem[];
+  timeline?: { status: string; timestamp: string; notes?: string; }[];
 }
 
 export interface AssignmentOffer {

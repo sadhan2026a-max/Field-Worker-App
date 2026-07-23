@@ -48,7 +48,7 @@ export default function ProfileScreen() {
         <Text style={styles.title}>My Profile</Text>
       </View>
 
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.green]} tintColor={palette.green} />}
       >
@@ -70,22 +70,22 @@ export default function ProfileScreen() {
             <Card style={styles.sectionCard}>
               <Text style={styles.sectionTitle}>Today's Performance</Text>
               <View style={styles.statsGrid}>
-                <StatTile 
-                  value={workspaceSummary?.completedCount?.toString() || '0'} 
-                  label="Completed" 
-                  color={palette.green} 
+                <StatTile
+                  value={workspaceSummary?.completedCount?.toString() || '0'}
+                  label="Completed"
+                  color={palette.green}
                   icon={<MaterialIcons name="check-circle" size={24} color={palette.green} />}
                 />
-                <StatTile 
-                  value={workspaceSummary?.pendingCount?.toString() || '0'} 
-                  label="Pending" 
-                  color={palette.orange} 
+                <StatTile
+                  value={workspaceSummary?.pendingCount?.toString() || '0'}
+                  label="Pending"
+                  color={palette.orange}
                   icon={<MaterialIcons name="pending-actions" size={24} color={palette.orange} />}
                 />
-                <StatTile 
-                  value={`₹${(workspaceSummary?.codCollection || 0).toLocaleString()}`} 
-                  label="COD Collected" 
-                  color={palette.blue} 
+                <StatTile
+                  value={`₹${(workspaceSummary?.codCollection || 0).toLocaleString()}`}
+                  label="COD Collected"
+                  color={palette.blue}
                   icon={<MaterialIcons name="payments" size={24} color={palette.blue} />}
                 />
               </View>
@@ -94,7 +94,7 @@ export default function ProfileScreen() {
             {/* Account Details */}
             <Card style={styles.sectionCard}>
               <Text style={styles.sectionTitle}>Account Details</Text>
-              
+
               <View style={styles.detailRow}>
                 <View style={styles.detailIcon}>
                   <MaterialIcons name="badge" size={20} color={colors.textSecondary} />
@@ -108,9 +108,9 @@ export default function ProfileScreen() {
                   </View>
                 </View>
               </View>
-              
+
               <View style={styles.divider} />
-              
+
               <View style={styles.detailRow}>
                 <View style={styles.detailIcon}>
                   <MaterialIcons name="local-shipping" size={20} color={colors.textSecondary} />
@@ -134,9 +134,9 @@ export default function ProfileScreen() {
                   </View>
                 </View>
               </View>
-              
+
               <View style={styles.divider} />
-              
+
               <View style={styles.detailRow}>
                 <View style={styles.detailIcon}>
                   <MaterialIcons name="business" size={20} color={colors.textSecondary} />
@@ -160,10 +160,10 @@ export default function ProfileScreen() {
 
         <View style={styles.spacer} />
 
-        <Button 
-          label="Log Out" 
-          variant="outline" 
-          onPress={logout} 
+        <Button
+          label="Log Out"
+          variant="outline"
+          onPress={logout}
           style={styles.logoutBtn}
           textStyle={styles.logoutLabel}
           icon={<MaterialIcons name="logout" size={18} color={palette.red} />}
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   sectionTitle: {
-    ...typography.h4,
+    ...typography.h3,
     color: colors.textPrimary,
     marginBottom: spacing.md,
   },
@@ -310,7 +310,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: {
-    ...typography.bodyLarge,
+    ...typography.bodyMedium,
+    color: colors.textSecondary,
+  },
+  logoutText: {
+    ...typography.bodyMedium,
     color: colors.textSecondary,
   },
   spacer: {

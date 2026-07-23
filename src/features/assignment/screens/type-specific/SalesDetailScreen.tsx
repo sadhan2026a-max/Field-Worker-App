@@ -126,11 +126,11 @@ const styles = StyleSheet.create({
     ...typography.body,
   },
   inputError: {
-    borderColor: colors.error || '#FF3B30',
+    borderColor: colors.danger || '#FF3B30',
   },
   errorText: {
     ...typography.caption,
-    color: colors.error || '#FF3B30',
+    color: colors.danger || '#FF3B30',
     marginTop: spacing.xs,
   },
   textArea: {

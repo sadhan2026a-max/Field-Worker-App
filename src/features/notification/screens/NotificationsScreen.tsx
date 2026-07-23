@@ -162,8 +162,8 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   unreadCard: {
-    backgroundColor: palette.blue50,
-    borderColor: palette.blue100,
+    backgroundColor: colors.infoLight,
+    borderColor: colors.border,
   },
   iconContainer: {
     paddingTop: 2,

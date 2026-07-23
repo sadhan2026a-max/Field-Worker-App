@@ -82,7 +82,7 @@ export function WorkspaceScreen() {
         {((isSummaryLoading || isAssignmentsLoading) && !refreshing) ? (
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 100 }}>
             <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={{ marginTop: spacing.md, color: colors.textSecondary, ...typography.bodyMedium }}>
+            <Text style={[typography.bodyMedium, { marginTop: spacing.md, color: colors.textSecondary }]}>
               Loading workspace...
             </Text>
           </View>

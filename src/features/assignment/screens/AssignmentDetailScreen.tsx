@@ -372,7 +372,7 @@ export function AssignmentDetailScreen() {
                 <View key={index} style={styles.timelineItem}>
                   <View style={styles.timelineIconContainer}>
                     <View style={styles.timelineDot} />
-                    {index < assignment.timeline.length - 1 && <View style={styles.timelineLine} />}
+                    {index < assignment.timeline!.length - 1 && <View style={styles.timelineLine} />}
                   </View>
                   <View style={styles.timelineContent}>
                     <Text style={styles.timelineStatus}>{item.status}</Text>

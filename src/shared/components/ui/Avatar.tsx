@@ -10,10 +10,6 @@ interface AvatarProps {
   style?: ViewStyle;
 }
 
-/**
- * Circular avatar showing the first letter of a name.
- * Uses brand primary colour scheme by default.
- */
 export function Avatar({ name, size = 44, style }: AvatarProps) {
   const initial = name?.charAt(0).toUpperCase() ?? '?';
   const fontSize = Math.round(size * 0.4);

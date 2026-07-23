@@ -28,7 +28,7 @@ export function DashboardHeader({ name, isAvailable, onToggleAvailability }: Das
         <Text style={styles.greeting}>{getTimeGreeting()}</Text>
         <Text style={styles.name}>{name} 👋</Text>
       </View>
-      
+
       <View style={styles.rightActions}>
         <Pressable style={styles.bellButton} onPress={() => router.push('/notifications')}>
           <MaterialIcons name="notifications-none" size={26} color={colors.textPrimary} />

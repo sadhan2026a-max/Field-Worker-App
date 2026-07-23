@@ -90,7 +90,7 @@ export function ScanQrScreen() {
         items: [],
         timeline: [],
         createdAt: new Date().toISOString(),
-      } as Assignment;
+      } as unknown as Assignment;
       
       dispatch(addAssignment(newAssignment));
 
