@@ -1,6 +1,6 @@
 import React from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, Platform } from 'react-native';
 import { colors, spacing, shadows, FontFamily } from '@/core/theme';
 
 interface StatCardProps {
@@ -18,12 +18,26 @@ export function StatCard({ icon, value, label, tint, tintLight, variant = 'compa
   const isWide = variant === 'wide';
   const isDashboard = variant === 'dashboard';
 
+  if (isDashboard) {
+    return (
+      <View style={[styles.dashboardCard, styles.cardShadow]}>
+        <View style={styles.dashboardContent}>
+          <View style={styles.dashboardTopRow}>
+            {icon && (
+              <View style={[styles.dashboardIconChip, { backgroundColor: tintLight }]}>
+                <MaterialIcons name={icon} size={16} color={tint} />
+              </View>
+            )}
+            <Text style={[styles.dashboardValue, valueColor && { color: valueColor }]} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
+          </View>
+          <Text style={styles.dashboardLabel} numberOfLines={1}>{label}</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
-    <View style={[
-      styles.card, 
-      !isDashboard && shadows.card,
-      isDashboard && { backgroundColor: tintLight, padding: 12 }
-    ]}>
+    <View style={[styles.card, shadows.card]}>
       {isWide ? (
         <View style={styles.headerWide}>
           {icon && (
@@ -41,12 +55,11 @@ export function StatCard({ icon, value, label, tint, tintLight, variant = 'compa
         ) : null
       )}
       <Text style={[
-        styles.value, 
-        isWide && styles.valueWide, 
-        isDashboard && styles.valueDashboard,
+        styles.value,
+        isWide && styles.valueWide,
         valueColor && { color: valueColor }
       ]}>{value}</Text>
-      {!isWide ? <Text style={[styles.label, isDashboard && styles.labelDashboard]}>{label}</Text> : null}
+      {!isWide ? <Text style={styles.label}>{label}</Text> : null}
     </View>
   );
 }
@@ -58,6 +71,52 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 10,
     alignItems: 'flex-start',
+  },
+  dashboardCard: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+  },
+  cardShadow: {
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.04,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 1,
+      },
+    }),
+  },
+  dashboardContent: {
+    padding: 12,
+    alignItems: 'flex-start',
+  },
+  dashboardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  dashboardIconChip: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dashboardValue: {
+    fontSize: 18,
+    fontFamily: FontFamily.bold,
+    color: '#101828',
+    flexShrink: 1,
+  },
+  dashboardLabel: {
+    fontSize: 11,
+    fontFamily: FontFamily.bold,
+    color: '#374151',
   },
   headerWide: {
     flexDirection: 'row',
@@ -81,18 +140,10 @@ const styles = StyleSheet.create({
   valueWide: {
     fontSize: 18,
   },
-  valueDashboard: {
-    fontSize: 22,
-    marginBottom: 4,
-  },
   label: {
     fontSize: 10,
     fontFamily: FontFamily.medium,
     color: colors.textSecondary,
     marginTop: 2,
-  },
-  labelDashboard: {
-    fontSize: 11,
-    marginTop: 0,
   },
 });

@@ -26,7 +26,7 @@ export const colors = {
   primaryDark: palette.greenDark,
   primaryLight: palette.greenLight,
 
-  background: palette.grey50,
+  background: '#FFFFFF',
   surface: palette.white,
   border: palette.grey200,
 

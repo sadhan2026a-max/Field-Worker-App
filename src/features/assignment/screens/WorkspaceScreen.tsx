@@ -4,6 +4,7 @@ import { safeRouter } from '@/shared/utils/navigation';
 import React, { useState, useCallback } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { DashboardHeader, NextDeliveryCard, QuickActionButton, StatCard } from '@/features/assignment/components';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -11,6 +12,7 @@ import { selectDriver, toggleAvailability } from '@/features/auth/redux/authSlic
 import { colors, spacing, FontFamily, typography } from '@/core/theme';
 import { useAssignments, useWorkspaceSummary } from '@/hooks/useAssignments';
 import { fetchNotifications, selectUnreadCount } from '@/features/notification/redux/notificationSlice';
+import { useIsFocused } from '@react-navigation/native';
 import { useEffect } from 'react';
 
 const QUICK_ACTIONS: {
@@ -26,12 +28,22 @@ const QUICK_ACTIONS: {
     { icon: 'notifications', label: 'Notifications', tint: colors.accent, tintLight: colors.accentLight, onPress: () => safeRouter.push('/notifications') },
   ];
 
+function SectionTitle({ icon, title }: { icon: keyof typeof MaterialIcons.glyphMap; title: string }) {
+  return (
+    <View style={styles.sectionTitleRow}>
+      <MaterialIcons name={icon} size={15} color={colors.primary} />
+      <Text style={styles.sectionTitle}>{title}</Text>
+    </View>
+  );
+}
+
 export function WorkspaceScreen() {
   const driver = useAppSelector(selectDriver);
   const dispatch = useAppDispatch();
   const { data: summary, isLoading: isSummaryLoading, refetch: refetchSummary } = useWorkspaceSummary();
   const { data: allAssignments, isLoading: isAssignmentsLoading, refetch: refetchAssignments } = useAssignments();
   const unreadCount = useAppSelector(selectUnreadCount);
+  const isFocused = useIsFocused();
 
   useEffect(() => {
     dispatch(fetchNotifications());
@@ -60,11 +72,23 @@ export function WorkspaceScreen() {
   const pendingCount = allAssignments?.filter(a =>
     ['pending', 'accepted', 'en_route', 'arrived', 'in_progress'].includes(a.status)
   ).length ?? 0;
+  
+  const localCompletedCount = allAssignments?.filter(a => a.status === 'completed').length ?? 0;
+  const completedCount = Math.max(summary?.completedCount ?? 0, localCompletedCount);
+
+  const localCodCollection = allAssignments?.reduce((total, a) => {
+    if (a.status === 'completed' && a.paymentMode === 'cash') {
+      return total + (a.receivedAmount ?? a.codAmount ?? 0);
+    }
+    return total;
+  }, 0) ?? 0;
+  const codCollection = Math.max(summary?.codCollection ?? 0, localCodCollection);
 
   const isAvailable = driver?.status === 'Available';
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
+      {isFocused && <StatusBar style="light" />}
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.content}
@@ -80,59 +104,67 @@ export function WorkspaceScreen() {
         />
 
         {((isSummaryLoading || isAssignmentsLoading) && !refreshing) ? (
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 100 }}>
+          <View style={styles.loaderContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={[typography.bodyMedium, { marginTop: spacing.md, color: colors.textSecondary }]}>
-              Loading workspace...
-            </Text>
+            <Text style={styles.loaderText}>Loading workspace...</Text>
           </View>
         ) : (
           <>
-            <Text style={styles.sectionTitle}>Today's Workspace</Text>
+            <SectionTitle icon="dashboard" title="Today's Overview" />
             <View style={styles.workspaceGrid}>
               <View style={styles.statsRow}>
                 <StatCard
+                  icon="pending-actions"
                   value={String(pendingCount)}
                   label="Pending"
-                  tintLight={colors.accentLight}
-                  valueColor={colors.textPrimary}
+                  tint={colors.warning}
+                  tintLight={colors.warningLight}
+                  valueColor={colors.warning}
                   variant="dashboard"
                 />
                 <StatCard
-                  value={String(summary?.completedCount ?? 0)}
+                  icon="check-circle"
+                  value={String(completedCount)}
                   label="Completed"
+                  tint={colors.primary}
                   tintLight={colors.primaryLight}
                   valueColor={colors.primary}
                   variant="dashboard"
                 />
                 <StatCard
-                  value={`₹${(summary?.codCollection ?? 0).toString()}`}
-                  label="COD Collection"
-                  tintLight={colors.primaryLight}
-                  valueColor={colors.primary}
+                  icon="account-balance-wallet"
+                  value={`₹${codCollection.toLocaleString()}`}
+                  label="COD"
+                  tint={colors.info}
+                  tintLight={colors.infoLight}
+                  valueColor={colors.info}
                   variant="dashboard"
                 />
               </View>
 
               <View style={styles.statsRow}>
                 <StatCard
+                  icon="trending-up"
                   value={`₹${(summary?.totalEarnings ?? 0).toLocaleString('en-IN')}`}
-                  label="Total Earnings"
-                  tintLight={colors.infoLight}
+                  label="Earnings"
+                  tint={colors.primary}
+                  tintLight={colors.primaryLight}
                   valueColor={colors.textPrimary}
                   variant="dashboard"
                 />
                 <StatCard
+                  icon="star"
                   value={`₹${(summary?.commissionEarned ?? 0).toLocaleString('en-IN')}`}
-                  label="Commission Earned"
-                  tintLight={colors.infoLight}
+                  label="Commission"
+                  tint={colors.accent}
+                  tintLight={colors.accentLight}
                   valueColor={colors.textPrimary}
                   variant="dashboard"
                 />
               </View>
             </View>
 
-            <Text style={styles.sectionTitle}>Next Delivery</Text>
+            <SectionTitle icon="local-shipping" title="Next Delivery" />
             {nextDelivery ? (
               <NextDeliveryCard
                 assignment={nextDelivery}
@@ -149,7 +181,7 @@ export function WorkspaceScreen() {
           </>
         )}
 
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <SectionTitle icon="flash-on" title="Quick Actions" />
         <View style={styles.quickActionsGrid}>
           {QUICK_ACTIONS.map((action) => (
             <QuickActionButton
@@ -160,46 +192,60 @@ export function WorkspaceScreen() {
           ))}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#FFFFFF',
   },
   scrollView: {
     flex: 1,
   },
   content: {
     padding: 12,
-    paddingBottom: 24,
+    paddingBottom: 32,
   },
-  loader: {
-    marginVertical: spacing.xl,
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 100,
+  },
+  loaderText: {
+    ...typography.bodyMedium,
+    marginTop: spacing.md,
+    color: colors.textSecondary,
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+    marginTop: 2,
   },
   sectionTitle: {
     fontSize: 13,
     fontFamily: FontFamily.bold,
     color: colors.textPrimary,
-    marginBottom: 8,
-    marginTop: 8,
+    letterSpacing: 0.2,
   },
   workspaceGrid: {
-    gap: 12,
-    marginBottom: 12,
+    gap: 10,
+    marginBottom: 14,
   },
   statsRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
   },
   emptyState: {
-    marginBottom: 12,
+    marginBottom: 14,
   },
   quickActionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 10,
   },
 });

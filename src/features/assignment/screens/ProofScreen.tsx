@@ -3,7 +3,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { safeRouter } from '@/shared/utils/navigation';
 import { useRef, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View, KeyboardAvoidingView, Platform } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -101,7 +101,12 @@ export function ProofScreen() {
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: true, title: `${assignment.code} · ${assignment.customer.name}` }} />
-      <ScrollView contentContainerStyle={styles.content}>
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 80}
+      >
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.sectionTitle}>Delivery Proof</Text>
         <Card style={styles.photoCard}>
           <Text style={styles.label}>Take Photo</Text>
@@ -145,9 +150,10 @@ export function ProofScreen() {
         />
       </ScrollView>
 
-      <ScreenFooter>
-        <Button label="Save & Continue" onPress={onSaveAndContinue} loading={saveProof.isPending || completeAssignment.isPending} />
-      </ScreenFooter>
+        <ScreenFooter>
+          <Button label="Save & Continue" onPress={onSaveAndContinue} loading={saveProof.isPending || completeAssignment.isPending} />
+        </ScreenFooter>
+      </KeyboardAvoidingView>
     </View>
   );
 }

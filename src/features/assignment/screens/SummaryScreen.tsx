@@ -53,6 +53,10 @@ export function SummaryScreen() {
           Toast.show({ type: 'error', text1: 'Missing Requirement', text2: 'Service details are pending.' });
           safeRouter.push({ pathname: '/assignment/[id]/service', params: { id: assignment.id } });
           return;
+        } else if (req === 'meetingNotes' || req === 'outcome' || req === 'sales_detail') {
+          Toast.show({ type: 'error', text1: 'Missing Requirement', text2: 'Sales details are pending.' });
+          safeRouter.push({ pathname: '/assignment/[id]/sales', params: { id: assignment.id } });
+          return;
         }
         
         errorMessage += `\nMissing: ${missingReqs.join(', ')}`;

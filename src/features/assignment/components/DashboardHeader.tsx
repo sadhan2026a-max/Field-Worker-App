@@ -1,16 +1,26 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, Platform } from 'react-native';
 import { colors, spacing, FontFamily, palette } from '@/core/theme';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAppSelector } from '@/store/hooks';
 import { selectUnreadCount } from '@/features/notification/redux/notificationSlice';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 function getTimeGreeting(): string {
   const hour = new Date().getHours();
-  if (hour < 12) return 'Good Morning,';
-  if (hour < 17) return 'Good Afternoon,';
-  return 'Good Evening,';
+  if (hour < 12) return 'Good Morning';
+  if (hour < 17) return 'Good Afternoon';
+  return 'Good Evening';
+}
+
+function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .map(w => w[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
 }
 
 interface DashboardHeaderProps {
@@ -21,104 +31,236 @@ interface DashboardHeaderProps {
 
 export function DashboardHeader({ name, isAvailable, onToggleAvailability }: DashboardHeaderProps) {
   const unreadCount = useAppSelector(selectUnreadCount);
+  const insets = useSafeAreaInsets();
 
   return (
-    <View style={styles.row}>
-      <View style={styles.textGroup}>
-        <Text style={styles.greeting}>{getTimeGreeting()}</Text>
-        <Text style={styles.name}>{name} 👋</Text>
-      </View>
+    <View style={styles.headerWrapper}>
+      <View style={[styles.banner, { paddingTop: insets.top + 6 }]}>
+        {/* Decorative circle */}
+        <View style={styles.decorCircle1} />
+        <View style={styles.decorCircle2} />
 
-      <View style={styles.rightActions}>
-        <Pressable style={styles.bellButton} onPress={() => router.push('/notifications')}>
-          <MaterialIcons name="notifications-none" size={26} color={colors.textPrimary} />
-          {unreadCount > 0 && (
-            <View style={styles.badgeContainer}>
-              <Text style={styles.badgeCount}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+        <View style={styles.topRow}>
+          {/* Avatar */}
+          <View style={styles.avatarContainer}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{getInitials(name)}</Text>
             </View>
-          )}
-        </Pressable>
+            <View style={[styles.statusDot, !isAvailable && styles.statusDotOffline]} />
+          </View>
 
-        <Pressable
-          style={[styles.badge, !isAvailable && styles.badgeOffline]}
-          onPress={onToggleAvailability}
-        >
-          <Text style={[styles.badgeText, !isAvailable && styles.badgeTextOffline]}>
-            {isAvailable ? 'Available' : 'Offline'}
-          </Text>
-        </Pressable>
+          {/* Greeting */}
+
+          <View style={styles.greetingGroup}>
+            <Text style={styles.greeting}>{getTimeGreeting()}        </Text>
+            <Text style={styles.name} numberOfLines={1}>{name}</Text>
+          </View>
+
+          {/* Right Actions */}
+          <View style={styles.rightActions}>
+            <Pressable style={styles.customSwitchContainer} onPress={onToggleAvailability}>
+              <Text style={[styles.switchLabel, !isAvailable && styles.switchLabelOffline]}>
+                {isAvailable ? 'Online' : 'Offline'}
+              </Text>
+              <View style={[styles.switchTrack, isAvailable ? styles.switchTrackOnline : styles.switchTrackOffline]}>
+                <View style={[styles.switchThumb, isAvailable ? styles.switchThumbOnline : styles.switchThumbOffline]} />
+              </View>
+            </Pressable>
+
+            <Pressable
+              style={styles.iconButton}
+              onPress={() => router.push('/notifications')}
+            >
+              <MaterialIcons name="notifications-none" size={24} color="#FFFFFF" />
+              {unreadCount > 0 && (
+                <View style={styles.notifBadge}>
+                  <Text style={styles.notifBadgeText}>
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </Text>
+                </View>
+              )}
+            </Pressable>
+          </View>
+        </View>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.xl,
-    marginTop: spacing.sm,
+  headerWrapper: {
+    marginHorizontal: -12,
+    marginTop: -12,
+    marginBottom: 14,
   },
-  textGroup: {
+  banner: {
+    backgroundColor: '#1FA855',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#1FA855',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.3,
+        shadowRadius: 16,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
+  },
+  decorCircle1: {
+    position: 'absolute',
+    top: -30,
+    right: -30,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  decorCircle2: {
+    position: 'absolute',
+    bottom: -20,
+    left: -20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginRight: 10,
+  },
+  avatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.4)',
+  },
+  avatarText: {
+    fontSize: 15,
+    fontFamily: FontFamily.bold,
+    color: '#FFFFFF',
+  },
+  statusDot: {
+    position: 'absolute',
+    bottom: 1,
+    right: 1,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#4ADE80',
+    borderWidth: 2.5,
+    borderColor: '#1FA855',
+  },
+  statusDotOffline: {
+    backgroundColor: '#9CA3AF',
+  },
+  greetingGroup: {
     flex: 1,
   },
   greeting: {
-    fontSize: 14,
+    fontSize: 11,
     fontFamily: FontFamily.medium,
-    color: colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    color: 'rgba(255,255,255,0.8)',
+    marginBottom: 2,
   },
   name: {
-    fontSize: 28,
+    fontSize: 18,
     fontFamily: FontFamily.bold,
-    color: colors.textPrimary,
-    marginTop: 2,
+    color: '#FFFFFF',
   },
   rightActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: 8,
   },
-  bellButton: {
-    position: 'relative',
-    padding: 4,
-  },
-  badgeContainer: {
-    position: 'absolute',
-    top: 2,
-    right: 2,
-    backgroundColor: palette.red,
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
+  iconButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: colors.background,
+    position: 'relative',
   },
-  badgeCount: {
-    color: palette.white,
+  notifBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#1FA855',
+    paddingHorizontal: 4,
+  },
+  notifBadgeText: {
+    color: '#FFFFFF',
     fontSize: 10,
     fontFamily: FontFamily.bold,
-    lineHeight: 12,
+    lineHeight: 13,
   },
-  badge: {
-    backgroundColor: colors.primaryLight,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+  customSwitchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  badgeOffline: {
-    backgroundColor: palette.grey200,
-  },
-  badgeText: {
-    color: colors.primaryDark,
-    fontSize: 12,
+  switchLabel: {
+    fontSize: 13,
     fontFamily: FontFamily.bold,
+    color: '#FFFFFF',
   },
-  badgeTextOffline: {
-    color: palette.grey700,
+  switchLabelOffline: {
+    color: 'rgba(255,255,255,0.7)',
+  },
+  switchTrack: {
+    width: 38,
+    height: 22,
+    borderRadius: 11,
+    padding: 2,
+    justifyContent: 'center',
+  },
+  switchTrackOnline: {
+    backgroundColor: '#FFFFFF',
+  },
+  switchTrackOffline: {
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  switchThumb: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  switchThumbOnline: {
+    backgroundColor: '#168A44',
+    alignSelf: 'flex-end',
+  },
+  switchThumbOffline: {
+    backgroundColor: '#D1D5DB',
+    alignSelf: 'flex-start',
   },
 });

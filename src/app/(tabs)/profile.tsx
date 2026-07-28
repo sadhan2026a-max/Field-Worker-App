@@ -1,6 +1,7 @@
 import React from 'react';
-import { StyleSheet, Text, View, ScrollView, RefreshControl } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, RefreshControl, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
@@ -8,16 +9,43 @@ import { Avatar } from '@/shared/components/ui/Avatar';
 import { StatTile } from '@/shared/components/ui/StatTile';
 import { colors, spacing, typography, palette, FontFamily } from '@/core/theme';
 import { logoutThunk, selectDriver } from '@/features/auth/redux/authSlice';
-import { selectWorkspaceSummary, fetchWorkspaceSummary } from '@/features/assignment/redux/assignmentSlice';
+import { selectWorkspaceSummary, fetchWorkspaceSummary, selectAssignments } from '@/features/assignment/redux/assignmentSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { useIsFocused } from '@react-navigation/native';
 
 export default function ProfileScreen() {
   const dispatch = useAppDispatch();
   const driver = useAppSelector(selectDriver);
   const workspaceSummary = useAppSelector(selectWorkspaceSummary);
+  const assignments = useAppSelector(selectAssignments);
   const [refreshing, setRefreshing] = React.useState(false);
+  const isFocused = useIsFocused();
 
-  const logout = () => dispatch(logoutThunk());
+  const localCompletedCount = assignments?.filter(a => a.status === 'completed').length ?? 0;
+  const completedCount = Math.max(workspaceSummary?.completedCount ?? 0, localCompletedCount);
+
+  const pendingCount = assignments?.filter(a =>
+    ['pending', 'accepted', 'en_route', 'arrived', 'in_progress'].includes(a.status)
+  ).length ?? (workspaceSummary?.pendingCount ?? 0);
+
+  const localCodCollection = assignments?.reduce((total, a) => {
+    if (a.status === 'completed' && a.paymentMode === 'cash') {
+      return total + (a.receivedAmount ?? a.codAmount ?? 0);
+    }
+    return total;
+  }, 0) ?? 0;
+  const codCollection = Math.max(workspaceSummary?.codCollection ?? 0, localCodCollection);
+
+  const logout = () => {
+    Alert.alert(
+      "Logout",
+      "Are you sure you want to logout?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Logout", style: "destructive", onPress: () => dispatch(logoutThunk()) }
+      ]
+    );
+  };
 
   const onRefresh = React.useCallback(async () => {
     if (driver?.id) {
@@ -44,6 +72,7 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {isFocused && <StatusBar style="dark" />}
       <View style={styles.header}>
         <Text style={styles.title}>My Profile</Text>
       </View>
@@ -66,24 +95,24 @@ export default function ProfileScreen() {
               </View>
             </View>
 
-            {/* Performance Stats */}
+            {/* Performance Stats */} 
             <Card style={styles.sectionCard}>
               <Text style={styles.sectionTitle}>Today's Performance</Text>
               <View style={styles.statsGrid}>
                 <StatTile
-                  value={workspaceSummary?.completedCount?.toString() || '0'}
-                  label="Completed"
+                  value={completedCount.toString()}
+                  label="Completed Deliveries"
                   color={palette.green}
                   icon={<MaterialIcons name="check-circle" size={24} color={palette.green} />}
                 />
                 <StatTile
-                  value={workspaceSummary?.pendingCount?.toString() || '0'}
+                  value={pendingCount.toString()}
                   label="Pending"
                   color={palette.orange}
                   icon={<MaterialIcons name="pending-actions" size={24} color={palette.orange} />}
                 />
                 <StatTile
-                  value={`₹${(workspaceSummary?.codCollection || 0).toLocaleString()}`}
+                  value={`₹${codCollection.toLocaleString()}`}
                   label="COD Collected"
                   color={palette.blue}
                   icon={<MaterialIcons name="payments" size={24} color={palette.blue} />}
@@ -177,7 +206,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#FFFFFF',
   },
   header: {
     paddingHorizontal: spacing.lg,

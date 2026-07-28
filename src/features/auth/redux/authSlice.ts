@@ -1,7 +1,8 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import { Driver } from '@/domain/entities/Driver';
-import * as authService from '@/services/authService';
+import * as authService from '@/features/auth/api/authService';
 import { logger } from '@/core/utils/logger';
+import { NotificationService } from '@/core/services/NotificationService';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -27,6 +28,15 @@ export const initAuth = createAsyncThunk<Driver | null>(
     const driver = await authService.getStoredDriver();
     if (driver) {
       logger.info('auth', 'Session restored', { driverId: driver.id });
+      // Register push token for existing session
+      try {
+        const token = await NotificationService.registerForPushNotificationsAsync();
+        if (token) {
+          await authService.registerDeviceToken(token);
+        }
+      } catch (tokenErr) {
+        logger.warn('auth', 'Failed to register push token on boot', tokenErr);
+      }
     } else {
       logger.info('auth', 'No stored session found');
     }
@@ -46,14 +56,25 @@ export const loginThunk = createAsyncThunk<
   try {
     const driver = await authService.login(phone, password, pin);
     logger.info('auth', 'Login successful', { driverId: driver.id, name: driver.name });
+    
+    // Register push token
+    try {
+      const token = await NotificationService.registerForPushNotificationsAsync();
+      if (token) {
+        await authService.registerDeviceToken(token);
+      }
+    } catch (tokenErr) {
+      logger.warn('auth', 'Failed to register push token after login', tokenErr);
+    }
+
     return driver;
   } catch (err) {
     logger.error('auth', 'Login failed', err);
     let errorMessage = 'Login failed';
     if (err instanceof AxiosError && err.response?.data?.error) {
-      errorMessage = err.response.data.error;
+      errorMessage = 'Login failed';
     } else if (err instanceof Error) {
-      errorMessage = err.message;
+      errorMessage = 'Login failed';
     }
     return rejectWithValue(errorMessage);
   }
@@ -64,6 +85,17 @@ export const logoutThunk = createAsyncThunk<void>(
   'auth/logout',
   async () => {
     logger.info('auth', 'Driver logging out…');
+    
+    // Remove push token
+    try {
+      const token = await NotificationService.registerForPushNotificationsAsync();
+      if (token) {
+        await authService.removeDeviceToken(token);
+      }
+    } catch (tokenErr) {
+      logger.warn('auth', 'Failed to remove push token on logout', tokenErr);
+    }
+
     await authService.logout();
     logger.info('auth', 'Logout complete');
   },
@@ -119,16 +151,13 @@ const authSlice = createSlice({
     // loginThunk
     builder
       .addCase(loginThunk.pending, (state) => {
-        state.isLoading = true;
         state.error = null;
       })
       .addCase(loginThunk.fulfilled, (state, action) => {
         state.driver = action.payload;
-        state.isLoading = false;
       })
       .addCase(loginThunk.rejected, (state, action) => {
         state.error = (action.payload as string) ?? action.error.message ?? 'Login failed';
-        state.isLoading = false;
       });
 
     // logoutThunk

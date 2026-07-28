@@ -129,16 +129,21 @@ export function AssignmentsScreen() {
                 </View>
               </View>
 
-              {/* Middle Side: Content */}
+              {/* Content */}
               <View style={styles.cardContent}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                {/* Top Row */}
+                <View style={styles.cardTopRow}>
                   <Text style={styles.code}>{item.code}</Text>
                   {item.status !== 'pending' && (
                     <View style={styles.typeBadge}>
                       <Text style={styles.typeBadgeText}>{formatAssignmentType(item.type)}</Text>
                     </View>
                   )}
+                  <View style={{ flex: 1 }} />
+                  <StatusBadge status={item.status} />
                 </View>
+
+                {/* Customer Info */}
                 <Text style={styles.customerName}>{item.customer.name}</Text>
                 <DistanceDisplay
                   style={styles.distance}
@@ -150,29 +155,29 @@ export function AssignmentsScreen() {
                 <Text style={styles.address} numberOfLines={2}>
                   {item.customer.address}
                 </Text>
-              </View>
 
-              {/* Right Side: Status & Pricing */}
-              <View style={styles.cardRight}>
-                <StatusBadge style={styles.badge} status={item.status} />
-                {(() => {
-                  let hint = null;
-                  if (item.status === 'accepted') hint = 'Start Navigation';
-                  else if (item.status === 'en_route') hint = "I've Arrived";
-                  else if (item.status === 'arrived') hint = 'Start Job';
-                  else if (item.status === 'in_progress') hint = item.type === 'other' ? 'Complete Job' : 'Continue Job';
+                {/* Bottom Row (COD & Hint) */}
+                <View style={styles.cardBottomRow}>
+                  {(() => {
+                    let hint = null;
+                    if (item.status === 'accepted') hint = 'Start Navigation';
+                    else if (item.status === 'en_route') hint = "I've Arrived";
+                    else if (item.status === 'arrived') hint = 'Start Job';
+                    else if (item.status === 'in_progress') hint = item.type === 'other' ? 'Complete Job' : 'Continue Job';
+                    
+                    if (!hint) return <View style={{ flex: 1 }} />;
+                    return (
+                      <Text style={styles.actionHint}>
+                        {hint} →
+                      </Text>
+                    );
+                  })()}
                   
-                  if (!hint) return null;
-                  return (
-                    <Text style={{ fontSize: 10, color: colors.primary, fontFamily: FontFamily.semiBold, marginTop: 4, textAlign: 'right' }}>
-                      {hint} →
+                  <View style={styles.codContainer}>
+                    <Text style={styles.codLabel}>
+                      COD: ₹{(item.codAmount ?? 0).toLocaleString()}
                     </Text>
-                  );
-                })()}
-                <View style={styles.codContainer}>
-                  <Text style={styles.codLabel}>
-                    COD: ₹{(item.codAmount ?? 0).toLocaleString()}
-                  </Text>
+                  </View>
                 </View>
               </View>
             </Card>
@@ -264,22 +269,22 @@ const styles = StyleSheet.create({
   },
   card: {
     flexDirection: 'row',
-    padding: spacing.lg,
+    padding: 12,
   },
   cardIconContainer: {
     justifyContent: 'center',
-    marginRight: spacing.md,
+    marginRight: 12,
   },
   iconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cardContent: {
     flex: 1,
-    gap: 4,
+    gap: 2,
   },
   code: {
     ...typography.caption,
@@ -310,18 +315,33 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     marginTop: 4,
   },
-  cardRight: {
-    justifyContent: 'space-between',
-    minWidth: 95,
+  cardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: 2,
   },
-  badge: {
-    alignSelf: 'flex-end',
+  cardBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  actionHint: {
+    fontSize: 10,
+    color: colors.primary,
+    fontFamily: FontFamily.semiBold,
+    flex: 1,
   },
   codContainer: {
-    marginTop: spacing.xs,
+    backgroundColor: palette.grey100,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
   codLabel: {
     ...typography.body,
+    fontSize: 12,
     fontFamily: FontFamily.bold,
     color: colors.textPrimary,
   },

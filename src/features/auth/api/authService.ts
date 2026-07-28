@@ -46,3 +46,19 @@ export async function updateDriverStatus(id: string, status: Driver['status']): 
   const res = await api.patch<Driver>(`/api/v1/drivers/${id}/status`, { status });
   return res.data;
 }
+
+export async function registerDeviceToken(token: string): Promise<void> {
+  try {
+    await api.post('/api/v1/drivers/me/device-tokens', { token, platform: 'android' });
+  } catch (error) {
+    console.error('Failed to register device token:', error);
+  }
+}
+
+export async function removeDeviceToken(token: string): Promise<void> {
+  try {
+    await api.delete(`/api/v1/drivers/me/device-tokens?token=${encodeURIComponent(token)}`);
+  } catch (error) {
+    console.error('Failed to remove device token:', error);
+  }
+}

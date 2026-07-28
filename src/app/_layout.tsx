@@ -2,6 +2,10 @@ import { logger } from '@/core/utils/logger';
 import { initAuth, selectDriver, selectIsLoading } from '@/features/auth/redux/authSlice';
 import { store } from '@/store';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { NotificationService } from '@/core/services/NotificationService';
+import * as Notifications from 'expo-notifications';
+import { fetchAssignments, fetchWorkspaceSummary } from '@/features/assignment/redux/assignmentSlice';
+import { fetchNotifications } from '@/features/notification/redux/notificationSlice';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState, Component } from 'react';
@@ -14,7 +18,8 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as SplashScreen from 'expo-splash-screen';
-import { Text, View, ScrollView, StyleSheet } from 'react-native';
+import { Text, View, ScrollView, StyleSheet, Animated, Easing } from 'react-native';
+import { useRef } from 'react';
 import { colors, typography, FontSize } from '@/core/theme';
 import { TabletWrapper } from '@/shared/components/ui/TabletWrapper';
 
@@ -79,6 +84,34 @@ function AppBootstrap({ children }: { children: React.ReactNode }) {
       .catch((err) => {
         logger.error('bootstrap', '❌ initAuth failed', err);
       });
+
+    // Set up push notification listeners
+    const notificationListener = NotificationService.addNotificationReceivedListener((notification) => {
+      logger.info('notification', 'Foreground notification received', {
+        title: notification.request.content.title,
+        body: notification.request.content.body
+      });
+
+      // Auto-refresh data when push arrives
+      dispatch(fetchAssignments());
+      dispatch(fetchNotifications());
+
+      const currentDriver = store.getState().auth.driver;
+      if (currentDriver?.id) {
+        dispatch(fetchWorkspaceSummary(currentDriver.id));
+      }
+    });
+
+    const responseListener = NotificationService.addNotificationResponseReceivedListener((response) => {
+      logger.info('notification', 'Notification clicked', {
+        actionId: response.actionIdentifier
+      });
+    });
+
+    return () => {
+      Notifications.removeNotificationSubscription(notificationListener);
+      Notifications.removeNotificationSubscription(responseListener);
+    };
   }, [dispatch]);
 
   // Global authentication state router hook
@@ -254,6 +287,7 @@ export default function RootLayout() {
                   screenOptions={{
                     headerShown: false,
                     headerShadowVisible: false,
+                    contentStyle: { backgroundColor: '#FFFFFF' },
                     headerStyle: {
                       backgroundColor: colors.background,
                     },

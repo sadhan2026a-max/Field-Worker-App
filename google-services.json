@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "395046681979",
+    "project_id": "fieldoperation",
+    "storage_bucket": "fieldoperation.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:395046681979:android:6050ac697c5ae7865c51de",
+        "android_client_info": {
+          "package_name": "com.sidhahisab.fieldoperation.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA1xyvrnre1xoc1mlLmOq9ZkrrEtQ7TwM8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

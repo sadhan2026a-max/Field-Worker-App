@@ -216,6 +216,11 @@ const assignmentSlice = createSlice({
         .addCase(thunk.fulfilled, (state, action) => {
           if (action.payload) {
             upsertAssignment(state, action.payload as Assignment);
+            
+            // Immediately reflect completion in the dashboard summary
+            if (thunk.typePrefix === completeAssignment.typePrefix && state.workspaceSummary) {
+              state.workspaceSummary.completedCount = (state.workspaceSummary.completedCount || 0) + 1;
+            }
           }
           state.isMutating = false;
         })

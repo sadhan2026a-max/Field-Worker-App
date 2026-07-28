@@ -14,10 +14,10 @@ import {
   Image,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import Toast from 'react-native-toast-message';
+
 import { Button } from '@/components/ui/Button';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { loginThunk, selectDriver } from '@/features/auth/redux/authSlice';
+import { loginThunk, selectDriver, selectAuthError } from '@/features/auth/redux/authSlice';
 import { colors, spacing, typography, FontSize, FontFamily, palette } from '@/core/theme';
 
 interface LoginForm {
@@ -67,6 +67,7 @@ function CustomInput({ label, leftIcon, rightElement, rightLabel, error, style, 
 export function LoginScreen() {
   const dispatch = useAppDispatch();
   const driver = useAppSelector(selectDriver);
+  const authError = useAppSelector(selectAuthError);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -84,9 +85,8 @@ export function LoginScreen() {
     setIsSubmitting(true);
     try {
       await dispatch(loginThunk({ phone: values.phone, pin: values.pin })).unwrap();
-    } catch (err) {
-      const errorMessage = typeof err === 'string' ? err : 'Please check your credentials and try again.';
-      Toast.show({ type: 'error', text1: 'Login failed', text2: errorMessage });
+    } catch (_err) {
+      // Error is already stored in Redux state by loginThunk.rejected
     } finally {
       setIsSubmitting(false);
     }
@@ -113,14 +113,18 @@ export function LoginScreen() {
             <Controller
               control={control}
               name="phone"
-              rules={{ required: 'Phone number is required' }}
+              rules={{
+                required: 'Phone number is required',
+                pattern: { value: /^[0-9]{10}$/, message: 'Phone number must be exactly 10 digits' },
+              }}
               render={({ field }) => (
                 <CustomInput
                   label="Phone Number"
                   placeholder="Enter your phone number"
                   keyboardType="phone-pad"
+                  maxLength={10}
                   value={field.value}
-                  onChangeText={field.onChange}
+                  onChangeText={(text: string) => field.onChange(text.replace(/[^0-9]/g, ''))}
                   error={errors.phone?.message}
                   leftIcon={<MaterialIcons name="phone" size={20} color={colors.textSecondary} />}
                 />
@@ -157,6 +161,14 @@ export function LoginScreen() {
                 />
               )}
             />
+
+            {/* Login Error */}
+            {authError ? (
+              <View style={styles.loginErrorContainer}>
+                <MaterialIcons name="error-outline" size={18} color={colors.danger} />
+                <Text style={styles.loginErrorText}>{authError}</Text>
+              </View>
+            ) : null}
 
             {/* Submit button */}
             <Button
@@ -290,6 +302,23 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.medium,
     color: colors.danger,
     marginTop: 4,
+  },
+  loginErrorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  loginErrorText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: FontFamily.medium,
+    color: colors.danger,
   },
   submit: {
     marginTop: spacing.sm,
