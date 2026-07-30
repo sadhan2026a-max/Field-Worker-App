@@ -14,7 +14,7 @@ interface QuickActionButtonProps {
 
 export function QuickActionButton({ icon, label, tint, tintLight, onPress, badgeCount }: QuickActionButtonProps) {
   return (
-    <View style={styles.actionContainer}>
+    <View style={[styles.actionContainer, { backgroundColor: '#FFFFFF' }]}>
       <Pressable
         style={({ pressed }) => [
           styles.action,
@@ -23,16 +23,16 @@ export function QuickActionButton({ icon, label, tint, tintLight, onPress, badge
         android_ripple={{ color: 'rgba(0,0,0,0.05)' }}
         onPress={onPress}
       >
-        <View style={[styles.iconContainer, { backgroundColor: tintLight }]}>
+        <View style={[styles.iconContainer, { backgroundColor: '#FFFFFF' }]}>
           <MaterialIcons name={icon} color={tint} size={22} />
+          {!!badgeCount && badgeCount > 0 && (
+            <View style={styles.badgeContainer}>
+              <Text style={styles.badgeCount}>{badgeCount > 9 ? '9+' : badgeCount}</Text>
+            </View>
+          )}
         </View>
         <Text style={styles.label}>{label}</Text>
         <MaterialIcons name="chevron-right" size={18} color={colors.textSecondary} style={styles.chevron} />
-        {!!badgeCount && badgeCount > 0 && (
-          <View style={styles.badgeContainer}>
-            <Text style={styles.badgeCount}>{badgeCount > 9 ? '9+' : badgeCount}</Text>
-          </View>
-        )}
       </Pressable>
     </View>
   );
@@ -88,21 +88,22 @@ const styles = StyleSheet.create({
   },
   badgeContainer: {
     position: 'absolute',
-    top: -6,
-    right: -6,
+    top: -4,
+    right: -4,
     backgroundColor: '#EF4444',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: colors.surface,
+    paddingHorizontal: 2,
+    borderWidth: 1.5,
+    borderColor: '#FFF',
   },
   badgeCount: {
     color: '#FFF',
-    fontSize: 10,
+    fontSize: 9,
     fontFamily: FontFamily.bold,
-    lineHeight: 12,
+    lineHeight: 11,
   },
 });

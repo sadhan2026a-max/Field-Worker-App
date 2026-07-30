@@ -73,7 +73,14 @@ export const confirmPayment = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
-      return await assignmentService.confirmPayment(params.id, params);
+      const assignment = await assignmentService.confirmPayment(params.id, params);
+      // Manually attach payment info because backend OrderDto might not include it yet
+      return {
+        ...assignment,
+        paymentMode: params.paymentMode,
+        receivedAmount: params.receivedAmount,
+        paymentReferenceNumber: params.referenceNumber,
+      } as Assignment;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to confirm payment');
     }
@@ -133,6 +140,13 @@ const assignmentSlice = createSlice({
       // Restore assignments from AsyncStorage, merging with existing
       action.payload.forEach((a) => upsertAssignment(state, a));
     },
+    restoreWorkspaceSummary: (state, action: PayloadAction<DriverWorkspaceSummary>) => {
+      // Only restore if we don't have a fresh summary loaded already
+      if (!state.workspaceSummary) {
+        state.workspaceSummary = action.payload;
+        state.summaryStatus = 'succeeded';
+      }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -140,12 +154,22 @@ const assignmentSlice = createSlice({
         state.summaryStatus = 'loading';
       })
       .addCase(fetchWorkspaceSummary.fulfilled, (state, action) => {
-        state.workspaceSummary = action.payload;
+        const fresh = action.payload;
+        const existing = state.workspaceSummary;
+        // Merge: always take the higher count between API and local
+        // This prevents 403 errors from wiping out locally tracked completions
+        state.workspaceSummary = {
+          ...fresh,
+          completedCount: Math.max(fresh.completedCount ?? 0, existing?.completedCount ?? 0),
+          codCollection: Math.max(fresh.codCollection ?? 0, existing?.codCollection ?? 0),
+          totalEarnings: Math.max(fresh.totalEarnings ?? 0, existing?.totalEarnings ?? 0),
+        };
         state.summaryStatus = 'succeeded';
       })
-      .addCase(fetchWorkspaceSummary.rejected, (state, action) => {
-        state.summaryStatus = 'failed';
-        state.error = action.error.message ?? 'Failed to load workspace summary';
+      .addCase(fetchWorkspaceSummary.rejected, (state) => {
+        // Don't wipe existing data on API failure (e.g. 403 from earnings API)
+        // Just mark status and keep whatever data we have
+        state.summaryStatus = state.workspaceSummary ? 'succeeded' : 'failed';
       })
       .addCase(startNavigation.pending, (state) => {
         state.isMutating = true;
@@ -180,6 +204,21 @@ const assignmentSlice = createSlice({
         // Merge (not replace): the offers endpoint this is sourced from only returns
         // pending offers, so a full replace would drop items that already moved past
         // "Offered" (e.g. right after acceptOffer) until they show up again elsewhere.
+
+        // However, if we fetched the default pending offers (status is undefined or 'pending'),
+        // any offer that is locally 'pending' but missing from the payload has been
+        // cancelled, withdrawn, or assigned to someone else. We must remove it.
+        const requestedStatus = action.meta.arg;
+        if (!requestedStatus || requestedStatus === 'pending') {
+          const fetchedIds = new Set(action.payload.map((a) => a.id));
+          state.items = state.items.filter((item) => {
+            if (item.status === 'pending' && !fetchedIds.has(item.id)) {
+              return false; // Remove stuck pending order
+            }
+            return true;
+          });
+        }
+
         for (const item of action.payload) {
           upsertAssignment(state, item);
         }
@@ -215,8 +254,15 @@ const assignmentSlice = createSlice({
         })
         .addCase(thunk.fulfilled, (state, action) => {
           if (action.payload) {
-            upsertAssignment(state, action.payload as Assignment);
+            let payload = action.payload as Assignment;
+            // Force status to completed if this was the completeAssignment thunk
+            // in case the backend hasn't updated its status or returns "Delivered"
+            if (thunk.typePrefix === completeAssignment.typePrefix) {
+              payload = { ...payload, status: 'completed' };
+            }
             
+            upsertAssignment(state, payload);
+
             // Immediately reflect completion in the dashboard summary
             if (thunk.typePrefix === completeAssignment.typePrefix && state.workspaceSummary) {
               state.workspaceSummary.completedCount = (state.workspaceSummary.completedCount || 0) + 1;
@@ -263,7 +309,7 @@ const assignmentSlice = createSlice({
 });
 
 export const assignmentReducer = assignmentSlice.reducer;
-export const { addAssignment, clearError, restoreAssignments } = assignmentSlice.actions;
+export const { addAssignment, clearError, restoreAssignments, restoreWorkspaceSummary } = assignmentSlice.actions;
 
 // ─── Selectors ────────────────────────────────────────────────────────────────
 

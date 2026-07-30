@@ -23,7 +23,9 @@ import {
   markArrived as markArrivedThunk,
   updateOrderItems as updateOrderItemsThunk,
   restoreAssignments,
+  restoreWorkspaceSummary,
 } from '@/features/assignment/redux/assignmentSlice';
+import { markRelatedNotificationsRead } from '@/features/notification/redux/notificationSlice';
 
 export function useWorkspaceSummary() {
   const dispatch = useAppDispatch();
@@ -33,9 +35,23 @@ export function useWorkspaceSummary() {
   const driverId = useAppSelector((state) => state.auth.driver?.id);
 
   useEffect(() => {
-    if (driverId) {
-      dispatch(fetchWorkspaceSummary(driverId));
-    }
+    // First restore persisted summary from AsyncStorage (so counts show instantly)
+    AsyncStorage.getItem('persisted_workspace_summary')
+      .then((data) => {
+        if (data) {
+          const parsed = JSON.parse(data);
+          if (parsed && typeof parsed === 'object') {
+            dispatch(restoreWorkspaceSummary(parsed));
+          }
+        }
+      })
+      .catch(console.error)
+      .finally(() => {
+        // Then try to fetch fresh from API (will silently fail on 403)
+        if (driverId) {
+          dispatch(fetchWorkspaceSummary(driverId));
+        }
+      });
   }, [dispatch, driverId]);
 
   const refetch = () => {
@@ -165,7 +181,12 @@ export function useCompleteAssignment() {
 
   return {
     isPending,
-    mutateAsync: (id: string) => dispatch(completeAssignmentThunk(id)).unwrap(),
+    mutateAsync: async (id: string) => {
+      const result = await dispatch(completeAssignmentThunk(id)).unwrap();
+      // Clear notification badge for this order
+      dispatch(markRelatedNotificationsRead(result.id));
+      return result;
+    },
   };
 }
 
@@ -175,7 +196,12 @@ export function useAcceptOffer() {
 
   return {
     isPending,
-    mutateAsync: (id: string) => dispatch(acceptOfferThunk(id)).unwrap(),
+    mutateAsync: async (id: string) => {
+      const result = await dispatch(acceptOfferThunk(id)).unwrap();
+      // Clear notification badge for this order
+      dispatch(markRelatedNotificationsRead(result.id));
+      return result;
+    },
   };
 }
 
@@ -185,6 +211,11 @@ export function useDeclineOffer() {
 
   return {
     isPending,
-    mutateAsync: (id: string) => dispatch(declineOfferThunk(id)).unwrap(),
+    mutateAsync: async (id: string) => {
+      const result = await dispatch(declineOfferThunk(id)).unwrap();
+      // Clear notification badge for this order
+      dispatch(markRelatedNotificationsRead(id));
+      return result;
+    },
   };
 }

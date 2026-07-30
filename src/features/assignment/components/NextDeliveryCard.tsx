@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
-import { StyleSheet, Text, View, Platform } from 'react-native';
+import { StyleSheet, Text, View, Platform, Alert } from 'react-native';
+import Toast from 'react-native-toast-message';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { colors, spacing, shadows, FontFamily, palette } from '@/core/theme';
 import { Assignment } from '@/domain/entities/Assignment';
 import { DistanceDisplay } from '@/features/assignment/components';
 import { useCurrentLocation } from '@/shared/utils/location';
+import { useAcceptOffer, useDeclineOffer } from '@/features/assignment/hooks/useAssignments';
 
 function getStatusLabel(status: string): string {
   const labels: Record<string, string> = {
@@ -39,12 +41,49 @@ export function NextDeliveryCard({ assignment, onStart }: NextDeliveryCardProps)
   const currentLocation = useCurrentLocation();
   const statusColor = getStatusColor(assignment.status);
 
+  const acceptOffer = useAcceptOffer();
+  const declineOffer = useDeclineOffer();
+  const [actionType, setActionType] = useState<'accept' | 'decline' | null>(null);
+
+  const onAccept = async () => {
+    setActionType('accept');
+    try {
+      await acceptOffer.mutateAsync(assignment.offerId ?? assignment.id);
+      Toast.show({ type: 'success', text1: 'Offer Accepted' });
+    } catch (error) {
+      Toast.show({ type: 'error', text1: 'Failed to accept offer' });
+    } finally {
+      setActionType(null);
+    }
+  };
+
+  const onDecline = () => {
+    Alert.alert('Decline Offer', 'Are you sure you want to decline this assignment?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Decline',
+        style: 'destructive',
+        onPress: async () => {
+          setActionType('decline');
+          try {
+            await declineOffer.mutateAsync(assignment.offerId ?? assignment.id);
+            Toast.show({ type: 'success', text1: 'Offer Declined' });
+          } catch (error) {
+            Toast.show({ type: 'error', text1: 'Failed to decline offer' });
+          } finally {
+            setActionType(null);
+          }
+        },
+      },
+    ]);
+  };
+
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { backgroundColor: '#FFFFFF' }]}>
       <View style={styles.content}>
         {/* Status Badge */}
         <View style={styles.statusRow}>
-          <View style={[styles.statusBadge, { backgroundColor: statusColor.bg }]}>
+          <View style={[styles.statusBadge, { backgroundColor: '#FFFFFF' }]}>
             <View style={[styles.statusDot, { backgroundColor: statusColor.text }]} />
             <Text style={[styles.statusText, { color: statusColor.text }]}>
               {getStatusLabel(assignment.status)}
@@ -58,23 +97,53 @@ export function NextDeliveryCard({ assignment, onStart }: NextDeliveryCardProps)
           <Avatar name={assignment.customer.name} size={44} />
           <View style={styles.meta}>
             <Text style={styles.name}>{assignment.customer.name}</Text>
-            <DistanceDisplay
-              style={styles.distance}
-              currentLocation={currentLocation}
-              targetLocation={assignment.customer.location}
-              targetAddress={assignment.customer.address}
-              backendDistanceKm={assignment.distanceKm}
-            />
+            {assignment.customer.location.latitude === 0 && assignment.customer.location.longitude === 0 ? (
+              <Text style={styles.distance}>
+                {assignment.customer.address !== 'Address will be available after acceptance'
+                  ? assignment.customer.address
+                  : 'Pending — address after acceptance'}
+              </Text>
+            ) : (
+              <DistanceDisplay
+                style={styles.distance}
+                currentLocation={currentLocation}
+                targetLocation={assignment.customer.location}
+                targetAddress={assignment.customer.address}
+                backendDistanceKm={assignment.distanceKm}
+              />
+            )}
           </View>
         </View>
 
         {/* Action Button */}
-        <Button
-          label="Navigate"
-          onPress={onStart}
-          style={styles.button}
-          textStyle={styles.buttonText}
-        />
+        {assignment.status === 'pending' ? (
+          <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs }}>
+            <Button
+              label="Decline"
+              variant="outline"
+              onPress={onDecline}
+              loading={actionType === 'decline' && declineOffer.isPending}
+              disabled={actionType === 'accept' && acceptOffer.isPending}
+              style={{ ...styles.button, flex: 1, borderColor: palette.red }}
+              textStyle={{ ...styles.buttonText, color: palette.red }}
+            />
+            <Button
+              label="Accept Offer"
+              onPress={onAccept}
+              loading={actionType === 'accept' && acceptOffer.isPending}
+              disabled={actionType === 'decline' && declineOffer.isPending}
+              style={{ ...styles.button, flex: 1, backgroundColor: palette.green }}
+              textStyle={styles.buttonText}
+            />
+          </View>
+        ) : (
+          <Button
+            label="Navigate"
+            onPress={onStart}
+            style={styles.button}
+            textStyle={styles.buttonText}
+          />
+        )}
       </View>
     </View>
   );

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -30,6 +30,13 @@ export function ScanQrScreen() {
 
   const [status, setStatus] = useState<'scanning' | 'loading' | 'previewing' | 'accepting'>('scanning');
   const [token, setToken] = useState<string | null>(null);
+  const [isCameraReady, setIsCameraReady] = useState(false);
+
+  // Delay camera mount so screen finishes rendering — prevents black screen on Android
+  useEffect(() => {
+    const timer = setTimeout(() => setIsCameraReady(true), 300);
+    return () => clearTimeout(timer);
+  }, []);
   const [preview, setPreview] = useState<QrOrderSummaryDto | null>(null);
   const [error, setError] = useState<string | null>(null);
   const hasScannedRef = useRef(false);
@@ -129,12 +136,14 @@ export function ScanQrScreen() {
 
   return (
     <View style={styles.container}>
-      <CameraView
-        style={StyleSheet.absoluteFill}
-        facing="back"
-        barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-        onBarcodeScanned={status === 'scanning' ? onBarcodeScanned : undefined}
-      />
+      {isCameraReady && (
+        <CameraView
+          style={StyleSheet.absoluteFill}
+          facing="back"
+          barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+          onBarcodeScanned={status === 'scanning' ? onBarcodeScanned : undefined}
+        />
+      )}
 
       <SafeAreaView style={styles.overlay} pointerEvents="box-none">
         <View style={styles.header} pointerEvents="box-none">

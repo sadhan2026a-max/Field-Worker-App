@@ -46,7 +46,8 @@ function mapOrderStatus(status: string): Assignment['status'] {
     case 'arrived': return 'arrived';
     case 'inprogress':
     case 'in_progress': return 'in_progress';
-    case 'completed': return 'completed';
+    case 'completed': 
+    case 'delivered': return 'completed';
     case 'cancelled':
     case 'failed': return 'cancelled';
     default: return 'pending'; // Pending / Offered

@@ -19,21 +19,40 @@ api.interceptors.request.use(async (config) => {
   if (__DEV__) {
     const url = `${config.baseURL ?? ''}${config.url ?? ''}`;
     const method = (config.method ?? 'get').toUpperCase();
-    
+    (config as any).metadata = { startTime: Date.now() };
+
     const yellow = '\x1b[33m';
     const reset = '\x1b[0m';
-    const colorize = (text: string) => `${yellow}${text}${reset}`;
 
-    console.log(colorize('\n======================================================'));
-    console.log(colorize(`🚀 API REQUEST: ${method} ${url}`));
-    console.log(colorize('======================================================'));
+    const logLines: string[] = [];
+    logLines.push(`\n╔╣ Request ║ ${method}`);
+    logLines.push(`║  ${url}`);
+    logLines.push(`╚══════════════════════════════════════════════════════════════════════════════════════════╝`);
+
+    if (config.headers) {
+      logLines.push(`╔ Headers`);
+      Object.entries(config.headers).forEach(([key, value]) => {
+        if (typeof value !== 'undefined') logLines.push(`╟ ${key}: ${value}`);
+      });
+      logLines.push(`╚══════════════════════════════════════════════════════════════════════════════════════════╝`);
+    }
+
     if (config.params && Object.keys(config.params).length > 0) {
-      console.log(colorize(`📝 PARAMS:\n${JSON.stringify(config.params, null, 2)}`));
+      logLines.push(`╔ Params`);
+      Object.entries(config.params).forEach(([key, value]) => {
+        logLines.push(`╟ ${key}: ${value}`);
+      });
+      logLines.push(`╚══════════════════════════════════════════════════════════════════════════════════════════╝`);
     }
+
     if (config.data) {
-      console.log(colorize(`📦 BODY:\n${JSON.stringify(config.data, null, 2)}`));
+      logLines.push(`╔ Body`);
+      const bodyStr = JSON.stringify(config.data, null, 4);
+      bodyStr.split('\n').forEach(line => logLines.push(`║    ${line}`));
+      logLines.push(`╚══════════════════════════════════════════════════════════════════════════════════════════╝`);
     }
-    console.log(colorize('======================================================\n'));
+
+    console.log(logLines.map(line => `${yellow}${line}${reset}`).join('\n'));
   }
 
   return config;
@@ -59,16 +78,25 @@ api.interceptors.response.use(
       const { config } = response;
       const url = `${config.baseURL ?? ''}${config.url ?? ''}`;
       const method = (config.method ?? 'get').toUpperCase();
-      
-      const blue = '\x1b[34m';
-      const reset = '\x1b[0m';
-      const colorize = (text: string) => `${blue}${text}${reset}`;
+      const startTime = (config as any).metadata?.startTime;
+      const timeMs = startTime ? Date.now() - startTime : '?';
 
-      console.log(colorize('\n======================================================'));
-      console.log(colorize(`✅ API RESPONSE: ${method} ${url} [${response.status}]`));
-      console.log(colorize('======================================================'));
-      console.log(colorize(`📥 DATA:\n${JSON.stringify(response.data, null, 2)}`));
-      console.log(colorize('======================================================\n'));
+      const green = '\x1b[32m';
+      const reset = '\x1b[0m';
+
+      const logLines: string[] = [];
+      logLines.push(`\n╔╣ Response ║ ${method} ║ Status: ${response.status} ║ Time: ${timeMs} ms`);
+      logLines.push(`║  ${url}`);
+      logLines.push(`╚══════════════════════════════════════════════════════════════════════════════════════════╝`);
+
+      if (response.data) {
+        logLines.push(`╔ Body`);
+        const bodyStr = JSON.stringify(response.data, null, 4);
+        bodyStr.split('\n').forEach(line => logLines.push(`║    ${line}`));
+        logLines.push(`╚══════════════════════════════════════════════════════════════════════════════════════════╝`);
+      }
+
+      console.log(logLines.map(line => `${green}${line}${reset}`).join('\n'));
     }
     return response;
   },
@@ -79,16 +107,26 @@ api.interceptors.response.use(
       const failedUrl = `${originalRequest?.baseURL ?? ''}${originalRequest?.url ?? ''}`;
       const status = error.response?.status ?? 'NETWORK_ERROR';
       const method = (originalRequest?.method ?? 'get').toUpperCase();
-      
+      const startTime = (originalRequest as any)?.metadata?.startTime;
+      const timeMs = startTime ? Date.now() - startTime : '?';
+
       const red = '\x1b[31m';
       const reset = '\x1b[0m';
-      const colorize = (text: string) => `${red}${text}${reset}`;
 
-      console.log(colorize('\n======================================================'));
-      console.log(colorize(`❌ API ERROR: ${method} ${failedUrl} [${status}]`));
-      console.log(colorize('======================================================'));
-      console.log(colorize(`📉 ERROR RESPONSE:\n${JSON.stringify(error.response?.data ?? error.message, null, 2)}`));
-      console.log(colorize('======================================================\n'));
+      const logLines: string[] = [];
+      logLines.push(`\n╔╣ Error ║ ${method} ║ Status: ${status} ║ Time: ${timeMs} ms`);
+      logLines.push(`║  ${failedUrl}`);
+      logLines.push(`╚══════════════════════════════════════════════════════════════════════════════════════════╝`);
+
+      const errorData = error.response?.data ?? error.message;
+      if (errorData) {
+        logLines.push(`╔ Error Data`);
+        const bodyStr = typeof errorData === 'string' ? errorData : JSON.stringify(errorData, null, 4);
+        bodyStr.split('\n').forEach(line => logLines.push(`║    ${line}`));
+        logLines.push(`╚══════════════════════════════════════════════════════════════════════════════════════════╝`);
+      }
+
+      console.log(logLines.map(line => `${red}${line}${reset}`).join('\n'));
     }
 
     if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
@@ -112,17 +150,17 @@ api.interceptors.response.use(
           const res = await axios.post(`${api.defaults.baseURL?.toString().replace(/\/$/, '')}/api/v1/auth/refresh`, { refreshToken });
           const newAccessToken = res.data.accessToken;
           const newRefreshToken = res.data.refreshToken;
-          
+
           if (newAccessToken) {
             await AsyncStorage.setItem('riderToken', newAccessToken);
           }
           if (newRefreshToken) {
             await AsyncStorage.setItem('riderRefreshToken', newRefreshToken);
           }
-          
+
           originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
           processQueue(null, newAccessToken);
-          
+
           return api(originalRequest);
         } else {
           processQueue(new Error('No refresh token'));
@@ -139,7 +177,7 @@ api.interceptors.response.use(
         isRefreshing = false;
       }
     }
-    
+
     return Promise.reject(error);
   }
 );

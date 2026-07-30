@@ -304,22 +304,25 @@ export function AssignmentDetailScreen() {
 
           <View style={styles.divider} />
 
-          <View style={styles.customerActions}>
-            <Pressable
-              style={[styles.actionBtn, styles.callBtn]}
-              onPress={() => Linking.openURL(`tel:${assignment.customer.phone}`)}
-            >
-              <MaterialIcons name="call" size={18} color={palette.green} />
-              <Text style={styles.actionBtnText}>Call Customer</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.actionBtn, styles.waBtn]}
-              onPress={() => Linking.openURL(`https://wa.me/${assignment.customer.phone.replace(/\D/g, '')}`)}
-            >
-              <FontAwesome name="whatsapp" size={18} color={palette.green} />
-              <Text style={styles.actionBtnText}>WhatsApp Chat</Text>
-            </Pressable>
-          </View>
+          {/* Call & WhatsApp buttons — only show for active/pending orders */}
+          {assignment.status !== 'completed' && assignment.status !== 'cancelled' && (
+            <View style={styles.customerActions}>
+              <Pressable
+                style={[styles.actionBtn, styles.callBtn]}
+                onPress={() => Linking.openURL(`tel:${assignment.customer.phone}`)}
+              >
+                <MaterialIcons name="call" size={18} color={palette.green} />
+                <Text style={styles.actionBtnText}>Call Customer</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.actionBtn, styles.waBtn]}
+                onPress={() => Linking.openURL(`https://wa.me/${assignment.customer.phone.replace(/\D/g, '')}`)}
+              >
+                <FontAwesome name="whatsapp" size={18} color={palette.green} />
+                <Text style={styles.actionBtnText}>WhatsApp Chat</Text>
+              </Pressable>
+            </View>
+          )}
         </Card>
 
         {/* Delivery Address Card */}
@@ -389,8 +392,8 @@ export function AssignmentDetailScreen() {
           </Card>
         )}
 
-        {/* Quick Actions Grid */}
-        {!isAssignedToOther && (
+        {/* Quick Actions Grid — only show for active/pending orders */}
+        {!isAssignedToOther && assignment.status !== 'completed' && assignment.status !== 'cancelled' && (
           <View style={styles.actionsSection}>
             <Text style={styles.sectionTitle}>Quick Actions</Text>
             <View style={styles.quickActionsGrid}>
@@ -407,33 +410,13 @@ export function AssignmentDetailScreen() {
         )}
       </ScrollView>
 
-      {!isAssignedToOther && (
+      {!isAssignedToOther && assignment.status !== 'pending' && (
         <ScreenFooter>
-          {assignment.status === 'pending' ? (
-            <View style={{ flexDirection: 'row', gap: spacing.md }}>
-              <Button
-                label="Decline"
-                variant="outline"
-                onPress={onDecline}
-                loading={actionType === 'decline' && declineOffer.isPending}
-                disabled={actionType === 'accept' && acceptOffer.isPending}
-                style={{ flex: 1, borderColor: palette.red, backgroundColor: palette.white }}
-              />
-              <Button
-                label="Accept Offer"
-                onPress={onAccept}
-                loading={actionType === 'accept' && acceptOffer.isPending}
-                disabled={actionType === 'decline' && declineOffer.isPending}
-                style={{ flex: 1, backgroundColor: palette.green, borderColor: palette.green }}
-              />
-            </View>
-          ) : (
-            <Button
-              label={actionLabel}
-              onPress={onActionPress}
-              loading={isActionLoading}
-            />
-          )}
+          <Button
+            label={actionLabel}
+            onPress={onActionPress}
+            loading={isActionLoading}
+          />
         </ScreenFooter>
       )}
     </SafeAreaView>

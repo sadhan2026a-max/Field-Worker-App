@@ -43,7 +43,7 @@ export function NotificationsScreen() {
     if (!notification.readAt) {
       dispatch(markAsRead(notification.id));
     }
-    
+
     if (notification.relatedOrderId) {
       router.push({ pathname: '/assignment/[id]', params: { id: notification.relatedOrderId } });
     }
@@ -51,10 +51,10 @@ export function NotificationsScreen() {
 
   const renderItem = ({ item }: { item: NotificationDto }) => {
     const isUnread = !item.readAt;
-    
+
     return (
-      <Pressable 
-        style={[styles.notificationCard, isUnread && styles.unreadCard]} 
+      <Pressable
+        style={[styles.notificationCard, isUnread && styles.unreadCard]}
         onPress={() => handleNotificationPress(item)}
       >
         <View style={styles.iconContainer}>
@@ -62,7 +62,7 @@ export function NotificationsScreen() {
             <MaterialIcons name="notifications" size={20} color={isUnread ? palette.white : colors.textSecondary} />
           </View>
         </View>
-        
+
         <View style={styles.contentContainer}>
           <View style={styles.headerRow}>
             <Text style={[styles.title, isUnread && styles.unreadTitle]} numberOfLines={1}>
@@ -76,7 +76,7 @@ export function NotificationsScreen() {
             {item.message}
           </Text>
         </View>
-        
+
         {isUnread && <View style={styles.unreadDot} />}
       </Pressable>
     );

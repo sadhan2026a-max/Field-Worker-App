@@ -20,11 +20,11 @@ export function StatCard({ icon, value, label, tint, tintLight, variant = 'compa
 
   if (isDashboard) {
     return (
-      <View style={[styles.dashboardCard, styles.cardShadow]}>
+      <View style={[styles.dashboardCard, styles.cardShadow, tintLight ? { backgroundColor: tintLight } : undefined]}>
         <View style={styles.dashboardContent}>
           <View style={styles.dashboardTopRow}>
             {icon && (
-              <View style={[styles.dashboardIconChip, { backgroundColor: tintLight }]}>
+              <View style={[styles.dashboardIconChip, { backgroundColor: '#FFFFFF' }]}>
                 <MaterialIcons name={icon} size={16} color={tint} />
               </View>
             )}

@@ -1,4 +1,4 @@
-import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
+import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { NotificationDto } from '../types/Notification';
 import * as notificationService from '../api/notificationService';
 
@@ -32,7 +32,18 @@ export const markAsRead = createAsyncThunk<string, string>(
 const notificationSlice = createSlice({
   name: 'notification',
   initialState,
-  reducers: {},
+  reducers: {
+    // Mark all unread notifications related to a specific order as read
+    // Called when an order is accepted, completed, or declined so badge count stays accurate
+    markRelatedNotificationsRead: (state, action: PayloadAction<string>) => {
+      const orderId = action.payload;
+      state.items.forEach((n) => {
+        if (n.relatedOrderId === orderId && !n.readAt) {
+          n.readAt = new Date().toISOString();
+        }
+      });
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchNotifications.pending, (state) => {
@@ -42,7 +53,7 @@ const notificationSlice = createSlice({
       .addCase(fetchNotifications.fulfilled, (state, action) => {
         state.isLoading = false;
         // Sort by created at descending
-        state.items = action.payload.sort((a, b) => 
+        state.items = action.payload.sort((a, b) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
       })
@@ -61,9 +72,10 @@ const notificationSlice = createSlice({
 });
 
 export const notificationReducer = notificationSlice.reducer;
+export const { markRelatedNotificationsRead } = notificationSlice.actions;
 
 // Selectors
 export const selectNotifications = (state: { notification: NotificationState }) => state.notification.items;
-export const selectUnreadCount = (state: { notification: NotificationState }) => 
+export const selectUnreadCount = (state: { notification: NotificationState }) =>
   state.notification.items.filter(n => !n.readAt).length;
 export const selectIsLoadingNotifications = (state: { notification: NotificationState }) => state.notification.isLoading;

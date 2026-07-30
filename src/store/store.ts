@@ -8,9 +8,12 @@ import { reduxLoggerMiddleware } from '@/core/utils/logger';
 const persistenceMiddleware: Middleware = (store) => (next) => (action) => {
   const result = next(action);
   const state = store.getState();
-  // Save assignments to AsyncStorage in the background whenever the assignment slice is mutated
+  // Save assignments AND workspaceSummary to AsyncStorage in the background whenever the assignment slice is mutated
   if (action && typeof action === 'object' && 'type' in action && typeof action.type === 'string' && action.type.startsWith('assignment/')) {
     AsyncStorage.setItem('persisted_assignments', JSON.stringify(state.assignment.items)).catch(console.error);
+    if (state.assignment.workspaceSummary) {
+      AsyncStorage.setItem('persisted_workspace_summary', JSON.stringify(state.assignment.workspaceSummary)).catch(console.error);
+    }
   }
   return result;
 };
