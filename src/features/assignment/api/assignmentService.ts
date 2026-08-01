@@ -133,6 +133,8 @@ function mapOrderDtoToAssignment(order: OrderDto, offerId?: string): Assignment 
           followUpDate: order.salesVisitDetail.followUpDate,
         }
       : undefined,
+    requiresDeliveryOtp: order.requiresDeliveryOtp,
+    deliveryOtpVerifiedAt: order.deliveryOtpVerifiedAt,
   };
 }
 
@@ -531,5 +533,12 @@ export async function updateOrderItems(
   const response = await api.patch<OrderDto>(`/api/v1/orders/${id}`, {
     items: items,
   });
+  return mapOrderDtoToAssignment(response.data);
+}
+
+export async function verifyOrderOtp(id: string, otp: string): Promise<Assignment> {
+  logger.info('assignment', 'Verifying OTP', { id });
+  const response = await api.post<OrderDto>(`/api/v1/orders/${id}/verify-otp`, { otp });
+  logger.info('assignment', 'OTP verified', { id });
   return mapOrderDtoToAssignment(response.data);
 }

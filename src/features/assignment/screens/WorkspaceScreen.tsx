@@ -5,6 +5,7 @@ import React, { useState, useCallback } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import Toast from 'react-native-toast-message';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { DashboardHeader, NextDeliveryCard, QuickActionButton, StatCard } from '@/features/assignment/components';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -66,12 +67,15 @@ export function WorkspaceScreen() {
     }
   }, [refetchSummary, refetchAssignments]);
 
-  const nextDelivery = allAssignments?.find(a =>
-    ['pending', 'accepted', 'en_route', 'arrived', 'in_progress'].includes(a.status)
-  );
-  const pendingCount = allAssignments?.filter(a =>
-    ['pending', 'accepted', 'en_route', 'arrived', 'in_progress'].includes(a.status)
-  ).length ?? 0;
+  const isAvailable = driver?.status === 'Available';
+
+  const activeStatuses = ['accepted', 'en_route', 'arrived', 'in_progress'];
+  const displayStatuses = isAvailable ? ['pending', ...activeStatuses] : activeStatuses;
+  
+  const nextDelivery = allAssignments?.find(a => displayStatuses.includes(a.status));
+  const hasActiveAssignment = allAssignments?.some(a => activeStatuses.includes(a.status));
+  
+  const pendingCount = allAssignments?.filter(a => displayStatuses.includes(a.status)).length ?? 0;
   
   const localCompletedCount = allAssignments?.filter(a => a.status === 'completed').length ?? 0;
   const completedCount = Math.max(summary?.completedCount ?? 0, localCompletedCount);
@@ -83,8 +87,6 @@ export function WorkspaceScreen() {
     return total;
   }, 0) ?? 0;
   const codCollection = Math.max(summary?.codCollection ?? 0, localCodCollection);
-
-  const isAvailable = driver?.status === 'Available';
 
   return (
     <View style={styles.container}>
@@ -100,7 +102,22 @@ export function WorkspaceScreen() {
         <DashboardHeader
           name={driver?.name ?? 'Rider'}
           isAvailable={isAvailable}
-          onToggleAvailability={() => dispatch(toggleAvailability())}
+          onToggleAvailability={async () => {
+            if (isAvailable && hasActiveAssignment) {
+              Toast.show({ type: 'error', text1: 'Cannot go offline', text2: 'Please complete or cancel active jobs first.' });
+              return;
+            }
+            const newAvailability = !isAvailable;
+            await dispatch(toggleAvailability());
+            
+            if (newAvailability) {
+              Toast.show({ type: 'info', text1: 'Online', text2: 'Fetching new assignments...' });
+              await Promise.all([
+                 refetchAssignments(),
+                 dispatch(fetchNotifications())
+              ]);
+            }
+          }}
         />
 
         {((isSummaryLoading || isAssignmentsLoading) && !refreshing) ? (
@@ -187,7 +204,7 @@ export function WorkspaceScreen() {
             <QuickActionButton
               key={action.label}
               {...action}
-              badgeCount={action.label === 'Notifications' ? unreadCount : undefined}
+              badgeCount={action.label === 'Notifications' && isAvailable ? unreadCount : undefined}
             />
           ))}
         </View>

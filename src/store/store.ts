@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authReducer } from '@/features/auth/redux/authSlice';
 import { assignmentReducer } from '@/features/assignment/redux/assignmentSlice';
 import { notificationReducer } from '@/features/notification/redux/notificationSlice';
+import { walletReducer } from '@/features/wallet/redux/walletSlice';
 import { reduxLoggerMiddleware } from '@/core/utils/logger';
 
 const persistenceMiddleware: Middleware = (store) => (next) => (action) => {
@@ -23,6 +24,7 @@ export const store = configureStore({
     auth: authReducer,
     assignment: assignmentReducer,
     notification: notificationReducer,
+    wallet: walletReducer,
   },
   middleware: (getDefaultMiddleware) =>
     __DEV__

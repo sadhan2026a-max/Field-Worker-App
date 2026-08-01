@@ -55,8 +55,12 @@ export function AssignmentsScreen() {
   }, [activeTab, dispatch]);
 
   const allAssignments = assignments ?? [];
+  const isOnline = driver?.status === 'Available';
+  const activeStatuses = ['accepted', 'en_route', 'arrived', 'in_progress'];
+  const pendingStatuses = isOnline ? ['pending', ...activeStatuses] : activeStatuses;
+
   const pendingAssignments = allAssignments.filter(
-    (a) => ['pending', 'accepted', 'en_route', 'arrived', 'in_progress'].includes(a.status)
+    (a) => pendingStatuses.includes(a.status)
   );
   const completedAssignments = allAssignments.filter(
     (a) => a.status === 'completed'
@@ -69,7 +73,7 @@ export function AssignmentsScreen() {
       ? pendingAssignments
       : completedAssignments;
 
-  const isOnline = driver?.status === 'Available';
+  // driver status already extracted above
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>

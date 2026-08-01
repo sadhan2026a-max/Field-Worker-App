@@ -22,6 +22,7 @@ import {
   startNavigation as startNavigationThunk,
   markArrived as markArrivedThunk,
   updateOrderItems as updateOrderItemsThunk,
+  verifyOrderOtp as verifyOrderOtpThunk,
   restoreAssignments,
   restoreWorkspaceSummary,
 } from '@/features/assignment/redux/assignmentSlice';
@@ -172,6 +173,17 @@ export function useUpdateOrderItems() {
     isPending,
     mutateAsync: (params: { id: string; items: { id: string; quantity: number }[] }) =>
       dispatch(updateOrderItemsThunk(params)).unwrap(),
+  };
+}
+
+export function useVerifyOrderOtp() {
+  const dispatch = useAppDispatch();
+  const isPending = useAppSelector(selectIsMutating);
+
+  return {
+    isPending,
+    mutateAsync: (params: { id: string; otp: string }) =>
+      dispatch(verifyOrderOtpThunk(params)).unwrap(),
   };
 }
 

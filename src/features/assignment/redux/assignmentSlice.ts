@@ -97,6 +97,11 @@ export const updateOrderItems = createAsyncThunk<
   { id: string; items: { id: string; quantity: number }[] }
 >('assignment/updateOrderItems', (params) => assignmentService.updateOrderItems(params.id, params.items));
 
+export const verifyOrderOtp = createAsyncThunk<
+  Assignment,
+  { id: string; otp: string }
+>('assignment/verifyOrderOtp', (params) => assignmentService.verifyOrderOtp(params.id, params.otp));
+
 export const acceptOffer = createAsyncThunk<Assignment, string>(
   'assignment/acceptOffer',
   (offerId) => assignmentService.acceptOffer(offerId),
@@ -246,7 +251,7 @@ const assignmentSlice = createSlice({
         state.error = action.error.message ?? 'Failed to load assignment';
       });
 
-    for (const thunk of [startAssignment, saveDeliveryProof, confirmPayment, completeAssignment, updateOrderItems]) {
+    for (const thunk of [startAssignment, saveDeliveryProof, confirmPayment, completeAssignment, updateOrderItems, verifyOrderOtp]) {
       builder
         .addCase(thunk.pending, (state) => {
           state.isMutating = true;

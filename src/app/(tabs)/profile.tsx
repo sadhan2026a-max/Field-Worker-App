@@ -12,6 +12,7 @@ import { logoutThunk, selectDriver } from '@/features/auth/redux/authSlice';
 import { selectWorkspaceSummary, fetchWorkspaceSummary, selectAssignments } from '@/features/assignment/redux/assignmentSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { useIsFocused } from '@react-navigation/native';
+import { router } from 'expo-router';
 
 export default function ProfileScreen() {
   const dispatch = useAppDispatch();
@@ -94,8 +95,6 @@ export default function ProfileScreen() {
                 </View>
               </View>
             </View>
-
-            {/* Performance Stats */} 
             <Card style={styles.sectionCard}>
               <Text style={styles.sectionTitle}>Today's Performance</Text>
               <View style={styles.statsGrid}>
@@ -119,8 +118,6 @@ export default function ProfileScreen() {
                 />
               </View>
             </Card>
-
-            {/* Account Details */}
             <Card style={styles.sectionCard}>
               <Text style={styles.sectionTitle}>Account Details</Text>
 
@@ -188,6 +185,14 @@ export default function ProfileScreen() {
         )}
 
         <View style={styles.spacer} />
+        <Button
+          label="My Wallet & Earnings"
+          variant="outline"
+          onPress={() => router.push('/wallet')}
+          style={styles.walletBtn}
+          textStyle={styles.walletLabel}
+          icon={<MaterialIcons name="account-balance-wallet" size={18} color={palette.blue} />}
+        />
 
         <Button
           label="Log Out"
@@ -351,7 +356,14 @@ const styles = StyleSheet.create({
   },
   logoutBtn: {
     borderColor: palette.red,
+    marginTop: spacing.md,
+  },
+  walletBtn: {
+    borderColor: palette.blue,
     marginTop: spacing.xl,
+  },
+  walletLabel: {
+    color: palette.blue,
   },
   logoutLabel: {
     color: palette.red,

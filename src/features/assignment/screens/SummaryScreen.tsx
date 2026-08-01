@@ -7,19 +7,37 @@ import { Card } from '@/components/ui/Card';
 import { ScreenLoader } from '@/components/ui/ScreenLoader';
 import { ScreenFooter } from '@/components/ui/ScreenFooter';
 import { colors, radius, spacing, typography } from '@/core/theme';
-import { useAssignment, useCompleteAssignment } from '@/hooks/useAssignments';
+import { useAssignment, useCompleteAssignment, useVerifyOrderOtp } from '@/hooks/useAssignments';
 import { safeRouter } from '@/shared/utils/navigation';
+import React, { useState } from 'react';
+import { TextInput } from 'react-native';
 
 export function SummaryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: assignment, isLoading } = useAssignment(id);
   const completeAssignment = useCompleteAssignment();
+  const verifyOtp = useVerifyOrderOtp();
+  const [otp, setOtp] = useState('');
 
   if (isLoading || !assignment) {
     return <ScreenLoader />;
   }
 
   const handleCompleteJob = async () => {
+    if (assignment.requiresDeliveryOtp && !assignment.deliveryOtpVerifiedAt) {
+      if (!otp || otp.length < 6) {
+        Toast.show({ type: 'error', text1: 'OTP Required', text2: 'Please enter the 6-digit OTP provided by the customer.' });
+        return;
+      }
+      try {
+        await verifyOtp.mutateAsync({ id: assignment.id, otp });
+        Toast.show({ type: 'success', text1: 'OTP Verified' });
+      } catch (e: any) {
+        Toast.show({ type: 'error', text1: 'Invalid OTP', text2: 'The OTP entered is incorrect.' });
+        return;
+      }
+    }
+
     try {
       await completeAssignment.mutateAsync(assignment.id);
       router.replace({ pathname: '/assignment/[id]/complete', params: { id: assignment.id } });
@@ -127,10 +145,34 @@ export function SummaryScreen() {
             </>
           )}
         </Card>
+
+        {assignment.requiresDeliveryOtp && !assignment.deliveryOtpVerifiedAt && (
+          <Card style={styles.card}>
+            <View style={styles.otpContainer}>
+              <MaterialIcons name="security" size={24} color={colors.primary} />
+              <View style={styles.otpTextContainer}>
+                <Text style={styles.recapLabel}>OTP Verification Required</Text>
+                <TextInput
+                  style={styles.otpInput}
+                  placeholder="Enter 6-digit OTP"
+                  placeholderTextColor={colors.textSecondary}
+                  value={otp}
+                  onChangeText={setOtp}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                />
+              </View>
+            </View>
+          </Card>
+        )}
       </ScrollView>
 
       <ScreenFooter>
-        <Button label="Complete Job" onPress={handleCompleteJob} loading={completeAssignment.isPending} />
+        <Button 
+          label={assignment.requiresDeliveryOtp && !assignment.deliveryOtpVerifiedAt ? "Verify OTP & Complete" : "Complete Job"} 
+          onPress={handleCompleteJob} 
+          loading={completeAssignment.isPending || verifyOtp.isPending} 
+        />
       </ScreenFooter>
     </View>
   );
@@ -173,5 +215,26 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: colors.border,
+  },
+  otpContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.lg,
+    gap: spacing.md,
+    backgroundColor: '#fff8f0', // Slight orange/warning tint
+  },
+  otpTextContainer: {
+    flex: 1,
+  },
+  otpInput: {
+    marginTop: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    fontSize: 18,
+    letterSpacing: 4,
+    backgroundColor: colors.surface,
+    color: colors.textPrimary,
   },
 });

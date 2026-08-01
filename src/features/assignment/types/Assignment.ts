@@ -100,7 +100,6 @@ export interface ReturnReasonOption {
 
 export interface Assignment {
   id: string;
-  /** Assignment-offer id — distinct from the order id, needed for accept/decline calls while still 'pending'. */
   offerId?: string;
   code: string;
   type: AssignmentType;
@@ -128,6 +127,8 @@ export interface Assignment {
   checklist?: ChecklistItem[];
   items?: AssignmentItem[];
   timeline?: { status: string; timestamp: string; notes?: string; }[];
+  requiresDeliveryOtp?: boolean;
+  deliveryOtpVerifiedAt?: string | null;
 }
 
 export interface AssignmentOffer {
@@ -142,13 +143,11 @@ export interface AssignmentOffer {
   respondedAt?: string;
   expiresAt: string;
 }
-
 // ─── Raw API shapes (GET /api/v1/orders) ──────────────────────────────────────
 
 export type OrderStatus = 'Pending' | 'Offered' | 'Assigned' | 'EnRoute' | 'Arrived' | 'InProgress' | 'Completed' | 'Cancelled' | 'Failed';
 
 export type OrderTypeApi = 'Delivery' | 'Pickup' | 'Return' | 'Installation' | 'Inspection' | 'SalesVisit' | 'ServiceVisit' | 'Other';
-
 export interface OrderItemDto {
   id: string;
   description: string;
@@ -254,6 +253,8 @@ export interface OrderDto {
   serviceVisitDetail: OrderServiceVisitDetailDto | null;
   salesVisitDetail: OrderSalesVisitDetailDto | null;
   externalReferenceId: string | null;
+  requiresDeliveryOtp: boolean;
+  deliveryOtpVerifiedAt: string | null;
 }
 
 // ─── QR self-assign (GET /api/v1/qr/{token}, POST /api/v1/qr/{token}/accept) ──

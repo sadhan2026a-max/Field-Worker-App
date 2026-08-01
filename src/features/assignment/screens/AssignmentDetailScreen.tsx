@@ -195,6 +195,11 @@ export function AssignmentDetailScreen() {
       }
 
       if (assignment.status === 'in_progress' && assignment.type === 'other') {
+        if (assignment.requiresDeliveryOtp && !assignment.deliveryOtpVerifiedAt) {
+          safeRouter.push({ pathname: '/assignment/[id]/summary', params: { id: assignment.id } });
+          return;
+        }
+
         await completeAssignment.mutateAsync(assignment.id);
         Toast.show({ type: 'success', text1: 'Job Completed' });
         safeRouter.push({ pathname: '/assignment/[id]/complete', params: { id: assignment.id } });

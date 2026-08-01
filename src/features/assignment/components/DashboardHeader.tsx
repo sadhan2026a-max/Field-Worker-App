@@ -72,7 +72,7 @@ export function DashboardHeader({ name, isAvailable, onToggleAvailability }: Das
               onPress={() => router.push('/notifications')}
             >
               <MaterialIcons name="notifications-none" size={24} color="#FFFFFF" />
-              {unreadCount > 0 && (
+              {isAvailable && unreadCount > 0 && (
                 <View style={styles.notifBadge}>
                   <Text style={styles.notifBadgeText}>
                     {unreadCount > 99 ? '99+' : unreadCount}
