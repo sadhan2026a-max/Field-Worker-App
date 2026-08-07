@@ -6,13 +6,16 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ScreenLoader } from '@/components/ui/ScreenLoader';
 import { ScreenFooter } from '@/components/ui/ScreenFooter';
-import { colors, radius, spacing, typography } from '@/core/theme';
+import { radius, spacing, typography, colors, useTheme } from '@/core/theme';
+
 import { useAssignment, useCompleteAssignment, useVerifyOrderOtp } from '@/hooks/useAssignments';
 import { safeRouter } from '@/shared/utils/navigation';
 import React, { useState } from 'react';
 import { TextInput } from 'react-native';
 
 export function SummaryScreen() {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: assignment, isLoading } = useAssignment(id);
   const completeAssignment = useCompleteAssignment();
@@ -43,12 +46,12 @@ export function SummaryScreen() {
       router.replace({ pathname: '/assignment/[id]/complete', params: { id: assignment.id } });
     } catch (error: any) {
       let errorMessage = error.response?.data?.error || error.response?.data?.message || 'An error occurred while saving.';
-      
+
       const missingReqs = error.response?.data?.details?.missingRequirements;
       if (Array.isArray(missingReqs) && missingReqs.length > 0) {
         // Find the first missing requirement to route back to
         const req = missingReqs[0];
-        
+
         if (req.startsWith('checklist:')) {
           const checklistId = req.split(':')[1];
           const checklistItem = assignment.checklist?.find(c => c.id === checklistId);
@@ -76,7 +79,7 @@ export function SummaryScreen() {
           safeRouter.push({ pathname: '/assignment/[id]/sales', params: { id: assignment.id } });
           return;
         }
-        
+
         errorMessage += `\nMissing: ${missingReqs.join(', ')}`;
       }
 
@@ -87,13 +90,13 @@ export function SummaryScreen() {
   // Determine recap status
   const proofCaptured = assignment.type !== 'sales_visit' && assignment.type !== 'inspection'; // Usually true if we reached here
   const paymentCollected = assignment.receivedAmount !== undefined && assignment.receivedAmount > 0;
-  
+
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: true, title: 'Job Summary' }} />
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.sectionTitle}>Review Job Completion</Text>
-        
+
         <Card style={styles.card}>
           <View style={styles.recapRow}>
             <MaterialIcons name="local-shipping" size={24} color={colors.primary} />
@@ -102,9 +105,9 @@ export function SummaryScreen() {
               <Text style={styles.recapValue}>{assignment.type.toUpperCase()}</Text>
             </View>
           </View>
-          
+
           <View style={styles.divider} />
-          
+
           {proofCaptured && (
             <View style={styles.recapRow}>
               <MaterialIcons name="camera-alt" size={24} color={colors.primary} />
@@ -178,7 +181,7 @@ export function SummaryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -189,6 +192,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     ...typography.h3,
+    color: colors.textPrimary,
   },
   card: {
     padding: 0,
@@ -210,6 +214,7 @@ const styles = StyleSheet.create({
   },
   recapValue: {
     ...typography.body,
+    color: colors.textPrimary,
     fontWeight: '500',
   },
   divider: {

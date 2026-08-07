@@ -129,6 +129,40 @@ api.interceptors.response.use(
       console.log(logLines.map(line => `${red}${line}${reset}`).join('\n'));
     }
 
+    
+    const isModifyingRequest = ['post', 'put', 'patch', 'delete'].includes(originalRequest?.method?.toLowerCase() || '');
+    const isReplay = (originalRequest as any)?._isReplay;
+    const isNetworkError = !error.response; // No response usually means no internet or server down
+
+    // We only want to queue assignment-related actions to avoid queuing things like login or fetch
+    const isAssignmentAction = originalRequest?.url && (originalRequest.url.includes('/assignment') || originalRequest.url.includes('/order'));
+
+    if (isNetworkError && isModifyingRequest && isAssignmentAction && !isReplay) {
+      try {
+        const { OfflineSyncService } = require('@/core/services/OfflineSyncService');
+        const { logger } = require('@/core/utils/logger');
+        
+        let parsedData = originalRequest.data;
+        if (typeof parsedData === 'string') {
+           try { parsedData = JSON.parse(parsedData); } catch(e) {}
+        }
+
+        logger.info('network', `Network error on ${originalRequest.url}. Queuing for offline sync.`);
+        
+        await OfflineSyncService.enqueueAction({
+          url: originalRequest.url || '',
+          method: originalRequest.method || 'post',
+          data: parsedData,
+          headers: originalRequest.headers,
+        });
+        
+        // Return a mock success response so Redux handles it optimistically
+        return Promise.resolve({ data: { success: true, _offlineQueued: true }, status: 202, config: originalRequest, headers: {}, statusText: 'Accepted' });
+      } catch (e) {
+         console.error('Failed to queue offline action', e);
+      }
+    }
+
     if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {

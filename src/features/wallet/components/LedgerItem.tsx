@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { colors, palette, typography, spacing, FontFamily } from '@/core/theme';
+import { palette, typography, spacing, FontFamily, colors, useTheme } from '@/core/theme';
+
 import { LedgerEntryDto } from '../types/Wallet';
 
 interface LedgerItemProps {
@@ -10,6 +11,8 @@ interface LedgerItemProps {
 }
 
 export function LedgerItem({ item, type }: LedgerItemProps) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
   const isCash = type === 'cash';
   const iconName = isCash ? 'account-balance-wallet' : 'account-balance';
   const iconColor = isCash ? palette.orange : palette.green;
@@ -25,7 +28,7 @@ export function LedgerItem({ item, type }: LedgerItemProps) {
       <View style={[styles.iconContainer, { backgroundColor: bgColor }]}>
         <MaterialIcons name={iconName} size={24} color={iconColor} />
       </View>
-      
+
       <View style={styles.content}>
         <View style={styles.headerRow}>
           <Text style={styles.title} numberOfLines={1}>
@@ -35,13 +38,13 @@ export function LedgerItem({ item, type }: LedgerItemProps) {
             ₹{item.amount.toLocaleString('en-IN')}
           </Text>
         </View>
-        
+
         <View style={styles.footerRow}>
           <View style={styles.dateContainer}>
             <MaterialIcons name="event" size={14} color={colors.textSecondary} />
             <Text style={styles.dateText}>{formattedDate}, {formattedTime}</Text>
           </View>
-          
+
           <View style={styles.recordedByContainer}>
             <MaterialIcons name="person" size={14} color={colors.textSecondary} />
             <Text style={styles.recordedByText}>{item.recordedByName}</Text>
@@ -56,7 +59,7 @@ export function LedgerItem({ item, type }: LedgerItemProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   container: {
     flexDirection: 'row',
     padding: spacing.md,
@@ -98,6 +101,7 @@ const styles = StyleSheet.create({
   },
   amount: {
     ...typography.h3,
+    color: colors.textPrimary,
     fontFamily: FontFamily.bold,
   },
   footerRow: {

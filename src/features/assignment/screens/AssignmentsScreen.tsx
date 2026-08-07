@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { router } from 'expo-router';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { colors, spacing, typography, palette, FontFamily, FontSize } from '@/core/theme';
+import { Skeleton } from '@/shared/components/ui/Skeleton';
+import { spacing, typography, palette, FontFamily, FontSize, useTheme } from '@/core/theme';
 import { useAssignments } from '@/hooks/useAssignments';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { selectDriver } from '@/features/auth/redux/authSlice';
@@ -13,24 +14,24 @@ import { fetchAssignments } from '@/features/assignment/redux/assignmentSlice';
 import { useCurrentLocation, calculateDistanceKm } from '@/shared/utils/location';
 import { DistanceDisplay } from '@/features/assignment/components';
 
-function getCardIcon(type: string) {
+function getCardIcon(type: string, colors: any) {
   switch (type) {
     case 'delivery':
-      return { icon: 'local-shipping' as const, bg: palette.blue };
+      return { icon: 'local-shipping' as const, bg: colors.info };
     case 'pickup':
-      return { icon: 'archive' as const, bg: palette.orange };
+      return { icon: 'archive' as const, bg: colors.warning };
     case 'return':
-      return { icon: 'assignment-return' as const, bg: palette.red };
+      return { icon: 'assignment-return' as const, bg: colors.danger };
     case 'installation':
-      return { icon: 'build' as const, bg: palette.green };
+      return { icon: 'build' as const, bg: colors.primary };
     case 'inspection':
-      return { icon: 'fact-check' as const, bg: '#9c27b0' };
+      return { icon: 'fact-check' as const, bg: colors.accent };
     case 'sales_visit':
-      return { icon: 'handshake' as const, bg: palette.blue };
+      return { icon: 'handshake' as const, bg: colors.info };
     case 'service_visit':
-      return { icon: 'engineering' as const, bg: palette.green };
+      return { icon: 'engineering' as const, bg: colors.primary };
     default:
-      return { icon: 'list-alt' as const, bg: palette.grey500 };
+      return { icon: 'list-alt' as const, bg: colors.textSecondary };
   }
 }
 
@@ -42,6 +43,8 @@ function formatAssignmentType(type: string) {
 }
 
 export function AssignmentsScreen() {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
   const driver = useAppSelector(selectDriver);
   const dispatch = useAppDispatch();
   const { data: assignments, isLoading, refetch } = useAssignments();
@@ -54,7 +57,30 @@ export function AssignmentsScreen() {
     }
   }, [activeTab, dispatch]);
 
-  const allAssignments = assignments ?? [];
+  const onRefresh = async () => {
+    await refetch();
+    if (activeTab === 'completed') {
+      await dispatch(fetchAssignments('completed'));
+    }
+  };
+
+  const allAssignments = [...(assignments ?? [])].sort((a, b) => {
+    const priority: Record<string, number> = {
+      'in_progress': 1,
+      'arrived': 2,
+      'en_route': 3,
+      'accepted': 4,
+      'pending': 5,
+      'completed': 6,
+      'cancelled': 7,
+    };
+    
+    const pA = priority[a.status] || 99;
+    const pB = priority[b.status] || 99;
+    
+    if (pA !== pB) return pA - pB;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
   const isOnline = driver?.status === 'Available';
   const activeStatuses = ['accepted', 'en_route', 'arrived', 'in_progress'];
   const pendingStatuses = isOnline ? ['pending', ...activeStatuses] : activeStatuses;
@@ -113,20 +139,47 @@ export function AssignmentsScreen() {
       </View>
 
       {/* Assignments List */}
-      <FlatList
-        data={displayedAssignments}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
-        refreshing={isLoading}
-        onRefresh={refetch}
-        renderItem={({ item }) => (
+      {isLoading ? (
+        <ScrollView contentContainerStyle={styles.list}>
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i} style={styles.card}>
+              <View style={styles.cardIconContainer}>
+                <Skeleton width={36} height={36} borderRadius={18} />
+              </View>
+              <View style={styles.cardContent}>
+                <View style={styles.cardTopRow}>
+                  <Skeleton width={120} height={16} borderRadius={4} />
+                  <Skeleton width={70} height={16} borderRadius={999} />
+                  <View style={{ flex: 1 }} />
+                  <Skeleton width={70} height={20} borderRadius={999} />
+                </View>
+                <Skeleton width={140} height={16} borderRadius={4} style={{ marginTop: 4 }} />
+                <Skeleton width={200} height={12} borderRadius={4} style={{ marginTop: 8 }} />
+                <Skeleton width={160} height={12} borderRadius={4} style={{ marginTop: 4 }} />
+                
+                <View style={[styles.cardBottomRow, { marginTop: 12 }]}>
+                  <Skeleton width={80} height={12} borderRadius={4} />
+                  <Skeleton width={70} height={20} borderRadius={6} />
+                </View>
+              </View>
+            </Card>
+          ))}
+        </ScrollView>
+      ) : (
+        <FlatList
+          data={displayedAssignments}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
+          onRefresh={onRefresh}
+          refreshing={false}
+          renderItem={({ item }) => (
           <Pressable onPress={() => router.push({ pathname: '/assignment/[id]', params: { id: item.id } })}>
             <Card style={styles.card}>
               {/* Left Side: Icon Circle */}
               <View style={styles.cardIconContainer}>
-                <View style={[styles.iconCircle, { backgroundColor: getCardIcon(item.status === 'pending' ? 'generic' : item.type).bg }]}>
+                <View style={[styles.iconCircle, { backgroundColor: getCardIcon(item.status === 'pending' ? 'generic' : item.type, colors).bg }]}>
                   <MaterialIcons
-                    name={getCardIcon(item.status === 'pending' ? 'generic' : item.type).icon}
+                    name={getCardIcon(item.status === 'pending' ? 'generic' : item.type, colors).icon}
                     size={20}
                     color={palette.white}
                   />
@@ -137,7 +190,7 @@ export function AssignmentsScreen() {
               <View style={styles.cardContent}>
                 {/* Top Row */}
                 <View style={styles.cardTopRow}>
-                  <Text style={styles.code}>{item.code}</Text>
+                  <Text style={styles.code} numberOfLines={1} ellipsizeMode="tail">{item.code}</Text>
                   {item.status !== 'pending' && (
                     <View style={styles.typeBadge}>
                       <Text style={styles.typeBadgeText}>{formatAssignmentType(item.type)}</Text>
@@ -149,13 +202,15 @@ export function AssignmentsScreen() {
 
                 {/* Customer Info */}
                 <Text style={styles.customerName}>{item.customer.name}</Text>
-                <DistanceDisplay
-                  style={styles.distance}
-                  currentLocation={currentLocation}
-                  targetLocation={item.customer.location}
-                  targetAddress={item.customer.address}
-                  backendDistanceKm={item.distanceKm}
-                />
+                {item.status !== 'completed' && item.status !== 'cancelled' && (
+                  <DistanceDisplay
+                    style={styles.distance}
+                    currentLocation={currentLocation}
+                    targetLocation={item.customer.location}
+                    targetAddress={item.customer.address}
+                    backendDistanceKm={item.distanceKm}
+                  />
+                )}
                 <Text style={styles.address} numberOfLines={2}>
                   {item.customer.address}
                 </Text>
@@ -188,11 +243,12 @@ export function AssignmentsScreen() {
           </Pressable>
         )}
       />
+      )}
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -213,25 +269,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    backgroundColor: palette.greenLight,
+    backgroundColor: colors.primaryLight,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderRadius: 999,
   },
   onlineBadgeOffline: {
-    backgroundColor: palette.grey200,
+    backgroundColor: colors.border,
   },
   onlineDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: palette.green,
+    backgroundColor: colors.primary,
   },
   onlineDotOffline: {
     backgroundColor: colors.textSecondary,
   },
   onlineText: {
-    color: palette.greenDark,
+    color: colors.primary,
     fontSize: FontSize.extraSmall,
     fontFamily: FontFamily.bold,
   },
@@ -248,7 +304,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: 20,
-    backgroundColor: palette.grey100,
+    backgroundColor: colors.border,
   },
   activeTab: {
     backgroundColor: colors.primaryLight,
@@ -293,31 +349,37 @@ const styles = StyleSheet.create({
   code: {
     ...typography.caption,
     fontFamily: FontFamily.bold,
+    color: colors.textPrimary,
+    flexShrink: 1,
   },
   typeBadge: {
-    backgroundColor: palette.grey200,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+    backgroundColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: 999,
   },
   typeBadgeText: {
-    fontSize: 10,
-    fontFamily: FontFamily.medium,
+    fontSize: FontSize.extraSmall,
+    fontFamily: FontFamily.bold,
+    letterSpacing: 0.3,
     color: colors.textSecondary,
   },
   customerName: {
     ...typography.bodyMedium,
     fontSize: FontSize.small,
     fontFamily: FontFamily.semiBold,
+    color: colors.textPrimary,
   },
   distance: {
     ...typography.caption,
     fontSize: FontSize.extraSmall,
+    color: colors.warning,
   },
   address: {
     ...typography.caption,
     lineHeight: 16,
     marginTop: 4,
+    color: colors.textSecondary,
   },
   cardTopRow: {
     flexDirection: 'row',
@@ -338,7 +400,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   codContainer: {
-    backgroundColor: palette.grey100,
+    backgroundColor: colors.border,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,

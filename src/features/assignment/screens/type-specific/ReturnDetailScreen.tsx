@@ -5,12 +5,15 @@ import { safeRouter } from '@/shared/utils/navigation';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { ScreenFooter } from '@/components/ui/ScreenFooter';
-import { colors, spacing, typography } from '@/core/theme';
+import { spacing, typography, colors, useTheme } from '@/core/theme';
+
 import { useAssignment } from '@/features/assignment/hooks/useAssignments';
 import { getReturnReasons, saveReturnDetail } from '@/features/assignment/api/assignmentService';
 import { ReturnReasonOption } from '@/features/assignment/types/Assignment';
 
 export function ReturnDetailScreen() {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: assignment } = useAssignment(id as string);
   const [reasons, setReasons] = useState<ReturnReasonOption[]>([]);
@@ -65,7 +68,7 @@ export function ReturnDetailScreen() {
           textAlignVertical="top"
         />
       </ScrollView>
-      
+
       <ScreenFooter>
         <Button label="Continue to Proof" onPress={handleContinue} disabled={!selectedReasonId} />
       </ScreenFooter>
@@ -73,12 +76,15 @@ export function ReturnDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg },
-  title: { ...typography.h2, marginBottom: spacing.xs },
-  subtitle: { ...typography.body, color: colors.textSecondary, marginBottom: spacing.xl },
-  label: { ...typography.h3, marginBottom: spacing.sm, marginTop: spacing.md },
+  title: { ...typography.h2,
+    color: colors.textPrimary, marginBottom: spacing.xs },
+  subtitle: { ...typography.body,
+    color: colors.textSecondary, marginBottom: spacing.xl },
+  label: { ...typography.h3,
+    color: colors.textPrimary, marginBottom: spacing.sm, marginTop: spacing.md },
   reasonsContainer: { gap: spacing.sm, marginBottom: spacing.lg },
   reasonButton: { alignSelf: 'flex-start' },
   textArea: {
@@ -88,6 +94,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: spacing.md,
     ...typography.body,
+    color: colors.textPrimary,
     minHeight: 100,
   }
 });

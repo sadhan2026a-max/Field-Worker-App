@@ -47,6 +47,18 @@ export async function updateDriverStatus(id: string, status: Driver['status']): 
   return res.data;
 }
 
+export async function updateLocation(lat: number, lng: number): Promise<void> {
+  try {
+    const driverId = await AsyncStorage.getItem('riderId');
+    if (!driverId) return;
+    
+    await api.post(`/api/v1/drivers/${driverId}/location`, { lat, lng });
+  } catch (error) {
+    // Fail silently so it doesn't interrupt the user
+    console.warn('Failed to update driver location:', error);
+  }
+}
+
 export async function registerDeviceToken(token: string): Promise<void> {
   try {
     await api.post('/api/v1/drivers/me/device-tokens', { token, platform: 'android' });
@@ -61,4 +73,26 @@ export async function removeDeviceToken(token: string): Promise<void> {
   } catch (error) {
     console.error('Failed to remove device token:', error);
   }
+}
+
+export async function setPin(currentPassword: string, pin: string): Promise<void> {
+  await api.patch('/api/v1/drivers/me/pin', { currentPassword, pin });
+}
+
+export interface TenantInfo {
+  name: string;
+  logoUrl?: string;
+}
+
+export async function getTenant(): Promise<TenantInfo> {
+  const res = await api.get<TenantInfo>('/api/v1/drivers/me/tenant');
+  return res.data;
+}
+
+export async function requestPasswordReset(phone: string): Promise<void> {
+  await api.post('/api/v1/auth/password-reset/request', { phone, subjectType: 'Driver' });
+}
+
+export async function confirmPasswordReset(phone: string, token: string, newPassword: string): Promise<void> {
+  await api.post('/api/v1/auth/password-reset/confirm', { phone, otp: token, newPassword, subjectType: 'Driver' });
 }

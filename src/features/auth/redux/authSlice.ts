@@ -8,12 +8,14 @@ import { NotificationService } from '@/core/services/NotificationService';
 
 interface AuthState {
   driver: Driver | null;
+  tenant: authService.TenantInfo | null;
   isLoading: boolean;
   error: string | null;
 }
 
 const initialState: AuthState = {
   driver: null,
+  tenant: null,
   isLoading: true, // true on boot while we restore the session
   error: null,
 };
@@ -101,6 +103,18 @@ export const logoutThunk = createAsyncThunk<void>(
   },
 );
 
+export const fetchTenantThunk = createAsyncThunk<authService.TenantInfo, void, { rejectValue: string }>(
+  'auth/fetchTenant',
+  async (_, { rejectWithValue }) => {
+    try {
+      return await authService.getTenant();
+    } catch (err) {
+      logger.error('auth', 'Failed to fetch tenant', err);
+      return rejectWithValue('Failed to fetch tenant info');
+    }
+  }
+);
+
 // ─── Slice ────────────────────────────────────────────────────────────────────
 
 export const toggleAvailability = createAsyncThunk<
@@ -183,6 +197,12 @@ const authSlice = createSlice({
       .addCase(toggleAvailability.rejected, (state, action) => {
         state.error = (action.payload as string) ?? action.error.message ?? 'Failed to update status';
       });
+
+    // fetchTenantThunk
+    builder
+      .addCase(fetchTenantThunk.fulfilled, (state, action) => {
+        state.tenant = action.payload;
+      });
   },
 });
 
@@ -194,5 +214,6 @@ export const authReducer = authSlice.reducer;
 type StateWithAuth = { auth: AuthState };
 
 export const selectDriver = (state: StateWithAuth) => state.auth.driver;
+export const selectTenant = (state: StateWithAuth) => state.auth.tenant;
 export const selectIsLoading = (state: StateWithAuth) => state.auth.isLoading;
 export const selectAuthError = (state: StateWithAuth) => state.auth.error;

@@ -4,7 +4,7 @@
     "slug": "sidhahisab-rider",
     "version": "1.0.0",
     "orientation": "default",
-    "icon": "./assets/app-logi-f.jpeg",
+    "icon": "./assets/sidhahisab-fieldoperation.png",
     "platforms": [
       "ios",
       "android",
@@ -29,9 +29,10 @@
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
-        "foregroundImage": "./assets/app-logi-f.jpeg"
+        "foregroundImage": "./assets/sidhahisab-fieldoperation.png"
       },
       "edgeToEdgeEnabled": true,
+      "softwareKeyboardLayoutMode": "pan",
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
@@ -76,14 +77,15 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/app-icon.png",
+          "image": "./assets/sidhahisab-fieldoperation.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
       ],
       "expo-asset",
-      "expo-notifications"
+      "expo-notifications",
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true

@@ -5,15 +5,18 @@ import { safeRouter } from '@/shared/utils/navigation';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { ScreenFooter } from '@/components/ui/ScreenFooter';
-import { colors, spacing, typography } from '@/core/theme';
+import { spacing, typography, colors, useTheme } from '@/core/theme';
+
 import { useAssignment, useCompleteAssignment } from '@/features/assignment/hooks/useAssignments';
 import { saveSalesDetail } from '@/features/assignment/api/assignmentService';
 import { SalesOutcome } from '@/features/assignment/types/Assignment';
 
 export function SalesDetailScreen() {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: assignment } = useAssignment(id as string);
-  
+
   const [meetingNotes, setMeetingNotes] = useState('');
   const [outcome, setOutcome] = useState<SalesOutcome | ''>('');
   const [followUpDate, setFollowUpDate] = useState(''); // Simplified to string for now
@@ -29,13 +32,13 @@ export function SalesDetailScreen() {
   const handleComplete = async () => {
     if (!meetingNotes || !outcome) return;
     if (outcome === 'FollowUpNeeded' && !followUpDate) return;
-    
+
     await saveSalesDetail(id as string, {
       meetingNotes,
       outcome: outcome as SalesOutcome,
       followUpDate: outcome === 'FollowUpNeeded' ? followUpDate : undefined
     });
-    
+
     // Sales skips proof/payment entirely
     safeRouter.push({ pathname: '/assignment/[id]/summary', params: { id: id as string } });
   };
@@ -57,7 +60,7 @@ export function SalesDetailScreen() {
         <Text style={styles.title}>Sales Visit</Text>
         <Text style={styles.subtitle}>Order #{assignment?.code}</Text>
 
-        <Text style={styles.label}>Meeting Notes *</Text>
+        <Text style={styles.label}>Meeting Notes <Text style={styles.asterisk}>*</Text></Text>
         <TextInput
           style={styles.textArea}
           multiline
@@ -68,7 +71,7 @@ export function SalesDetailScreen() {
           textAlignVertical="top"
         />
 
-        <Text style={styles.label}>Outcome *</Text>
+        <Text style={styles.label}>Outcome <Text style={styles.asterisk}>*</Text></Text>
         <View style={styles.outcomesContainer}>
           {outcomes.map((o) => (
             <Button
@@ -83,7 +86,7 @@ export function SalesDetailScreen() {
 
         {outcome === 'FollowUpNeeded' && (
           <View>
-            <Text style={styles.label}>Follow-up Date *</Text>
+            <Text style={styles.label}>Follow-up Date <Text style={styles.asterisk}>*</Text></Text>
             <TextInput
               style={[styles.input, followUpDate.length > 0 && !isValidDate(followUpDate) && styles.inputError]}
               placeholder="YYYY-MM-DD"
@@ -97,7 +100,7 @@ export function SalesDetailScreen() {
           </View>
         )}
       </ScrollView>
-      
+
       <ScreenFooter>
         <Button 
           label="Review Job" 
@@ -109,12 +112,15 @@ export function SalesDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: 100 },
-  title: { ...typography.h2, marginBottom: spacing.xs },
-  subtitle: { ...typography.body, color: colors.textSecondary, marginBottom: spacing.xl },
-  label: { ...typography.h3, marginBottom: spacing.sm, marginTop: spacing.md },
+  title: { ...typography.h2,
+    color: colors.textPrimary, marginBottom: spacing.xs },
+  subtitle: { ...typography.body,
+    color: colors.textSecondary, marginBottom: spacing.xl },
+  label: { ...typography.h3,
+    color: colors.textPrimary, marginBottom: spacing.sm, marginTop: spacing.md },
   outcomesContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   outcomeButton: { alignSelf: 'flex-start' },
   input: {
@@ -124,6 +130,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: spacing.md,
     ...typography.body,
+    color: colors.textPrimary,
   },
   inputError: {
     borderColor: colors.danger || '#FF3B30',
@@ -133,6 +140,9 @@ const styles = StyleSheet.create({
     color: colors.danger || '#FF3B30',
     marginTop: spacing.xs,
   },
+  asterisk: {
+    color: colors.danger || '#FF3B30',
+  },
   textArea: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -140,6 +150,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: spacing.md,
     ...typography.body,
+    color: colors.textPrimary,
     minHeight: 100,
   }
 });

@@ -1,3 +1,4 @@
+import React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
@@ -8,7 +9,8 @@ import Toast from 'react-native-toast-message';
 
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { colors, spacing, typography, palette, FontFamily, FontSize } from '@/core/theme';
+import { spacing, typography, palette, FontFamily, FontSize, colors, useTheme } from '@/core/theme';
+
 import { useAssignments } from '@/hooks/useAssignments';
 import { previewOrderByQrToken, acceptOrderByQrToken } from '@/features/assignment/api/assignmentService';
 import { QrOrderSummaryDto, Assignment } from '@/features/assignment/types/Assignment';
@@ -24,6 +26,8 @@ function extractToken(scanned: string): string {
 }
 
 export function ScanQrScreen() {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
   const [permission, requestPermission] = useCameraPermissions();
   const { refetch: refetchAssignments } = useAssignments();
   const dispatch = useAppDispatch();
@@ -77,7 +81,7 @@ export function ScanQrScreen() {
     setStatus('accepting');
     try {
       const result = await acceptOrderByQrToken(token);
-      
+
       const newAssignment = {
         id: result.orderId,
         code: result.orderNumber,
@@ -98,7 +102,7 @@ export function ScanQrScreen() {
         timeline: [],
         createdAt: new Date().toISOString(),
       } as unknown as Assignment;
-      
+
       dispatch(addAssignment(newAssignment));
 
       Toast.show({ type: 'success', text1: 'Order assigned to you', text2: result.orderNumber });
@@ -129,7 +133,7 @@ export function ScanQrScreen() {
         <Text style={styles.permissionTitle}>Camera access needed</Text>
         <Text style={styles.permissionText}>Allow camera access to scan an order's QR code and assign it to yourself.</Text>
         <Button label="Grant Permission" onPress={requestPermission} style={{ marginTop: spacing.lg }} />
-        <Button label="Cancel" variant="outline" onPress={() => router.back()} style={{ marginTop: spacing.md }} />
+        <Button label="Cancel" variant="outline" onPress={() => router.back()} style={{ marginTop: spacing.md, borderColor: colors.danger, backgroundColor: 'transparent' }} textStyle={{ color: colors.danger }} />
       </SafeAreaView>
     );
   }
@@ -181,7 +185,8 @@ export function ScanQrScreen() {
                   variant="outline"
                   onPress={resetToScanning}
                   disabled={status === 'accepting'}
-                  style={{ flex: 1 }}
+                  style={{ flex: 1, borderColor: colors.danger, backgroundColor: 'transparent' }}
+                  textStyle={{ color: colors.danger }}
                 />
                 <Button
                   label="Assign to Me"
@@ -204,10 +209,10 @@ export function ScanQrScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.textPrimary,
+    backgroundColor: colors.background,
   },
   center: {
     alignItems: 'center',
@@ -216,6 +221,7 @@ const styles = StyleSheet.create({
   },
   permissionTitle: {
     ...typography.h3,
+    color: colors.textPrimary,
     marginTop: spacing.md,
     textAlign: 'center',
   },
@@ -276,6 +282,7 @@ const styles = StyleSheet.create({
   },
   previewOrderNumber: {
     ...typography.h3,
+    color: colors.textPrimary,
   },
   previewType: {
     ...typography.caption,
@@ -284,6 +291,7 @@ const styles = StyleSheet.create({
   },
   previewAddress: {
     ...typography.body,
+    color: colors.textPrimary,
     marginTop: spacing.xs,
   },
   previewAmount: {

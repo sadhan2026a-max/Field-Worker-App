@@ -1,7 +1,7 @@
 import React from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { StyleSheet, Text, View, Platform } from 'react-native';
-import { colors, spacing, shadows, FontFamily } from '@/core/theme';
+import { spacing, shadows, FontFamily, colors, useTheme } from '@/core/theme';
 
 interface StatCardProps {
   icon?: keyof typeof MaterialIcons.glyphMap;
@@ -15,6 +15,8 @@ interface StatCardProps {
 }
 
 export function StatCard({ icon, value, label, tint, tintLight, variant = 'compact', valueColor }: StatCardProps) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
   const isWide = variant === 'wide';
   const isDashboard = variant === 'dashboard';
 
@@ -24,7 +26,7 @@ export function StatCard({ icon, value, label, tint, tintLight, variant = 'compa
         <View style={styles.dashboardContent}>
           <View style={styles.dashboardTopRow}>
             {icon && (
-              <View style={[styles.dashboardIconChip, { backgroundColor: '#FFFFFF' }]}>
+              <View style={[styles.dashboardIconChip, { backgroundColor: colors.background }]}>
                 <MaterialIcons name={icon} size={16} color={tint} />
               </View>
             )}
@@ -37,7 +39,7 @@ export function StatCard({ icon, value, label, tint, tintLight, variant = 'compa
   }
 
   return (
-    <View style={[styles.card, shadows.card]}>
+    <View style={[styles.card]}>
       {isWide ? (
         <View style={styles.headerWide}>
           {icon && (
@@ -64,7 +66,7 @@ export function StatCard({ icon, value, label, tint, tintLight, variant = 'compa
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   card: {
     flex: 1,
     backgroundColor: colors.surface,
@@ -78,17 +80,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   cardShadow: {
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.04,
-        shadowRadius: 12,
-      },
-      android: {
-        elevation: 1,
-      },
-    }),
+    // Shadow removed
   },
   dashboardContent: {
     padding: 12,
@@ -110,13 +102,13 @@ const styles = StyleSheet.create({
   dashboardValue: {
     fontSize: 18,
     fontFamily: FontFamily.bold,
-    color: '#101828',
+    color: colors.textPrimary,
     flexShrink: 1,
   },
   dashboardLabel: {
     fontSize: 11,
     fontFamily: FontFamily.bold,
-    color: '#374151',
+    color: colors.textSecondary,
   },
   headerWide: {
     flexDirection: 'row',

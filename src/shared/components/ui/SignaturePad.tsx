@@ -1,7 +1,7 @@
 import React, { forwardRef, useImperativeHandle, useRef, useState, useEffect } from 'react';
 import { PanResponder, StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { colors, Borders } from '@/core/theme';
+import { useTheme, Borders } from '@/core/theme';
 
 export interface SignaturePadHandle {
   clear: () => void;
@@ -10,6 +10,7 @@ export interface SignaturePadHandle {
 interface SignaturePadProps {
   onChange?: (hasSignature: boolean, pathData: string) => void;
   height?: number;
+  initialValue?: string;
 }
 
 interface Point { x: number; y: number; }
@@ -29,8 +30,10 @@ function createSmoothPath(points: Point[]) {
 }
 
 export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
-  ({ onChange, height = 160 }, ref) => {
-    const [paths, setPaths] = useState<string[]>([]);
+  ({ onChange, height = 160, initialValue }, ref) => {
+    const { colors } = useTheme();
+    const styles = React.useMemo(() => useStyles(colors), [colors]);
+    const [paths, setPaths] = useState<string[]>(initialValue ? [initialValue] : []);
     const currentPoints = useRef<Point[]>([]);
     const currentPathRef = useRef<any>(null);
 
@@ -115,7 +118,7 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
 
 SignaturePad.displayName = 'SignaturePad';
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   pad: {
     backgroundColor: colors.surface,
     borderRadius: Borders.radius1,

@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl } f
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialIcons } from '@expo/vector-icons';
-import { colors, spacing, typography, palette, FontFamily } from '@/core/theme';
+import { spacing, typography, palette, FontFamily, colors, useTheme } from '@/core/theme';
+
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { selectDriver } from '@/features/auth/redux/authSlice';
 import { 
@@ -21,13 +22,15 @@ import { router } from 'expo-router';
 type Tab = 'cash' | 'payout';
 
 export default function WalletScreen() {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
   const dispatch = useAppDispatch();
   const driver = useAppSelector(selectDriver);
   const cashSettlements = useAppSelector(selectCashSettlements);
   const payouts = useAppSelector(selectPayouts);
   const isLoading = useAppSelector(selectWalletLoading);
   const error = useAppSelector(selectWalletError);
-  
+
   const [activeTab, setActiveTab] = useState<Tab>('cash');
   const [refreshing, setRefreshing] = useState(false);
 
@@ -144,7 +147,7 @@ export default function WalletScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,

@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View, ViewStyle } from 'react-native';
-import { colors, radius, spacing, FontSize, FontFamily } from '@/core/theme';
+import { radius, spacing, FontSize, FontFamily, colors, useTheme } from '@/core/theme';
+
 import { AssignmentStatus } from '@/domain/entities/Assignment';
 
 const STATUS_LABEL: Record<AssignmentStatus, string> = {
@@ -24,6 +25,8 @@ const STATUS_KEY: Record<AssignmentStatus, keyof typeof colors.status> = {
 };
 
 export function StatusBadge({ status, style }: { status: AssignmentStatus; style?: ViewStyle }) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
   const tone = colors.status[STATUS_KEY[status]];
   return (
     <View style={[styles.badge, { backgroundColor: tone.bg }, style]}>
@@ -32,7 +35,7 @@ export function StatusBadge({ status, style }: { status: AssignmentStatus; style
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   badge: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,

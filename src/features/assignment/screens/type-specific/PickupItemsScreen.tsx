@@ -5,12 +5,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { ScreenFooter } from '@/components/ui/ScreenFooter';
 import { Input } from '@/components/ui/Input';
-import { colors, spacing, typography, radius } from '@/core/theme';
+import { spacing, typography, radius, colors, useTheme } from '@/core/theme';
+
 import { useAssignment, useUpdateOrderItems } from '@/features/assignment/hooks/useAssignments';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ToastAndroid } from 'react-native';
 
 export function PickupItemsScreen() {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: assignment } = useAssignment(id as string);
   const { mutateAsync: updateOrderItems, isPending } = useUpdateOrderItems();
@@ -42,11 +45,11 @@ export function PickupItemsScreen() {
         id: itemId,
         quantity,
       }));
-      
+
       if (updatedItems.length > 0) {
         await updateOrderItems({ id: id as string, items: updatedItems });
       }
-      
+
       router.replace(`/assignment/${id}/proof`);
     } catch (e) {
       ToastAndroid.show('Failed to update items', ToastAndroid.SHORT);
@@ -58,7 +61,7 @@ export function PickupItemsScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Pickup Items</Text>
         <Text style={styles.subtitle}>Confirm items to collect for order #{assignment?.code}</Text>
-        
+
         {assignment?.items && assignment.items.length > 0 ? (
           assignment.items.map(item => (
             <View key={item.id} style={styles.itemCard}>
@@ -88,7 +91,7 @@ export function PickupItemsScreen() {
           </View>
         )}
       </ScrollView>
-      
+
       <ScreenFooter>
         <Button label="Continue" onPress={handleContinue} loading={isPending} />
       </ScreenFooter>
@@ -96,16 +99,19 @@ export function PickupItemsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxxl },
-  title: { ...typography.h2, marginBottom: spacing.xs },
-  subtitle: { ...typography.body, color: colors.textSecondary, marginBottom: spacing.sm },
+  title: { ...typography.h2,
+    color: colors.textPrimary, marginBottom: spacing.xs },
+  subtitle: { ...typography.body,
+    color: colors.textSecondary, marginBottom: spacing.sm },
   card: { padding: spacing.md, backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
   emptyCard: { padding: spacing.md, backgroundColor: colors.background, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, borderStyle: 'dashed' },
   itemText: { ...typography.bodyMedium },
-  emptyText: { ...typography.body, color: colors.textSecondary, fontStyle: 'italic', textAlign: 'center' },
-  
+  emptyText: { ...typography.body,
+    color: colors.textSecondary, fontStyle: 'italic', textAlign: 'center' },
+
   itemCard: {
     padding: spacing.md,
     backgroundColor: colors.surface,
@@ -123,6 +129,7 @@ const styles = StyleSheet.create({
   },
   itemName: {
     ...typography.bodyMedium,
+    color: colors.textPrimary,
     fontWeight: '600'
   },
   itemDetail: {

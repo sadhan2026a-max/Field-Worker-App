@@ -1,13 +1,15 @@
+import React from 'react';
 import { ReactNode } from 'react';
 import {
   ActivityIndicator,
   Pressable,
+  StyleProp,
   StyleSheet,
   Text,
   TextStyle,
   ViewStyle,
 } from 'react-native';
-import { colors, Borders, spacing, typography, hp, wp, FontSize, FontFamily } from '@/core/theme';
+import { Borders, spacing, typography, hp, wp, FontSize, FontFamily, colors, useTheme } from '@/core/theme';
 
 type Variant = 'primary' | 'secondary' | 'outline';
 
@@ -17,11 +19,11 @@ interface ButtonProps {
   variant?: Variant;
   disabled?: boolean;
   loading?: boolean;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   /** Optional icon rendered to the left of the label. */
   icon?: ReactNode;
   /** Overrides the label's text style. */
-  textStyle?: TextStyle;
+  textStyle?: StyleProp<TextStyle>;
 }
 
 export function Button({
@@ -34,7 +36,9 @@ export function Button({
   icon,
   textStyle,
 }: ButtonProps) {
-  const isDisabled = disabled || loading;
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
+  const isDisabled = Boolean(disabled || loading);
 
   return (
     <Pressable
@@ -44,7 +48,7 @@ export function Button({
         styles.base,
         !!icon && styles.baseWithIcon,
         variantStyles[variant],
-        isDisabled && styles.disabled,
+        (disabled && !loading) && styles.disabled,
         pressed && !isDisabled && styles.pressed,
         style,
       ]}
@@ -61,7 +65,7 @@ export function Button({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   base: {
     height: hp(5.5),
     borderRadius: 90,
@@ -80,7 +84,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   disabled: {
-    backgroundColor: '#E8E6EA',
+    opacity: 0.5,
     shadowOpacity: 0,
     elevation: 0,
   },
@@ -102,4 +106,3 @@ const variantStyles: Record<Variant, ViewStyle> = {
   secondary: { backgroundColor: colors.textPrimary },
   outline: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.primary, shadowOpacity: 0, elevation: 0 },
 };
-

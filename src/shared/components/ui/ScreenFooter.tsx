@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, spacing } from '@/core/theme';
+import { spacing, colors, useTheme } from '@/core/theme';
 
 interface ScreenFooterProps {
   children: React.ReactNode;
@@ -13,8 +13,10 @@ interface ScreenFooterProps {
  * Automatically adds bottom padding for notch devices and home indicators.
  */
 export function ScreenFooter({ children, style }: ScreenFooterProps) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
-  
+
   return (
     <View 
       style={[
@@ -28,7 +30,7 @@ export function ScreenFooter({ children, style }: ScreenFooterProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   footer: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,

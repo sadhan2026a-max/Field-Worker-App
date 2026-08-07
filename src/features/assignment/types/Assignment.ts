@@ -34,6 +34,8 @@ export interface ValidationRules {
   maxLength?: number;
 }
 
+export type ChecklistItemType = 'Checkbox' | 'Radio' | 'Text' | 'Number' | 'Dropdown' | 'Multiselect' | 'Date' | 'Time' | 'Image' | 'Signature';
+
 export interface ChecklistTemplateItem {
   id: string;
   orderType: string;
@@ -41,10 +43,8 @@ export interface ChecklistTemplateItem {
   isRequired: boolean;
   isActive: boolean;
   sortOrder: number;
-  
-  // These might be added by the backend later for dynamic support
-  fieldType?: FieldType;
-  validationRules?: ValidationRules;
+  itemType?: ChecklistItemType;
+  options?: string[];
 }
 
 export interface ChecklistItem {
@@ -52,10 +52,12 @@ export interface ChecklistItem {
   label: string;
   isRequired: boolean;
   isChecked: boolean; // Legacy/fallback for simple checkbox
-  value?: any; // The dynamic response value
+  value?: string | null; // The dynamic response value
   notes: string | null;
   sortOrder: number;
   checkedAt: string | null;
+  itemType?: ChecklistItemType;
+  options?: string[];
 }
 
 export interface ReturnDetail {
@@ -164,6 +166,9 @@ export interface OrderChecklistItemDto {
   notes: string | null;
   sortOrder: number;
   checkedAt: string | null;
+  itemType?: ChecklistItemType;
+  options?: string[];
+  value?: string | null;
 }
 
 // Same shape as returned by GET /api/v1/orders/{id}/checklist

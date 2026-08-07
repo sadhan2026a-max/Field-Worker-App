@@ -7,7 +7,7 @@ import Toast from 'react-native-toast-message';
 
 import { Button } from '@/components/ui/Button';
 import { ScreenFooter } from '@/components/ui/ScreenFooter';
-import { colors, spacing, typography, palette } from '@/core/theme';
+import { spacing, typography, palette, useTheme } from '@/core/theme';
 import { useAssignment } from '@/features/assignment/hooks/useAssignments';
 import { getChecklistTemplates, saveChecklist } from '@/features/assignment/api/assignmentService';
 import { ChecklistItem, ChecklistTemplateItem } from '@/features/assignment/types/Assignment';
@@ -15,6 +15,8 @@ import { DynamicField } from '@/features/assignment/components/DynamicField';
 import { validateChecklistItem } from '@/features/assignment/utils/validation';
 
 export function ChecklistScreen() {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: assignment, isLoading: isAssignmentLoading } = useAssignment(id as string);
   
@@ -49,7 +51,8 @@ export function ChecklistScreen() {
             isRequired: item.isRequired,
             isActive: true,
             sortOrder: item.sortOrder,
-            fieldType: 'checkbox', // Default to basic checkbox
+            itemType: item.itemType || 'Checkbox', // Default to basic checkbox
+            options: item.options || [],
           }));
         } else {
           throw templateErr;
@@ -67,10 +70,12 @@ export function ChecklistScreen() {
           label: t.label,
           isRequired: t.isRequired,
           isChecked: existingVal?.isChecked || false,
-          value: existingVal?.isChecked,
+          value: existingVal?.value !== undefined && existingVal?.value !== null ? existingVal.value : (existingVal?.isChecked ? "true" : null),
           notes: existingVal?.notes || null,
           sortOrder: t.sortOrder,
           checkedAt: existingVal?.checkedAt || null,
+          itemType: t.itemType,
+          options: t.options,
         };
       });
       setItems(initialItems);
@@ -135,7 +140,7 @@ export function ChecklistScreen() {
       Toast.show({ type: 'success', text1: 'Checklist saved successfully' });
       
       // Navigate to the next logical step based on assignment type
-      safeRouter.replace(`/assignment/${id}/proof`);
+      safeRouter.push(`/assignment/${id}/proof`);
       
     } catch (err) {
       Alert.alert('Error', 'Failed to save checklist. Please try again.');
@@ -199,7 +204,7 @@ export function ChecklistScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   container: { 
     flex: 1, 
     backgroundColor: colors.background 
@@ -215,6 +220,7 @@ const styles = StyleSheet.create({
   },
   title: { 
     ...typography.h2, 
+    color: colors.textPrimary,
     marginBottom: spacing.xs 
   },
   subtitle: { 

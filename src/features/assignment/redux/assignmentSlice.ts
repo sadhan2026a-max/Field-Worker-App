@@ -56,6 +56,11 @@ export const fetchAssignmentById = createAsyncThunk<Assignment | undefined, stri
   (id) => assignmentService.getAssignmentById(id),
 );
 
+export const addOrderNoteThunk = createAsyncThunk<void, { id: string; notes: string }>(
+  'assignment/addOrderNote',
+  (params) => assignmentService.addOrderNote(params.id, params.notes),
+);
+
 export const startAssignment = createAsyncThunk<Assignment, string>(
   'assignment/startAssignment',
   (id) => assignmentService.startAssignment(id),
@@ -64,7 +69,15 @@ export const startAssignment = createAsyncThunk<Assignment, string>(
 export const saveDeliveryProof = createAsyncThunk<
   Assignment,
   { id: string; proofPhotoUri?: string; signatureUri?: string; deliveryNotes?: string }
->('assignment/saveDeliveryProof', (params) => assignmentService.saveDeliveryProof(params.id, params));
+>('assignment/saveDeliveryProof', async (params) => {
+  const result = await assignmentService.saveDeliveryProof(params.id, params);
+  return {
+    ...result,
+    proofPhotoUri: params.proofPhotoUri,
+    signatureUri: params.signatureUri,
+    deliveryNotes: params.deliveryNotes,
+  };
+});
 
 export const confirmPayment = createAsyncThunk(
   'assignment/confirmPayment',
@@ -126,6 +139,13 @@ export const markArrived = createAsyncThunk<Assignment, string>(
   'assignment/markArrived',
   async (id) => {
     return await assignmentService.markArrived(id);
+  }
+);
+
+export const cancelAssignment = createAsyncThunk<Assignment, { id: string; reason: string }>(
+  'assignment/cancelAssignment',
+  async (params) => {
+    return await assignmentService.cancelAssignment(params.id, params.reason);
   }
 );
 
@@ -199,6 +219,18 @@ const assignmentSlice = createSlice({
       .addCase(markArrived.rejected, (state, action) => {
         state.isMutating = false;
         state.error = action.error.message || 'Failed to mark as arrived';
+      })
+      .addCase(cancelAssignment.pending, (state) => {
+        state.isMutating = true;
+        state.error = null;
+      })
+      .addCase(cancelAssignment.fulfilled, (state, action) => {
+        state.isMutating = false;
+        upsertAssignment(state, action.payload);
+      })
+      .addCase(cancelAssignment.rejected, (state, action) => {
+        state.isMutating = false;
+        state.error = action.error.message || 'Failed to cancel assignment';
       });
 
     builder
@@ -218,7 +250,7 @@ const assignmentSlice = createSlice({
           const fetchedIds = new Set(action.payload.map((a) => a.id));
           state.items = state.items.filter((item) => {
             if (item.status === 'pending' && !fetchedIds.has(item.id)) {
-              return false; // Remove stuck pending order
+              return false;
             }
             return true;
           });

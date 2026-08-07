@@ -2,7 +2,7 @@ import { FontAwesome, MaterialIcons } from '@expo/vector-icons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { safeRouter } from '@/shared/utils/navigation';
 import type { ReactNode } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View, Alert, RefreshControl } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View, Alert, RefreshControl, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import React, { useState } from 'react';
@@ -11,16 +11,19 @@ import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Avatar } from '@/components/ui/Avatar';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { ScreenLoader } from '@/components/ui/ScreenLoader';
+import { Skeleton } from '@/shared/components/ui/Skeleton';
 import { ScreenFooter } from '@/components/ui/ScreenFooter';
-import { colors, spacing, typography, palette, FontFamily, FontSize } from '@/core/theme';
-import { useAssignment, useStartAssignment, useAcceptOffer, useDeclineOffer, useStartNavigation, useMarkArrived, useCompleteAssignment } from '@/features/assignment/hooks/useAssignments';
+import { colors as lightColors, spacing, typography, palette, FontFamily, FontSize, useTheme } from '@/core/theme';
+import { useAssignment, useStartAssignment, useAcceptOffer, useDeclineOffer, useStartNavigation, useMarkArrived, useCompleteAssignment, useCancelAssignment } from '@/features/assignment/hooks/useAssignments';
 import { externalMapsUrl } from '@/shared/services/maps';
 import { useCurrentLocation } from '@/shared/utils/location';
 import { DistanceDisplay } from '@/features/assignment/components';
-import { useAppSelector } from '@/store/hooks';
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { selectDriver } from '@/features/auth/redux/authSlice';
+import { addOrderNoteThunk } from '@/features/assignment/redux/assignmentSlice';
+
 export function AssignmentDetailScreen() {
+  const { colors } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: assignment, isLoading, refetch } = useAssignment(id);
   const startAssignment = useStartAssignment();
@@ -31,9 +34,22 @@ export function AssignmentDetailScreen() {
   const completeAssignment = useCompleteAssignment();
   const currentLocation = useCurrentLocation();
   const driver = useAppSelector(selectDriver);
+  const dispatch = useAppDispatch();
 
   const [refreshing, setRefreshing] = useState(false);
   const [actionType, setActionType] = useState<'accept' | 'decline' | null>(null);
+  
+  const cancelAssignment = useCancelAssignment();
+  
+  const [isNoteModalVisible, setNoteModalVisible] = useState(false);
+  const [noteText, setNoteText] = useState('');
+  const [isSavingNote, setIsSavingNote] = useState(false);
+
+  const [isCancelModalVisible, setCancelModalVisible] = useState(false);
+  const [cancelReasonText, setCancelReasonText] = useState('');
+  const [isCancelling, setIsCancelling] = useState(false);
+
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
@@ -45,7 +61,60 @@ export function AssignmentDetailScreen() {
   }, [refetch]);
 
   if (isLoading) {
-    return <ScreenLoader />;
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={styles.customHeaderBar}>
+          <Pressable style={styles.backButton} onPress={() => router.back()}>
+            <MaterialIcons name="arrow-back" size={24} color={colors.textPrimary} />
+          </Pressable>
+          <Text style={styles.headerTitle}>Assignment Details</Text>
+        </View>
+        <ScrollView contentContainerStyle={styles.content}>
+          <View style={styles.codeHeader}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+              <Skeleton width={150} height={24} borderRadius={4} />
+              <Skeleton width={80} height={20} borderRadius={999} />
+            </View>
+            <Skeleton width={90} height={24} borderRadius={999} />
+          </View>
+
+          <Card style={styles.customerCard}>
+            <View style={styles.customerHeader}>
+              <Skeleton width={52} height={52} borderRadius={26} />
+              <View style={{ justifyContent: 'center', gap: 4 }}>
+                <Skeleton width={120} height={16} borderRadius={4} />
+                <Skeleton width={100} height={12} borderRadius={4} />
+              </View>
+            </View>
+            <View style={styles.divider} />
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Skeleton style={{ flex: 1 }} height={40} borderRadius={8} />
+              <Skeleton style={{ flex: 1 }} height={40} borderRadius={8} />
+              <Skeleton style={{ flex: 1 }} height={40} borderRadius={8} />
+            </View>
+          </Card>
+
+          <Card style={{ padding: 16, gap: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Skeleton width={20} height={20} borderRadius={10} />
+              <View style={{ gap: 4 }}>
+                <Skeleton width={80} height={12} borderRadius={4} />
+                <Skeleton width={120} height={16} borderRadius={4} />
+              </View>
+            </View>
+            <View style={styles.divider} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Skeleton width={20} height={20} borderRadius={10} />
+              <View style={{ gap: 4, flex: 1 }}>
+                <Skeleton width={80} height={12} borderRadius={4} />
+                <Skeleton width="100%" height={32} borderRadius={4} />
+              </View>
+            </View>
+          </Card>
+        </ScrollView>
+      </SafeAreaView>
+    );
   }
 
   if (!assignment) {
@@ -57,7 +126,6 @@ export function AssignmentDetailScreen() {
             <MaterialIcons name="arrow-back" size={24} color={colors.textPrimary} />
           </Pressable>
           <Text style={styles.headerTitle}>Assignment Details</Text>
-          <View style={styles.headerSpacer} />
         </View>
         <View style={styles.content}>
           <EmptyState
@@ -76,64 +144,90 @@ export function AssignmentDetailScreen() {
 
   const comingSoon = () => Toast.show({ type: 'warning', text1: 'Coming soon' });
 
-  const quickActions: { key: string; icon: ReactNode; bg: string; label: string; onPress: () => void }[] = [
+  const allQuickActions: { key: string; icon: ReactNode; bg: string; label: string; onPress: () => void }[] = [
     {
       key: 'call',
-      icon: <MaterialIcons name="call" size={20} color={palette.green} />,
-      bg: palette.greenLight,
+      icon: <MaterialIcons name="call" size={20} color={colors.primary} />,
+      bg: colors.primaryLight,
       label: 'Call',
       onPress: () => Linking.openURL(`tel:${assignment.customer.phone}`),
     },
     {
       key: 'whatsapp',
-      icon: <FontAwesome name="whatsapp" size={20} color={palette.green} />,
-      bg: palette.greenLight,
+      icon: <FontAwesome name="whatsapp" size={20} color={colors.primary} />,
+      bg: colors.primaryLight,
       label: 'WhatsApp',
       onPress: () => Linking.openURL(`https://wa.me/${assignment.customer.phone.replace(/\D/g, '')}`),
     },
     {
       key: 'navigate',
-      icon: <MaterialIcons name="near-me" size={20} color={palette.purple} />,
-      bg: palette.purpleLight,
+      icon: <MaterialIcons name="near-me" size={20} color={colors.accent} />,
+      bg: colors.accentLight,
       label: 'Navigate',
       onPress: () => Linking.openURL(externalMapsUrl(assignment.customer.location, assignment.customer.name, assignment.customer.address)),
     },
     {
       key: 'photo',
-      icon: <MaterialIcons name="photo-camera" size={20} color={palette.purple} />,
-      bg: palette.purpleLight,
+      icon: <MaterialIcons name="photo-camera" size={20} color={colors.accent} />,
+      bg: colors.accentLight,
       label: 'Photo',
       onPress: () => safeRouter.push({ pathname: '/assignment/[id]/proof', params: { id: assignment.id } }),
     },
     {
       key: 'signature',
-      icon: <MaterialIcons name="edit" size={20} color={palette.orange} />,
-      bg: palette.orangeLight,
+      icon: <MaterialIcons name="edit" size={20} color={colors.warning} />,
+      bg: colors.warningLight,
       label: 'Signature',
       onPress: () => safeRouter.push({ pathname: '/assignment/[id]/proof', params: { id: assignment.id } }),
     },
     {
       key: 'payment',
-      icon: <MaterialIcons name="payments" size={20} color={palette.orange} />,
-      bg: palette.orangeLight,
+      icon: <MaterialIcons name="payments" size={20} color={colors.warning} />,
+      bg: colors.warningLight,
       label: 'Payment',
       onPress: () => safeRouter.push({ pathname: '/assignment/[id]/payment', params: { id: assignment.id } }),
     },
     {
+      key: 'add-note',
+      icon: <MaterialIcons name="note-add" size={20} color={colors.info} />,
+      bg: colors.infoLight,
+      label: 'Add Note',
+      onPress: () => setNoteModalVisible(true),
+    },
+    {
       key: 'issue',
-      icon: <MaterialIcons name="report-problem" size={20} color={palette.red} />,
-      bg: palette.redLight,
+      icon: <MaterialIcons name="report-problem" size={20} color={colors.danger} />,
+      bg: colors.dangerLight,
       label: 'Issue',
       onPress: comingSoon,
     },
-    {
-      key: 'more',
-      icon: <MaterialIcons name="more-horiz" size={20} color={colors.textPrimary} />,
-      bg: palette.grey100,
-      label: 'More',
-      onPress: comingSoon,
-    },
   ];
+
+  const quickActions = allQuickActions.filter(action => {
+    if (assignment?.status === 'pending' && (action.key === 'call' || action.key === 'whatsapp')) {
+      return false;
+    }
+    return true;
+  });
+
+  const onSaveNote = async () => {
+    if (!noteText.trim()) {
+      Toast.show({ type: 'error', text1: 'Please enter a note' });
+      return;
+    }
+    setIsSavingNote(true);
+    try {
+      await dispatch(addOrderNoteThunk({ id: assignment.id, notes: noteText.trim() })).unwrap();
+      Toast.show({ type: 'success', text1: 'Note added successfully' });
+      setNoteText('');
+      setNoteModalVisible(false);
+      refetch();
+    } catch (error) {
+      Toast.show({ type: 'error', text1: 'Failed to add note' });
+    } finally {
+      setIsSavingNote(false);
+    }
+  };
 
   const onAccept = async () => {
     setActionType('accept');
@@ -149,7 +243,7 @@ export function AssignmentDetailScreen() {
 
   const onDecline = () => {
     Alert.alert('Decline Offer', 'Are you sure you want to decline this assignment?', [
-      { text: 'Cancel', style: 'cancel' },
+      { text: 'Back', style: 'cancel' },
       {
         text: 'Decline',
         style: 'destructive',
@@ -169,11 +263,31 @@ export function AssignmentDetailScreen() {
     ]);
   };
 
+  const onCancelOrder = async () => {
+    if (!cancelReasonText.trim()) {
+      Toast.show({ type: 'error', text1: 'Please enter a cancellation reason' });
+      return;
+    }
+    setIsCancelling(true);
+    try {
+      await cancelAssignment.mutateAsync({ id: assignment!.id, reason: cancelReasonText.trim() });
+      Toast.show({ type: 'success', text1: 'Order Cancelled successfully' });
+      setCancelReasonText('');
+      setCancelModalVisible(false);
+      refetch();
+    } catch (error) {
+      Toast.show({ type: 'error', text1: 'Failed to cancel order' });
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
   const onActionPress = async () => {
     try {
       if (assignment.status === 'accepted') {
         await startNavigation.mutateAsync(assignment.id);
         Toast.show({ type: 'success', text1: 'Navigation Started' });
+        Linking.openURL(externalMapsUrl(assignment.customer.location, assignment.customer.name, assignment.customer.address));
         return;
       }
 
@@ -265,7 +379,6 @@ export function AssignmentDetailScreen() {
           <MaterialIcons name="arrow-back" size={24} color={colors.textPrimary} />
         </Pressable>
         <Text style={styles.headerTitle}>Assignment Details</Text>
-        <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView
@@ -290,7 +403,7 @@ export function AssignmentDetailScreen() {
 
         {isAssignedToOther && (
           <View style={styles.warningBanner}>
-            <MaterialIcons name="error-outline" size={20} color={palette.red} />
+            <MaterialIcons name="error-outline" size={20} color={colors.danger} />
             <Text style={styles.warningText}>
               This order is currently assigned to {assignment.assignedDriverName || 'another driver'}.
             </Text>
@@ -309,21 +422,21 @@ export function AssignmentDetailScreen() {
 
           <View style={styles.divider} />
 
-          {/* Call & WhatsApp buttons — only show for active/pending orders */}
-          {assignment.status !== 'completed' && assignment.status !== 'cancelled' && (
+          {/* Call & WhatsApp buttons — only show for active orders (not pending, completed, or cancelled) */}
+          {assignment.status !== 'pending' && assignment.status !== 'completed' && assignment.status !== 'cancelled' && (
             <View style={styles.customerActions}>
               <Pressable
                 style={[styles.actionBtn, styles.callBtn]}
                 onPress={() => Linking.openURL(`tel:${assignment.customer.phone}`)}
               >
-                <MaterialIcons name="call" size={18} color={palette.green} />
+                <MaterialIcons name="call" size={18} color={colors.primary} />
                 <Text style={styles.actionBtnText}>Call Customer</Text>
               </Pressable>
               <Pressable
                 style={[styles.actionBtn, styles.waBtn]}
                 onPress={() => Linking.openURL(`https://wa.me/${assignment.customer.phone.replace(/\D/g, '')}`)}
               >
-                <FontAwesome name="whatsapp" size={18} color={palette.green} />
+                <FontAwesome name="whatsapp" size={18} color={colors.primary} />
                 <Text style={styles.actionBtnText}>WhatsApp Chat</Text>
               </Pressable>
             </View>
@@ -342,13 +455,15 @@ export function AssignmentDetailScreen() {
             <Text style={styles.addressText}>
               {assignment.customer.address.split(',').slice(1).join(',').trim()}
             </Text>
-            <DistanceDisplay
-              style={styles.distanceText}
-              currentLocation={currentLocation}
-              targetLocation={assignment.customer.location}
-              targetAddress={assignment.customer.address}
-              backendDistanceKm={assignment.distanceKm}
-            />
+            {assignment.status !== 'completed' && assignment.status !== 'cancelled' && (
+              <DistanceDisplay
+                style={styles.distanceText}
+                currentLocation={currentLocation}
+                targetLocation={assignment.customer.location}
+                targetAddress={assignment.customer.address}
+                backendDistanceKm={assignment.distanceKm}
+              />
+            )}
           </View>
         </Card>
 
@@ -397,8 +512,8 @@ export function AssignmentDetailScreen() {
           </Card>
         )}
 
-        {/* Quick Actions Grid — only show for active/pending orders */}
-        {!isAssignedToOther && assignment.status !== 'completed' && assignment.status !== 'cancelled' && (
+        {/* Quick Actions Grid — only show for active orders (not pending, completed, or cancelled) */}
+        {!isAssignedToOther && assignment.status !== 'pending' && assignment.status !== 'completed' && assignment.status !== 'cancelled' && (
           <View style={styles.actionsSection}>
             <Text style={styles.sectionTitle}>Quick Actions</Text>
             <View style={styles.quickActionsGrid}>
@@ -415,20 +530,114 @@ export function AssignmentDetailScreen() {
         )}
       </ScrollView>
 
-      {!isAssignedToOther && assignment.status !== 'pending' && (
+      {!isAssignedToOther && assignment.status !== 'completed' && assignment.status !== 'cancelled' && (
         <ScreenFooter>
-          <Button
-            label={actionLabel}
-            onPress={onActionPress}
-            loading={isActionLoading}
-          />
+          {assignment.status === 'pending' ? (
+            <View style={{ flexDirection: 'row', gap: spacing.md }}>
+              <Button
+                label="Decline"
+                variant="outline"
+                onPress={onDecline}
+                loading={actionType === 'decline' && declineOffer.isPending}
+                disabled={actionType === 'accept' && acceptOffer.isPending}
+                style={{ flex: 1, borderColor: colors.danger, backgroundColor: 'transparent' }}
+                textStyle={{ color: colors.danger }}
+              />
+              <Button
+                label="Accept Offer"
+                onPress={onAccept}
+                loading={actionType === 'accept' && acceptOffer.isPending}
+                disabled={actionType === 'decline' && declineOffer.isPending}
+                style={{ flex: 1, backgroundColor: palette.green, borderColor: palette.green }}
+              />
+            </View>
+          ) : (
+            <View style={{ gap: spacing.md, width: '100%' }}>
+              <Button
+                label={actionLabel}
+                onPress={onActionPress}
+                loading={isActionLoading}
+              />
+              <Button
+                label="Cancel Order"
+                variant="outline"
+                onPress={() => setCancelModalVisible(true)}
+                style={{ borderColor: colors.danger, backgroundColor: 'transparent' }}
+                textStyle={{ color: colors.danger }}
+              />
+            </View>
+          )}
         </ScreenFooter>
       )}
+
+      {/* Add Note Modal */}
+      <Modal visible={isNoteModalVisible} transparent animationType="fade">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add Global Note</Text>
+              <Pressable onPress={() => setNoteModalVisible(false)} style={styles.modalCloseButton}>
+                <MaterialIcons name="close" size={24} color={colors.textSecondary} />
+              </Pressable>
+            </View>
+            <View style={styles.modalBody}>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Type your note here..."
+                placeholderTextColor={colors.textSecondary}
+                multiline
+                numberOfLines={4}
+                value={noteText}
+                onChangeText={setNoteText}
+                textAlignVertical="top"
+              />
+            </View>
+            <View style={styles.modalFooter}>
+              <Button label="Cancel" variant="outline" onPress={() => setNoteModalVisible(false)} style={[styles.modalBtn, { borderColor: colors.danger, backgroundColor: 'transparent' }]} textStyle={{ color: colors.danger }} />
+              <Button label="Save Note" onPress={onSaveNote} loading={isSavingNote} style={styles.modalBtn} />
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Cancel Order Modal */}
+      <Modal visible={isCancelModalVisible} transparent animationType="fade">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.danger }]}>Cancel Order</Text>
+              <Pressable onPress={() => setCancelModalVisible(false)} style={styles.modalCloseButton}>
+                <MaterialIcons name="close" size={24} color={colors.textSecondary} />
+              </Pressable>
+            </View>
+            <View style={styles.modalBody}>
+              <Text style={{ ...typography.bodyMedium, color: colors.textSecondary, marginBottom: spacing.sm }}>
+                Please provide a reason for cancelling this order.
+              </Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Enter cancellation reason..."
+                placeholderTextColor={colors.textSecondary}
+                multiline
+                numberOfLines={3}
+                value={cancelReasonText}
+                onChangeText={setCancelReasonText}
+                textAlignVertical="top"
+              />
+            </View>
+            <View style={styles.modalFooter}>
+              <Button label="Back" variant="outline" onPress={() => setCancelModalVisible(false)} style={[styles.modalBtn, { borderColor: colors.border, backgroundColor: 'transparent' }]} textStyle={{ color: colors.textPrimary }} />
+              <Button label="Confirm Cancel" onPress={onCancelOrder} loading={isCancelling} style={[styles.modalBtn, { backgroundColor: colors.danger, borderColor: colors.danger }]} />
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -436,20 +645,18 @@ const styles = StyleSheet.create({
   customHeaderBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     backgroundColor: colors.background,
   },
   backButton: {
     padding: spacing.xs,
+    marginRight: spacing.sm,
   },
   headerTitle: {
     ...typography.h3,
     fontSize: FontSize.medium,
-  },
-  headerSpacer: {
-    width: 32,
+    color: colors.textPrimary,
   },
   content: {
     padding: spacing.md,
@@ -463,29 +670,31 @@ const styles = StyleSheet.create({
   },
   codeText: {
     ...typography.h2,
+    color: colors.textPrimary,
   },
   typeBadge: {
-    backgroundColor: palette.grey200,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
+    backgroundColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: 999,
   },
   typeBadgeText: {
-    fontSize: 12,
+    fontSize: FontSize.extraSmall,
     fontFamily: FontFamily.bold,
+    letterSpacing: 0.3,
     color: colors.textSecondary,
   },
   warningBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: palette.redLight,
+    backgroundColor: colors.dangerLight,
     padding: spacing.md,
     borderRadius: 8,
     gap: spacing.sm,
   },
   warningText: {
     ...typography.bodyMedium,
-    color: palette.red,
+    color: colors.danger,
     flex: 1,
   },
   customerCard: {
@@ -506,6 +715,7 @@ const styles = StyleSheet.create({
     ...typography.bodyMedium,
     fontFamily: FontFamily.semiBold,
     fontSize: 13,
+    color: colors.textPrimary,
   },
   customerPhone: {
     ...typography.caption,
@@ -531,15 +741,15 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   callBtn: {
-    backgroundColor: palette.greenLight,
+    backgroundColor: colors.primaryLight,
   },
   waBtn: {
-    backgroundColor: palette.greenLight,
+    backgroundColor: colors.primaryLight,
   },
   actionBtnText: {
     fontFamily: FontFamily.medium,
     fontSize: 10,
-    color: palette.greenDark,
+    color: colors.primary,
   },
   addressCard: {
     flexDirection: 'row',
@@ -557,18 +767,20 @@ const styles = StyleSheet.create({
     ...typography.bodyMedium,
     fontFamily: FontFamily.semiBold,
     fontSize: 12,
+    color: colors.textPrimary,
   },
   addressText: {
     ...typography.caption,
     fontSize: 10,
     marginTop: 2,
     lineHeight: 14,
+    color: colors.textSecondary,
   },
   distanceText: {
     ...typography.caption,
     fontSize: 10,
     fontFamily: FontFamily.bold,
-    color: palette.orange,
+    color: colors.warning,
     marginTop: 4,
   },
   sectionCard: {
@@ -580,6 +792,7 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.bold,
     marginBottom: 4,
     fontSize: 12,
+    color: colors.textPrimary,
   },
   orderSummary: {
     ...typography.caption,
@@ -596,6 +809,7 @@ const styles = StyleSheet.create({
     ...typography.caption,
     fontSize: 10,
     lineHeight: 14,
+    color: colors.textPrimary,
   },
   actionsSection: {
     gap: spacing.md,
@@ -639,13 +853,13 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: palette.green,
+    backgroundColor: colors.primary,
     marginTop: 4,
   },
   timelineLine: {
     flex: 1,
     width: 2,
-    backgroundColor: palette.grey200,
+    backgroundColor: colors.border,
     marginTop: 4,
     marginBottom: 4,
   },
@@ -656,6 +870,7 @@ const styles = StyleSheet.create({
   timelineStatus: {
     ...typography.bodyMedium,
     fontFamily: FontFamily.semiBold,
+    color: colors.textPrimary,
   },
   timelineTime: {
     ...typography.caption,
@@ -668,4 +883,56 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginTop: 2,
   },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: spacing.xl,
+  },
+  modalContainer: {
+    backgroundColor: colors.background,
+    borderRadius: 16,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12 },
+      android: { elevation: 8 },
+    }),
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing.lg,
+    borderBottomWidth: 1,
+    borderColor: colors.border,
+  },
+  modalTitle: {
+    ...typography.h3,
+    color: colors.textPrimary,
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalBody: {
+    padding: spacing.lg,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    padding: spacing.md,
+    ...typography.bodyMedium,
+    color: colors.textPrimary,
+    minHeight: 120,
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    padding: spacing.lg,
+    borderTopWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.md,
+  },
+  modalBtn: {
+    flex: 1,
+  }
 });

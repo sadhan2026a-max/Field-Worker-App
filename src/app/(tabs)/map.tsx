@@ -1,7 +1,10 @@
+import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, typography } from '@/core/theme';
+import { typography, colors, useTheme } from '@/core/theme';
 
 export default function MapScreen() {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
   return (
     <View style={styles.container}>
       <Text style={styles.text}>Live map coming soon</Text>
@@ -9,7 +12,7 @@ export default function MapScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -17,6 +20,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   text: {
-    ...typography.caption,
+    ...typography.h3,
+    color: colors.textSecondary,
   },
 });

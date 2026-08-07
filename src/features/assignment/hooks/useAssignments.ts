@@ -23,10 +23,11 @@ import {
   markArrived as markArrivedThunk,
   updateOrderItems as updateOrderItemsThunk,
   verifyOrderOtp as verifyOrderOtpThunk,
+  cancelAssignment as cancelAssignmentThunk,
   restoreAssignments,
   restoreWorkspaceSummary,
 } from '@/features/assignment/redux/assignmentSlice';
-import { markRelatedNotificationsRead } from '@/features/notification/redux/notificationSlice';
+import { markRelatedNotificationsRead, markRelatedNotificationsAsReadThunk } from '@/features/notification/redux/notificationSlice';
 
 export function useWorkspaceSummary() {
   const dispatch = useAppDispatch();
@@ -195,8 +196,10 @@ export function useCompleteAssignment() {
     isPending,
     mutateAsync: async (id: string) => {
       const result = await dispatch(completeAssignmentThunk(id)).unwrap();
-      // Clear notification badge for this order
-      dispatch(markRelatedNotificationsRead(result.id));
+      // Clear notification badge for this order locally and on the server
+      const payload = { orderId: result.id, offerId: result.offerId, orderNumber: result.code };
+      dispatch(markRelatedNotificationsRead(payload));
+      dispatch(markRelatedNotificationsAsReadThunk(payload));
       return result;
     },
   };
@@ -210,8 +213,10 @@ export function useAcceptOffer() {
     isPending,
     mutateAsync: async (id: string) => {
       const result = await dispatch(acceptOfferThunk(id)).unwrap();
-      // Clear notification badge for this order
-      dispatch(markRelatedNotificationsRead(result.id));
+      // Clear notification badge for this order locally and on the server
+      const payload = { orderId: result.id, offerId: result.offerId, orderNumber: result.code };
+      dispatch(markRelatedNotificationsRead(payload));
+      dispatch(markRelatedNotificationsAsReadThunk(payload));
       return result;
     },
   };
@@ -225,8 +230,26 @@ export function useDeclineOffer() {
     isPending,
     mutateAsync: async (id: string) => {
       const result = await dispatch(declineOfferThunk(id)).unwrap();
-      // Clear notification badge for this order
-      dispatch(markRelatedNotificationsRead(id));
+      // Clear notification badge for this order locally and on the server
+      const payload = { orderId: id, offerId: id }; // id might be the offer id
+      dispatch(markRelatedNotificationsRead(payload));
+      dispatch(markRelatedNotificationsAsReadThunk(payload));
+      return result;
+    },
+  };
+}
+
+export function useCancelAssignment() {
+  const dispatch = useAppDispatch();
+  const isPending = useAppSelector(selectIsMutating);
+
+  return {
+    isPending,
+    mutateAsync: async (params: { id: string; reason: string }) => {
+      const result = await dispatch(cancelAssignmentThunk(params)).unwrap();
+      const payload = { orderId: result.id, offerId: result.offerId, orderNumber: result.code };
+      dispatch(markRelatedNotificationsRead(payload));
+      dispatch(markRelatedNotificationsAsReadThunk(payload));
       return result;
     },
   };

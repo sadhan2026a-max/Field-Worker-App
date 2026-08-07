@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, spacing, typography, FontSize } from '@/core/theme';
+import { spacing, typography, FontSize, colors, useTheme } from '@/core/theme';
 
 interface StatTileProps {
   value: string;
@@ -10,6 +10,8 @@ interface StatTileProps {
 }
 
 export function StatTile({ value, label, color = colors.textPrimary, icon }: StatTileProps) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
   return (
     <View style={styles.tile}>
       {icon ? <View style={styles.iconContainer}>{icon}</View> : null}
@@ -19,7 +21,7 @@ export function StatTile({ value, label, color = colors.textPrimary, icon }: Sta
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   tile: {
     flex: 1,
     alignItems: 'center',
@@ -31,10 +33,12 @@ const styles = StyleSheet.create({
   },
   value: {
     ...typography.h2,
+    color: colors.textPrimary,
     fontSize: FontSize.large,
   },
   label: {
     ...typography.caption,
+    color: colors.textSecondary,
     textAlign: 'center',
   },
 });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View, ScrollView, RefreshControl, Alert } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, RefreshControl, Alert, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -7,7 +7,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
 import { Avatar } from '@/shared/components/ui/Avatar';
 import { StatTile } from '@/shared/components/ui/StatTile';
-import { colors, spacing, typography, palette, FontFamily } from '@/core/theme';
+import { colors, spacing, typography, palette, FontFamily, useTheme } from '@/core/theme';
 import { logoutThunk, selectDriver } from '@/features/auth/redux/authSlice';
 import { selectWorkspaceSummary, fetchWorkspaceSummary, selectAssignments } from '@/features/assignment/redux/assignmentSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -16,6 +16,8 @@ import { router } from 'expo-router';
 
 export default function ProfileScreen() {
   const dispatch = useAppDispatch();
+  const { colors, isDark, setTheme } = useTheme();
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
   const driver = useAppSelector(selectDriver);
   const workspaceSummary = useAppSelector(selectWorkspaceSummary);
   const assignments = useAppSelector(selectAssignments);
@@ -73,7 +75,7 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {isFocused && <StatusBar style="dark" />}
+      {isFocused && <StatusBar style={isDark ? "light" : "dark"} />}
       <View style={styles.header}>
         <Text style={styles.title}>My Profile</Text>
       </View>
@@ -95,7 +97,7 @@ export default function ProfileScreen() {
                 </View>
               </View>
             </View>
-            <Card style={styles.sectionCard}>
+            <Card style={[styles.sectionCard, { backgroundColor: colors.surface }]}>
               <Text style={styles.sectionTitle}>Today's Performance</Text>
               <View style={styles.statsGrid}>
                 <StatTile
@@ -118,8 +120,39 @@ export default function ProfileScreen() {
                 />
               </View>
             </Card>
-            <Card style={styles.sectionCard}>
+            <Card style={[styles.sectionCard, { backgroundColor: colors.surface }]}>
               <Text style={styles.sectionTitle}>Account Details</Text>
+
+              <View style={styles.detailRow}>
+                <View style={[styles.detailIcon, { backgroundColor: palette.blue + '15' }]}>
+                  <MaterialIcons name={isDark ? "dark-mode" : "light-mode"} size={20} color={palette.blue} />
+                </View>
+                <View style={styles.detailContent}>
+                  <Text style={styles.detailLabel}>Dark Mode</Text>
+                  <Text style={styles.detailValue}>{isDark ? 'On' : 'Off'}</Text>
+                </View>
+                <View>
+                   <Pressable 
+                      onPress={() => {
+                        console.log('Toggling theme to:', isDark ? 'light' : 'dark');
+                        setTheme(isDark ? 'light' : 'dark');
+                      }}
+                      style={({pressed}) => ({ 
+                        height: 32, 
+                        paddingHorizontal: 12, 
+                        borderRadius: 8, 
+                        backgroundColor: isDark ? palette.grey700 : palette.green,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        opacity: pressed ? 0.8 : 1
+                      })}
+                   >
+                     <Text style={{ fontSize: 12, color: 'white', fontWeight: 'bold' }}>{isDark ? 'Light' : 'Dark'}</Text>
+                   </Pressable>
+                </View>
+              </View>
+
+              <View style={styles.divider} />
 
               <View style={styles.detailRow}>
                 <View style={styles.detailIcon}>
@@ -189,18 +222,37 @@ export default function ProfileScreen() {
           label="My Wallet & Earnings"
           variant="outline"
           onPress={() => router.push('/wallet')}
-          style={styles.walletBtn}
-          textStyle={styles.walletLabel}
-          icon={<MaterialIcons name="account-balance-wallet" size={18} color={palette.blue} />}
+          style={[styles.walletBtn, { 
+            backgroundColor: isDark ? 'rgba(31,168,85,0.15)' : 'rgba(31,168,85,0.1)', 
+            borderColor: isDark ? 'rgba(31,168,85,0.3)' : 'rgba(31,168,85,0.2)' 
+          }]}
+          textStyle={[styles.walletLabel, { color: palette.green }]}
+          icon={<MaterialIcons name="account-balance-wallet" size={18} color={palette.green} />}
+        />
+
+        <Button
+          label="Change / Set PIN"
+          variant="outline"
+          onPress={() => router.push('/pin-setup')}
+          style={[styles.walletBtn, { 
+            backgroundColor: isDark ? 'rgba(31,168,85,0.15)' : 'rgba(31,168,85,0.1)', 
+            borderColor: isDark ? 'rgba(31,168,85,0.3)' : 'rgba(31,168,85,0.2)',
+            marginTop: 12
+          }]}
+          textStyle={[styles.walletLabel, { color: palette.green }]}
+          icon={<MaterialIcons name="lock-reset" size={18} color={palette.green} />}
         />
 
         <Button
           label="Log Out"
           variant="outline"
           onPress={logout}
-          style={styles.logoutBtn}
-          textStyle={styles.logoutLabel}
-          icon={<MaterialIcons name="logout" size={18} color={palette.red} />}
+          style={[styles.logoutBtn, { 
+            backgroundColor: isDark ? 'rgba(239,68,68,0.4)' : 'rgba(239,68,68,0.8)', 
+            borderColor: 'transparent' 
+          }]}
+          textStyle={[styles.logoutLabel, { color: '#FFFFFF' }]}
+          icon={<MaterialIcons name="logout" size={18} color="#FFFFFF" />}
         />
         <Text style={styles.versionText}>Version 1.0.0</Text>
       </ScrollView>
@@ -208,10 +260,10 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background,
   },
   header: {
     paddingHorizontal: spacing.lg,
@@ -270,6 +322,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     ...typography.label,
+    color: colors.textSecondary,
     fontSize: 12,
   },
   sectionCard: {
@@ -284,7 +337,7 @@ const styles = StyleSheet.create({
   statsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    backgroundColor: palette.grey50,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: spacing.md,
   },
@@ -297,7 +350,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: palette.grey50,
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
@@ -322,12 +375,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   badge: {
-    backgroundColor: palette.grey100,
+    backgroundColor: colors.surface,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: palette.grey200,
+    borderColor: colors.border,
   },
   badgeText: {
     ...typography.label,

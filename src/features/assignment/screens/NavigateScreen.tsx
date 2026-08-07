@@ -1,3 +1,4 @@
+import React from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
@@ -8,12 +9,15 @@ import { Card } from '@/components/ui/Card';
 import { ScreenLoader } from '@/components/ui/ScreenLoader';
 import { ScreenFooter } from '@/components/ui/ScreenFooter';
 import { RouteMapPreview } from '@/components/map/RouteMapPreview';
-import { colors, spacing, typography, FontSize } from '@/core/theme';
+import { spacing, typography, FontSize, colors, useTheme } from '@/core/theme';
+
 import { externalMapsUrl } from '@/core/utils/maps';
 import { Coordinates } from '@/domain/entities/Assignment';
 import { useAssignment, useStartAssignment } from '@/hooks/useAssignments';
 
 export function NavigateScreen() {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: assignment, isLoading } = useAssignment(id);
   const startAssignment = useStartAssignment();
@@ -90,7 +94,7 @@ export function NavigateScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -117,9 +121,11 @@ const styles = StyleSheet.create({
   },
   customerName: {
     ...typography.h3,
+    color: colors.textPrimary,
   },
   addressText: {
     ...typography.caption,
+    color: colors.textSecondary,
   },
   metaRow: {
     flexDirection: 'row',
@@ -127,9 +133,11 @@ const styles = StyleSheet.create({
   },
   metaValue: {
     ...typography.h2,
+    color: colors.textPrimary,
   },
   metaLabel: {
     ...typography.caption,
+    color: colors.textSecondary,
   },
   navigateWithCard: {
     flexDirection: 'row',
@@ -138,6 +146,7 @@ const styles = StyleSheet.create({
   },
   navigateWithText: {
     ...typography.bodyMedium,
+    color: colors.textPrimary,
     fontSize: FontSize.regular,
   },
 });

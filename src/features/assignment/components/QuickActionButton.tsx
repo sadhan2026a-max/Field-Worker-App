@@ -1,7 +1,7 @@
 import React from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View, Platform } from 'react-native';
-import { colors, spacing, shadows, FontFamily } from '@/core/theme';
+import { spacing, shadows, FontFamily, colors, useTheme } from '@/core/theme';
 
 interface QuickActionButtonProps {
   icon: keyof typeof MaterialIcons.glyphMap;
@@ -13,8 +13,10 @@ interface QuickActionButtonProps {
 }
 
 export function QuickActionButton({ icon, label, tint, tintLight, onPress, badgeCount }: QuickActionButtonProps) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
   return (
-    <View style={[styles.actionContainer, { backgroundColor: '#FFFFFF' }]}>
+    <View style={[styles.actionContainer, { backgroundColor: colors.background }]}>
       <Pressable
         style={({ pressed }) => [
           styles.action,
@@ -23,7 +25,7 @@ export function QuickActionButton({ icon, label, tint, tintLight, onPress, badge
         android_ripple={{ color: 'rgba(0,0,0,0.05)' }}
         onPress={onPress}
       >
-        <View style={[styles.iconContainer, { backgroundColor: '#FFFFFF' }]}>
+        <View style={[styles.iconContainer, { backgroundColor: colors.background }]}>
           <MaterialIcons name={icon} color={tint} size={22} />
           {!!badgeCount && badgeCount > 0 && (
             <View style={styles.badgeContainer}>
@@ -38,23 +40,14 @@ export function QuickActionButton({ icon, label, tint, tintLight, onPress, badge
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   actionContainer: {
     flexBasis: '47%',
     flexGrow: 1,
     borderRadius: 12,
     backgroundColor: colors.surface,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.04,
-        shadowRadius: 12,
-      },
-      android: {
-        elevation: 1,
-      },
-    }),
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   action: {
     flexDirection: 'row',
@@ -81,7 +74,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     fontFamily: FontFamily.bold,
-    color: '#101828',
+    color: colors.textPrimary,
   },
   chevron: {
     opacity: 0.4,
@@ -98,10 +91,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 2,
     borderWidth: 1.5,
-    borderColor: '#FFF',
+    borderColor: colors.background,
   },
   badgeCount: {
-    color: '#FFF',
+    color: colors.textInverse,
     fontSize: 9,
     fontFamily: FontFamily.bold,
     lineHeight: 11,

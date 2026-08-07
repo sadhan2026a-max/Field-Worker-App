@@ -21,7 +21,7 @@ export const palette = {
   grey50: '#F9FAFB',
 } as const;
 
-export const colors = {
+export const lightColors = {
   primary: palette.green,
   primaryDark: palette.greenDark,
   primaryLight: palette.greenLight,
@@ -52,43 +52,38 @@ export const colors = {
     completed: { text: palette.green, bg: palette.greenLight },
     cancelled: { text: palette.red, bg: palette.redLight },
   },
-} as const;
+};
 
-export type AppColors = typeof colors;
+export const darkColors = {
+  ...lightColors,
+  background: '#121212',
+  surface: '#1E1E1E',
+  border: '#333333',
 
-// Main App Design Token compatibility
-export const Colors = {
-  light: {
-    primary: palette.green,
-    blackText: "#000",
-    greenText: palette.green,
-    whiteText: "#FFF",
-    redText: "#DB4437",
-    background: "#FFF",
-    icon: "#000",
-    tabIconDefault: "#687076",
-    button: palette.green,
-    track: palette.greenLight,
-    pink: '#ff5862',
-    gray: '#E8E6EA',
-    recievedMessage: '#FFc4c4',
-    sentMessage: '#ffc3d3',
+  textPrimary: '#FFFFFF',
+  textSecondary: '#A0A0A0',
+  textInverse: '#000000',
+
+  primaryLight: '#0d4a25',
+  infoLight: '#0b2b5e',
+  warningLight: '#5c3905',
+  accentLight: '#321f5e',
+  dangerLight: '#571818',
+
+  status: {
+    pending: { text: '#ffcc80', bg: '#5c3905' },
+    accepted: { text: '#d1c4e9', bg: '#321f5e' },
+    enRoute: { text: '#90caf9', bg: '#0b2b5e' },
+    arrived: { text: '#e0e0e0', bg: '#424242' },
+    inProgress: { text: '#90caf9', bg: '#0b2b5e' },
+    completed: { text: '#a5d6a7', bg: '#0d4a25' },
+    cancelled: { text: '#ef9a9a', bg: '#571818' },
   },
-  dark: {
-    primary: palette.green,
-    blackText: "#000",
-    greenText: palette.green,
-    whiteText: "#FFF",
-    redText: "#DB4437",
-    background: "#FFF",
-    icon: "#000",
-    tabIconDefault: "#687076",
-    button: palette.green,
-    track: palette.greenLight,
-    white: "#FFFFFF",
-    pink: '#ff5862',
-    gray: '#E8E6EA',
-    recievedMessage: '#FFc4c4',
-    sentMessage: '#ffc3d3',
-  },
+};
+
+// Keeping 'colors' export pointing to lightColors to avoid breaking files that haven't been refactored yet.
+export const colors = lightColors;
+
+export type AppColors = {
+  [K in keyof typeof lightColors]: any;
 };

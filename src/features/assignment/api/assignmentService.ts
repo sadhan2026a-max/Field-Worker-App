@@ -102,6 +102,9 @@ function mapOrderDtoToAssignment(order: OrderDto, offerId?: string): Assignment 
       notes: item.notes,
       sortOrder: item.sortOrder,
       checkedAt: item.checkedAt,
+      value: item.value,
+      itemType: item.itemType,
+      options: item.options,
     })),
     items: order.items?.map((item) => ({
       id: item.id,
@@ -197,12 +200,7 @@ export async function getAssignments(status?: Assignment['status'] | string): Pr
 
   try {
     const backendStatus = status ? status.charAt(0).toUpperCase() + status.slice(1) : undefined;
-    
-    // If asking for completed, let's try the generic orders endpoint just in case it works!
     let url = backendStatus ? `/api/v1/driver/assignments?status=${backendStatus}` : '/api/v1/driver/assignments';
-    if (status === 'completed') {
-      url = '/api/v1/orders?status=Completed';
-    }
     
     const response = await api.get(url);
     offers = Array.isArray(response.data) ? response.data : (response.data?.items || []);
@@ -327,6 +325,11 @@ export async function acceptOffer(offerId: string): Promise<Assignment> {
       createdAt: response.data.offeredAt || new Date().toISOString(),
     };
   }
+}
+
+export async function addOrderNote(orderId: string, notes: string): Promise<void> {
+  logger.info('assignment', 'Adding global note', { orderId });
+  await api.post(`/api/v1/orders/${orderId}/notes`, { text: notes });
 }
 
 export async function declineOffer(offerId: string): Promise<void> {
@@ -486,6 +489,9 @@ export async function getChecklist(id: string): Promise<ChecklistItem[]> {
     notes: item.notes,
     sortOrder: item.sortOrder,
     checkedAt: item.checkedAt,
+    itemType: item.itemType,
+    options: item.options,
+    value: item.value,
   }));
 }
 
@@ -495,7 +501,12 @@ export async function saveChecklist(
 ): Promise<Assignment> {
   logger.info('assignment', 'Saving checklist', { id });
   await api.put(`/api/v1/orders/${id}/checklist`, {
-    items: items.map((item) => ({ id: item.id, isChecked: item.isChecked, notes: item.notes ?? undefined })),
+    items: items.map((item) => ({ 
+      id: item.id, 
+      isChecked: Boolean(item.isChecked), 
+      notes: item.notes || null,
+      value: (item.value !== undefined && item.value !== null && typeof item.value !== 'boolean') ? String(item.value) : null
+    })),
   });
   return fetchOrderAsAssignment(id);
 }
@@ -540,5 +551,12 @@ export async function verifyOrderOtp(id: string, otp: string): Promise<Assignmen
   logger.info('assignment', 'Verifying OTP', { id });
   const response = await api.post<OrderDto>(`/api/v1/orders/${id}/verify-otp`, { otp });
   logger.info('assignment', 'OTP verified', { id });
+  return mapOrderDtoToAssignment(response.data);
+}
+
+export async function cancelAssignment(id: string, reason: string): Promise<Assignment> {
+  logger.info('assignment', 'Cancelling assignment', { id, reason });
+  const response = await api.post<OrderDto>(`/api/v1/orders/${id}/cancel`, { reason });
+  logger.info('assignment', 'Assignment cancelled', { id });
   return mapOrderDtoToAssignment(response.data);
 }

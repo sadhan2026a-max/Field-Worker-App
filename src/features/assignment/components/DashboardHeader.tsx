@@ -1,11 +1,13 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View, Platform } from 'react-native';
+import { Pressable, StyleSheet, Text, View, Platform, ActivityIndicator } from 'react-native';
 import { colors, spacing, FontFamily, palette } from '@/core/theme';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAppSelector } from '@/store/hooks';
 import { selectUnreadCount } from '@/features/notification/redux/notificationSlice';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { TenantInfo } from '@/features/auth/api/authService';
+import { Image } from 'react-native';
 
 function getTimeGreeting(): string {
   const hour = new Date().getHours();
@@ -24,13 +26,15 @@ function getInitials(name: string): string {
 }
 
 interface DashboardHeaderProps {
-  name: string;
+  driverName: string;
   isAvailable: boolean;
+  isTogglingAvailability?: boolean;
+  tenant?: TenantInfo | null;
+  unreadCount: number;
   onToggleAvailability: () => void;
 }
 
-export function DashboardHeader({ name, isAvailable, onToggleAvailability }: DashboardHeaderProps) {
-  const unreadCount = useAppSelector(selectUnreadCount);
+export function DashboardHeader({ driverName, isAvailable, isTogglingAvailability, tenant, unreadCount, onToggleAvailability }: DashboardHeaderProps) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -41,45 +45,55 @@ export function DashboardHeader({ name, isAvailable, onToggleAvailability }: Das
         <View style={styles.decorCircle2} />
 
         <View style={styles.topRow}>
-          {/* Avatar */}
           <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{getInitials(name)}</Text>
-            </View>
+            {tenant?.logoUrl ? (
+              <Image source={{ uri: tenant.logoUrl }} style={styles.tenantLogo} />
+            ) : (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{getInitials(tenant?.name || driverName)}</Text>
+              </View>
+            )}
             <View style={[styles.statusDot, !isAvailable && styles.statusDotOffline]} />
           </View>
 
           {/* Greeting */}
-
           <View style={styles.greetingGroup}>
-            <Text style={styles.greeting}>{getTimeGreeting()}        </Text>
-            <Text style={styles.name} numberOfLines={1}>{name}</Text>
-          </View>
-
-          {/* Right Actions */}
-          <View style={styles.rightActions}>
-            <Pressable style={styles.customSwitchContainer} onPress={onToggleAvailability}>
-              <Text style={[styles.switchLabel, !isAvailable && styles.switchLabelOffline]}>
-                {isAvailable ? 'Online' : 'Offline'}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: -4 }}>
+              <Text style={[styles.greeting, { marginBottom: 0, flexShrink: 1, marginRight: 8 }]} numberOfLines={1}>
+                {tenant?.name || getTimeGreeting()}
               </Text>
-              <View style={[styles.switchTrack, isAvailable ? styles.switchTrackOnline : styles.switchTrackOffline]}>
-                <View style={[styles.switchThumb, isAvailable ? styles.switchThumbOnline : styles.switchThumbOffline]} />
-              </View>
-            </Pressable>
 
-            <Pressable
-              style={styles.iconButton}
-              onPress={() => router.push('/notifications')}
-            >
-              <MaterialIcons name="notifications-none" size={24} color="#FFFFFF" />
-              {isAvailable && unreadCount > 0 && (
-                <View style={styles.notifBadge}>
-                  <Text style={styles.notifBadgeText}>
-                    {unreadCount > 99 ? '99+' : unreadCount}
+              {/* Right Actions */}
+              <View style={styles.rightActions}>
+                <Pressable style={styles.customSwitchContainer} onPress={onToggleAvailability}>
+                  <Text style={[styles.switchLabel, !isAvailable && styles.switchLabelOffline]}>
+                    {isAvailable ? 'Online' : 'Offline'}
                   </Text>
-                </View>
-              )}
-            </Pressable>
+                  <View style={[styles.switchTrack, isAvailable ? styles.switchTrackOnline : styles.switchTrackOffline]}>
+                    <View style={[styles.switchThumb, isAvailable ? styles.switchThumbOnline : styles.switchThumbOffline, { justifyContent: 'center', alignItems: 'center' }]}>
+                      {isTogglingAvailability && (
+                        <ActivityIndicator size="small" color={isAvailable ? '#FFFFFF' : colors.primary} style={{ transform: [{ scale: 0.75 }] }} />
+                      )}
+                    </View>
+                  </View>
+                </Pressable>
+
+                <Pressable
+                  style={styles.iconButton}
+                  onPress={() => router.push('/notifications')}
+                >
+                  <MaterialIcons name="notifications-none" size={24} color="#FFFFFF" />
+                  {isAvailable && unreadCount > 0 && (
+                    <View style={styles.notifBadge}>
+                      <Text style={styles.notifBadgeText}>
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </Text>
+                    </View>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+            <Text style={styles.name} numberOfLines={1}>{driverName}</Text>
           </View>
         </View>
       </View>
@@ -142,13 +156,21 @@ const styles = StyleSheet.create({
   },
   avatar: {
     width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF20',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.4)',
+    borderWidth: 1,
+    borderColor: '#FFFFFF40',
+  },
+  tenantLogo: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#FFFFFF40',
   },
   avatarText: {
     fontSize: 15,

@@ -1,7 +1,7 @@
 import React from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { StyleSheet, Text, View, ViewStyle } from 'react-native';
-import { colors, spacing, typography, Borders } from '@/core/theme';
+import { spacing, typography, Borders, useTheme } from '@/core/theme';
 
 interface EmptyStateProps {
   icon: keyof typeof MaterialIcons.glyphMap;
@@ -9,7 +9,7 @@ interface EmptyStateProps {
   description?: string;
   tint?: string;
   tintLight?: string;
-  style?: ViewStyle;
+  style?: ViewStyle | ViewStyle[];
 }
 
 /** Centered icon + title + description, used wherever a list or card has nothing to show. */
@@ -17,14 +17,23 @@ export function EmptyState({
   icon,
   title,
   description,
-  tint = colors.primary,
-  tintLight = colors.primaryLight,
+  tint,
+  tintLight,
   style,
 }: EmptyStateProps) {
+  const { colors, isDark } = useTheme();
+  
+  const actualTint = tint || colors.primary;
+  // If in dark mode and using default primary, make the background translucent so it doesn't look too bright
+  const defaultTintLight = isDark ? 'rgba(31,168,85,0.15)' : (colors as any).primaryLight || 'rgba(31,168,85,0.15)';
+  const actualTintLight = tintLight || defaultTintLight;
+
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
+  
   return (
     <View style={[styles.card, style]}>
-      <View style={[styles.iconBg, { backgroundColor: tintLight }]}>
-        <MaterialIcons name={icon} size={32} color={tint} />
+      <View style={[styles.iconBg, { backgroundColor: actualTintLight }]}>
+        <MaterialIcons name={icon} size={32} color={actualTint} />
       </View>
       <Text style={styles.title}>{title}</Text>
       {description ? <Text style={styles.description}>{description}</Text> : null}
@@ -32,7 +41,7 @@ export function EmptyState({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: Borders.radius2,
@@ -50,6 +59,7 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.h3,
+    color: colors.textPrimary,
     marginBottom: spacing.xs,
   },
   description: {

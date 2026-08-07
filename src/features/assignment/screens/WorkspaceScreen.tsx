@@ -7,29 +7,29 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import Toast from 'react-native-toast-message';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Skeleton } from '@/shared/components/ui/Skeleton';
 import { DashboardHeader, NextDeliveryCard, QuickActionButton, StatCard } from '@/features/assignment/components';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { selectDriver, toggleAvailability } from '@/features/auth/redux/authSlice';
-import { colors, spacing, FontFamily, typography } from '@/core/theme';
+import { selectDriver, selectTenant, toggleAvailability, fetchTenantThunk } from '@/features/auth/redux/authSlice';
+import { spacing, FontFamily, typography, useTheme } from '@/core/theme';
 import { useAssignments, useWorkspaceSummary } from '@/hooks/useAssignments';
 import { fetchNotifications, selectUnreadCount } from '@/features/notification/redux/notificationSlice';
 import { useIsFocused } from '@react-navigation/native';
 import { useEffect } from 'react';
-
-const QUICK_ACTIONS: {
+const getQuickActions = (colors: any): {
   icon: keyof typeof MaterialIcons.glyphMap;
   label: string;
   tint: string;
   tintLight: string;
   onPress: () => void;
-}[] = [
+}[] => [
     { icon: 'qr-code-scanner', label: 'Scan QR', tint: colors.info, tintLight: colors.infoLight, onPress: () => safeRouter.push('/scan-qr') },
     { icon: 'assignment', label: 'My Assignments', tint: colors.info, tintLight: colors.infoLight, onPress: () => safeRouter.push('/(tabs)/assignments') },
     { icon: 'campaign', label: 'Broadcast Jobs', tint: colors.accent, tintLight: colors.accentLight, onPress: () => { } },
     { icon: 'notifications', label: 'Notifications', tint: colors.accent, tintLight: colors.accentLight, onPress: () => safeRouter.push('/notifications') },
   ];
 
-function SectionTitle({ icon, title }: { icon: keyof typeof MaterialIcons.glyphMap; title: string }) {
+function SectionTitle({ icon, title, colors, styles }: { icon: keyof typeof MaterialIcons.glyphMap; title: string; colors: any; styles: any; }) {
   return (
     <View style={styles.sectionTitleRow}>
       <MaterialIcons name={icon} size={15} color={colors.primary} />
@@ -39,18 +39,23 @@ function SectionTitle({ icon, title }: { icon: keyof typeof MaterialIcons.glyphM
 }
 
 export function WorkspaceScreen() {
+  const { colors } = useTheme();
+  const styles = useStyles(colors);
   const driver = useAppSelector(selectDriver);
   const dispatch = useAppDispatch();
   const { data: summary, isLoading: isSummaryLoading, refetch: refetchSummary } = useWorkspaceSummary();
   const { data: allAssignments, isLoading: isAssignmentsLoading, refetch: refetchAssignments } = useAssignments();
   const unreadCount = useAppSelector(selectUnreadCount);
+  const tenant = useAppSelector(selectTenant);
   const isFocused = useIsFocused();
 
   useEffect(() => {
     dispatch(fetchNotifications());
+    dispatch(fetchTenantThunk());
   }, [dispatch]);
 
   const [refreshing, setRefreshing] = useState(false);
+  const [isTogglingAvailability, setIsTogglingAvailability] = useState(false);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -71,12 +76,12 @@ export function WorkspaceScreen() {
 
   const activeStatuses = ['accepted', 'en_route', 'arrived', 'in_progress'];
   const displayStatuses = isAvailable ? ['pending', ...activeStatuses] : activeStatuses;
-  
+
   const nextDelivery = allAssignments?.find(a => displayStatuses.includes(a.status));
   const hasActiveAssignment = allAssignments?.some(a => activeStatuses.includes(a.status));
-  
+
   const pendingCount = allAssignments?.filter(a => displayStatuses.includes(a.status)).length ?? 0;
-  
+
   const localCompletedCount = allAssignments?.filter(a => a.status === 'completed').length ?? 0;
   const completedCount = Math.max(summary?.completedCount ?? 0, localCompletedCount);
 
@@ -100,34 +105,72 @@ export function WorkspaceScreen() {
         }
       >
         <DashboardHeader
-          name={driver?.name ?? 'Rider'}
+          tenant={tenant}
+          driverName={driver?.name || 'Driver'}
           isAvailable={isAvailable}
+          isTogglingAvailability={isTogglingAvailability}
+          unreadCount={unreadCount}
           onToggleAvailability={async () => {
             if (isAvailable && hasActiveAssignment) {
               Toast.show({ type: 'error', text1: 'Cannot go offline', text2: 'Please complete or cancel active jobs first.' });
               return;
             }
-            const newAvailability = !isAvailable;
-            await dispatch(toggleAvailability());
-            
-            if (newAvailability) {
-              Toast.show({ type: 'info', text1: 'Online', text2: 'Fetching new assignments...' });
-              await Promise.all([
-                 refetchAssignments(),
-                 dispatch(fetchNotifications())
-              ]);
+            setIsTogglingAvailability(true);
+            try {
+              await dispatch(toggleAvailability()).unwrap();
+              Toast.show({ type: 'success', text1: isAvailable ? 'You are now Offline' : 'You are now Online' });
+            } catch (error) {
+              Toast.show({ type: 'error', text1: 'Failed to update status', text2: error as string });
+            } finally {
+              setIsTogglingAvailability(false);
             }
           }}
         />
 
         {((isSummaryLoading || isAssignmentsLoading) && !refreshing) ? (
-          <View style={styles.loaderContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loaderText}>Loading workspace...</Text>
+          <View style={{ gap: spacing.md, paddingVertical: spacing.md }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: spacing.lg, marginBottom: spacing.xs }}>
+              <Skeleton width={24} height={24} borderRadius={12} />
+              <Skeleton width={120} height={20} />
+            </View>
+            <View style={styles.workspaceGrid}>
+              <View style={styles.statsRow}>
+                <Skeleton style={{ flex: 1 }} height={80} borderRadius={16} />
+                <Skeleton style={{ flex: 1 }} height={80} borderRadius={16} />
+                <Skeleton style={{ flex: 1 }} height={80} borderRadius={16} />
+              </View>
+              <View style={styles.statsRow}>
+                <Skeleton style={{ flex: 1 }} height={80} borderRadius={16} />
+                <Skeleton style={{ flex: 1 }} height={80} borderRadius={16} />
+              </View>
+            </View>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: spacing.lg, marginTop: spacing.md, marginBottom: spacing.xs }}>
+              <Skeleton width={24} height={24} borderRadius={12} />
+              <Skeleton width={120} height={20} />
+            </View>
+            <View style={{ paddingHorizontal: spacing.lg }}>
+              <Skeleton width="100%" height={160} borderRadius={16} />
+            </View>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: spacing.lg, marginTop: spacing.md, marginBottom: spacing.xs }}>
+              <Skeleton width={24} height={24} borderRadius={12} />
+              <Skeleton width={120} height={20} />
+            </View>
+            <View style={[styles.workspaceGrid, { marginTop: 0 }]}>
+              <View style={styles.statsRow}>
+                <Skeleton style={{ flex: 1 }} height={64} borderRadius={12} />
+                <Skeleton style={{ flex: 1 }} height={64} borderRadius={12} />
+              </View>
+              <View style={styles.statsRow}>
+                <Skeleton style={{ flex: 1 }} height={64} borderRadius={12} />
+                <Skeleton style={{ flex: 1 }} height={64} borderRadius={12} />
+              </View>
+            </View>
           </View>
         ) : (
           <>
-            <SectionTitle icon="dashboard" title="Today's Overview" />
+            <SectionTitle icon="dashboard" title="Today's Overview" colors={colors} styles={styles} />
             <View style={styles.workspaceGrid}>
               <View style={styles.statsRow}>
                 <StatCard
@@ -181,7 +224,7 @@ export function WorkspaceScreen() {
               </View>
             </View>
 
-            <SectionTitle icon="local-shipping" title="Next Delivery" />
+            <SectionTitle icon="local-shipping" title="Next Delivery" colors={colors} styles={styles} />
             {nextDelivery ? (
               <NextDeliveryCard
                 assignment={nextDelivery}
@@ -198,9 +241,9 @@ export function WorkspaceScreen() {
           </>
         )}
 
-        <SectionTitle icon="flash-on" title="Quick Actions" />
+        <SectionTitle icon="flash-on" title="Quick Actions" colors={colors} styles={styles} />
         <View style={styles.quickActionsGrid}>
-          {QUICK_ACTIONS.map((action) => (
+          {getQuickActions(colors).map((action) => (
             <QuickActionButton
               key={action.label}
               {...action}
@@ -213,10 +256,10 @@ export function WorkspaceScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background,
   },
   scrollView: {
     flex: 1,

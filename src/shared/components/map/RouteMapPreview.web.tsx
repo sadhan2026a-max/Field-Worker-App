@@ -1,7 +1,8 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
-import { colors, palette, radius, typography } from '@/core/theme';
+import { palette, radius, typography, colors, useTheme } from '@/core/theme';
+
 import { Coordinates } from '@/domain/entities/Assignment';
 
 interface RouteMapPreviewProps {
@@ -16,6 +17,8 @@ interface RouteMapPreviewProps {
  * screen doesn't look broken while testing in a browser; native renders a real map.
  */
 export function RouteMapPreview({ height = 260 }: RouteMapPreviewProps) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
   return (
     <View style={[styles.placeholder, { height }]}>
       <Svg width="100%" height="100%" viewBox="0 0 320 220" style={StyleSheet.absoluteFill}>
@@ -30,11 +33,11 @@ export function RouteMapPreview({ height = 260 }: RouteMapPreviewProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   placeholder: {
     width: '100%',
     borderRadius: radius.lg,
-    backgroundColor: palette.grey100,
+    backgroundColor: colors.surface,
     justifyContent: 'flex-end',
     alignItems: 'center',
     overflow: 'hidden',
@@ -42,7 +45,8 @@ const styles = StyleSheet.create({
   },
   text: {
     ...typography.caption,
-    backgroundColor: palette.white,
+    color: colors.textSecondary,
+    backgroundColor: colors.surface,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: radius.full,

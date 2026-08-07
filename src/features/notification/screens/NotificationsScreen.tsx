@@ -5,9 +5,9 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchNotifications, markAsRead, selectNotifications, selectIsLoadingNotifications } from '../redux/notificationSlice';
-import { colors, spacing, FontFamily, palette } from '@/core/theme';
+import { spacing, FontFamily, palette } from '@/core/theme';
+import { useTheme } from '@/core/theme';
 import { NotificationDto } from '../types/Notification';
-// import { formatDistanceToNow } from 'date-fns';
 
 const timeAgo = (dateString: string) => {
   const date = new Date(dateString);
@@ -24,6 +24,8 @@ const timeAgo = (dateString: string) => {
 };
 
 export function NotificationsScreen() {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
   const dispatch = useAppDispatch();
   const notifications = useAppSelector(selectNotifications);
   const isLoading = useAppSelector(selectIsLoadingNotifications);
@@ -84,12 +86,12 @@ export function NotificationsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Left-aligned header: back button + title side by side */}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <MaterialIcons name="arrow-back" size={24} color={colors.textPrimary} />
         </Pressable>
         <Text style={styles.headerTitle}>Notifications</Text>
-        <View style={{ width: 40 }} />
       </View>
 
       {isLoading && !refreshing && notifications.length === 0 ? (
@@ -118,7 +120,7 @@ export function NotificationsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -126,7 +128,6 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     backgroundColor: colors.surface,
@@ -135,6 +136,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: spacing.xs,
+    marginRight: spacing.sm,
   },
   headerTitle: {
     fontSize: 18,
@@ -179,7 +181,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   readIconCircle: {
-    backgroundColor: palette.grey100,
+    backgroundColor: colors.surface,
   },
   contentContainer: {
     flex: 1,

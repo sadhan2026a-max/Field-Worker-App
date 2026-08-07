@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
-import { StyleSheet, Text, View, Platform, Alert } from 'react-native';
+import { StyleSheet, Text, View, Platform, Alert, Pressable } from 'react-native';
+import { router } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
-import { colors, spacing, shadows, FontFamily, palette } from '@/core/theme';
+import { spacing, shadows, FontFamily, palette, colors, useTheme } from '@/core/theme';
+
 import { Assignment } from '@/domain/entities/Assignment';
 import { DistanceDisplay } from '@/features/assignment/components';
 import { useCurrentLocation } from '@/shared/utils/location';
@@ -38,6 +40,8 @@ interface NextDeliveryCardProps {
 }
 
 export function NextDeliveryCard({ assignment, onStart }: NextDeliveryCardProps) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
   const currentLocation = useCurrentLocation();
   const statusColor = getStatusColor(assignment.status);
 
@@ -79,11 +83,18 @@ export function NextDeliveryCard({ assignment, onStart }: NextDeliveryCardProps)
   };
 
   return (
-    <View style={[styles.card, { backgroundColor: '#FFFFFF' }]}>
+    <Pressable 
+      style={[styles.card, { backgroundColor: colors.background }]}
+      onPress={() => {
+        if (assignment.status !== 'pending') {
+          router.push({ pathname: '/assignment/[id]', params: { id: assignment.id } });
+        }
+      }}
+    >
       <View style={styles.content}>
         {/* Status Badge */}
         <View style={styles.statusRow}>
-          <View style={[styles.statusBadge, { backgroundColor: '#FFFFFF' }]}>
+          <View style={[styles.statusBadge, { backgroundColor: colors.background }]}>
             <View style={[styles.statusDot, { backgroundColor: statusColor.text }]} />
             <Text style={[styles.statusText, { color: statusColor.text }]}>
               {getStatusLabel(assignment.status)}
@@ -138,35 +149,26 @@ export function NextDeliveryCard({ assignment, onStart }: NextDeliveryCardProps)
           </View>
         ) : (
           <Button
-            label="Navigate"
+            label="Start Job"
             onPress={onStart}
             style={styles.button}
             textStyle={styles.buttonText}
           />
         )}
       </View>
-    </View>
+    </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: 16,
     overflow: 'hidden',
     marginBottom: spacing.lg,
     position: 'relative',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.04,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   content: {
     padding: 14,

@@ -1,6 +1,6 @@
 export const FontFamily = {
-  regular: "InterRegular",
-  medium: "InterMedium",
-  semiBold: "InterSemiBold",
-  bold: "InterBold",
+  regular: "Roboto_400Regular",
+  medium: "Roboto_500Medium",
+  semiBold: "Roboto_500Medium", // Roboto doesn't have a 600 weight, using 500
+  bold: "Roboto_700Bold",
 };

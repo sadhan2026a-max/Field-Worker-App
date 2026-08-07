@@ -7,7 +7,7 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
-import { colors, Borders, spacing, typography, hp, wp, FontSize } from '@/core/theme';
+import { Borders, spacing, typography, hp, wp, FontSize, colors, useTheme } from '@/core/theme';
 
 interface InputProps extends TextInputProps {
   label?: string;
@@ -16,6 +16,8 @@ interface InputProps extends TextInputProps {
 }
 
 export function Input({ label, error, containerStyle, style, ...rest }: InputProps) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
   return (
     <View style={[styles.container, containerStyle]}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
@@ -33,12 +35,13 @@ export function Input({ label, error, containerStyle, style, ...rest }: InputPro
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   container: {
     gap: spacing.xs,
   },
   label: {
     ...typography.label,
+    color: colors.textSecondary,
   },
   input: {
     height: hp(6.5),

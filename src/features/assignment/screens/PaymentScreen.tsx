@@ -1,3 +1,4 @@
+import React from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
@@ -7,7 +8,8 @@ import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { ScreenLoader } from '@/components/ui/ScreenLoader';
 import { ScreenFooter } from '@/components/ui/ScreenFooter';
-import { colors, radius, spacing, typography } from '@/core/theme';
+import { radius, spacing, typography, colors, useTheme } from '@/core/theme';
+
 import { PaymentMode } from '@/domain/entities/Assignment';
 import { useAssignment, useConfirmPayment } from '@/hooks/useAssignments';
 import { safeRouter } from '@/shared/utils/navigation';
@@ -19,6 +21,8 @@ const PAYMENT_MODES: { key: PaymentMode; label: string; icon: keyof typeof Mater
 ];
 
 export function PaymentScreen() {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: assignment, isLoading } = useAssignment(id);
   const confirmPayment = useConfirmPayment();
@@ -43,7 +47,7 @@ export function PaymentScreen() {
       receivedAmount: numericAmount,
       referenceNumber: paymentMode !== 'cash' ? referenceNumber : undefined,
     });
-    
+
     safeRouter.push({ pathname: '/assignment/[id]/summary', params: { id: assignment.id } });
   };
 
@@ -114,7 +118,7 @@ export function PaymentScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -125,9 +129,11 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     ...typography.h3,
+    color: colors.textPrimary,
   },
   label: {
     ...typography.label,
+    color: colors.textSecondary,
     marginBottom: spacing.sm,
   },
   codCard: {
@@ -157,6 +163,7 @@ const styles = StyleSheet.create({
   },
   modeLabel: {
     ...typography.caption,
+    color: colors.textSecondary,
   },
   modeLabelSelected: {
     color: colors.primary,

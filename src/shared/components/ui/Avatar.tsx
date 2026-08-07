@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View, ViewStyle } from 'react-native';
-import { colors, spacing } from '@/core/theme';
+import { spacing, colors, useTheme } from '@/core/theme';
 
 interface AvatarProps {
   /** The full name — first character is used as the initial. */
@@ -11,6 +11,8 @@ interface AvatarProps {
 }
 
 export function Avatar({ name, size = 44, style }: AvatarProps) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
   const initial = name?.charAt(0).toUpperCase() ?? '?';
   const fontSize = Math.round(size * 0.4);
 
@@ -27,7 +29,7 @@ export function Avatar({ name, size = 44, style }: AvatarProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   circle: {
     backgroundColor: colors.primaryLight,
     alignItems: 'center',

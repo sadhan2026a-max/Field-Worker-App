@@ -1,12 +1,16 @@
+import React from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { Button } from '@/components/ui/Button';
 import { ScreenLoader } from '@/components/ui/ScreenLoader';
-import { colors, spacing, typography } from '@/core/theme';
+import { spacing, typography, colors, useTheme } from '@/core/theme';
+
 import { useAssignment } from '@/hooks/useAssignments';
 
 export function CompleteScreen() {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: assignment, isLoading } = useAssignment(id);
 
@@ -47,7 +51,7 @@ export function CompleteScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -67,6 +71,7 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.h2,
+    color: colors.textPrimary,
     textAlign: 'center',
     marginBottom: spacing.xl,
   },
@@ -77,9 +82,11 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     ...typography.caption,
+    color: colors.textSecondary,
   },
   summaryValue: {
     ...typography.h2,
+    color: colors.textPrimary,
   },
   button: {
     marginTop: spacing.xl,

@@ -15,6 +15,8 @@ export interface Driver {
   avatarUri?: string;
   status: DriverAvailability;
   tenantId: string;
+  tenantName?: string;
+  companyName?: string;
   hasPin: boolean;
   assignableOrderTypes: string[];
 }

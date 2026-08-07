@@ -1,6 +1,6 @@
-import { ReactNode, useState } from 'react';
+import React, { ReactNode, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { Redirect } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -18,11 +18,12 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { loginThunk, selectDriver, selectAuthError } from '@/features/auth/redux/authSlice';
-import { colors, spacing, typography, FontSize, FontFamily, palette } from '@/core/theme';
+import { useTheme, spacing, typography, FontSize, FontFamily, palette } from '@/core/theme';
 
 interface LoginForm {
   phone: string;
-  pin: string;
+  pin?: string;
+  password?: string;
 }
 
 interface CustomInputProps extends TextInputProps {
@@ -34,6 +35,8 @@ interface CustomInputProps extends TextInputProps {
 }
 
 function CustomInput({ label, leftIcon, rightElement, rightLabel, error, style, ...rest }: CustomInputProps) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
   const [isFocused, setIsFocused] = useState(false);
 
   return (
@@ -65,26 +68,38 @@ function CustomInput({ label, leftIcon, rightElement, rightLabel, error, style, 
 }
 
 export function LoginScreen() {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
   const dispatch = useAppDispatch();
+  const router = useRouter();
   const driver = useAppSelector(selectDriver);
   const authError = useAppSelector(selectAuthError);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  const [loginMode, setLoginMode] = useState<'pin' | 'password'>('pin');
+
   const {
     control,
     handleSubmit,
     formState: { errors },
-  } = useForm<LoginForm>({ defaultValues: { phone: '', pin: '' } });
+  } = useForm<LoginForm>({ defaultValues: { phone: '', pin: '', password: '' } });
 
   if (driver) {
+    if (!driver.hasPin) {
+      return <Redirect href="/pin-setup" />;
+    }
     return <Redirect href="/(tabs)" />;
   }
 
   const onSubmit = async (values: LoginForm) => {
     setIsSubmitting(true);
     try {
-      await dispatch(loginThunk({ phone: values.phone, pin: values.pin })).unwrap();
+      await dispatch(loginThunk({ 
+        phone: values.phone, 
+        pin: loginMode === 'pin' ? values.pin : undefined,
+        password: loginMode === 'password' ? values.password : undefined
+      })).unwrap();
     } catch (_err) {
       // Error is already stored in Redux state by loginThunk.rejected
     } finally {
@@ -131,36 +146,77 @@ export function LoginScreen() {
               )}
             />
 
-            {/* PIN Field */}
-            <Controller
-              control={control}
-              name="pin"
-              rules={{ 
-                required: 'PIN is required',
-                minLength: { value: 6, message: 'PIN must be at least 6 digits' }
-              }}
-              render={({ field }) => (
-                <CustomInput
-                  label="6-Digit PIN"
-                  placeholder="Enter your PIN"
-                  secureTextEntry={!showPassword}
-                  keyboardType="number-pad"
-                  value={field.value}
-                  onChangeText={field.onChange}
-                  error={errors.pin?.message}
-                  leftIcon={<MaterialIcons name="lock" size={20} color={colors.textSecondary} />}
-                  rightElement={
-                    <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
-                      <MaterialIcons
-                        name={showPassword ? "visibility" : "visibility-off"}
-                        size={20}
-                        color={colors.textSecondary}
-                      />
-                    </Pressable>
-                  }
-                />
-              )}
-            />
+            {/* Password/PIN Field */}
+            {loginMode === 'pin' ? (
+              <Controller
+                control={control}
+                name="pin"
+                rules={{ 
+                  required: 'PIN is required',
+                  minLength: { value: 6, message: 'PIN must be at least 6 digits' }
+                }}
+                render={({ field }) => (
+                  <CustomInput
+                    label="6-Digit PIN"
+                    placeholder="Enter your PIN"
+                    secureTextEntry={!showPassword}
+                    keyboardType="number-pad"
+                    value={field.value}
+                    onChangeText={field.onChange}
+                    error={errors.pin?.message}
+                    leftIcon={<MaterialIcons name="lock" size={20} color={colors.textSecondary} />}
+                    rightElement={
+                      <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
+                        <MaterialIcons
+                          name={showPassword ? "visibility" : "visibility-off"}
+                          size={20}
+                          color={colors.textSecondary}
+                        />
+                      </Pressable>
+                    }
+                  />
+                )}
+              />
+            ) : (
+              <Controller
+                control={control}
+                name="password"
+                rules={{ 
+                  required: 'Password is required'
+                }}
+                render={({ field }) => (
+                  <CustomInput
+                    label="Password"
+                    placeholder="Enter your password"
+                    secureTextEntry={!showPassword}
+                    value={field.value}
+                    onChangeText={field.onChange}
+                    error={errors.password?.message}
+                    leftIcon={<MaterialIcons name="lock" size={20} color={colors.textSecondary} />}
+                    rightLabel={
+                      <Pressable onPress={() => router.push('/forgot-password')}>
+                        <Text style={styles.forgotText}>Forgot Password?</Text>
+                      </Pressable>
+                    }
+                    rightElement={
+                      <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
+                        <MaterialIcons
+                          name={showPassword ? "visibility" : "visibility-off"}
+                          size={20}
+                          color={colors.textSecondary}
+                        />
+                      </Pressable>
+                    }
+                  />
+                )}
+              />
+            )}
+
+            <Pressable onPress={() => setLoginMode(m => m === 'pin' ? 'password' : 'pin')} style={styles.toggleModeBtn}>
+              <Text style={styles.toggleModeText}>
+                {loginMode === 'pin' ? 'Login with Password instead' : 'Login with PIN instead'}
+              </Text>
+            </Pressable>
 
             {/* Login Error */}
             {authError ? (
@@ -185,10 +241,10 @@ export function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F9FAFB', // Match the dashboard background for consistency
+    backgroundColor: colors.background, // Match the dashboard background for consistency
   },
   container: {
     flex: 1,
@@ -208,7 +264,7 @@ const styles = StyleSheet.create({
     width: 88,
     height: 88,
     borderRadius: 44,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.xl,
@@ -265,15 +321,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     height: 52,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: colors.border,
     borderRadius: 12,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: colors.background,
     paddingHorizontal: spacing.md,
     gap: spacing.sm,
   },
   inputFieldFocused: {
     borderColor: colors.primary,
-    backgroundColor: palette.white,
+    backgroundColor: colors.surface,
   },
   inputFieldError: {
     borderColor: colors.danger,
@@ -309,7 +365,7 @@ const styles = StyleSheet.create({
     gap: 8,
     backgroundColor: '#FEF2F2',
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: colors.dangerLight,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -328,5 +384,21 @@ const styles = StyleSheet.create({
   submitText: {
     fontSize: 16,
     fontFamily: FontFamily.bold,
+  },
+  forgotText: {
+    fontSize: 13,
+    fontFamily: FontFamily.medium,
+    color: colors.primary,
+  },
+  toggleModeBtn: {
+    alignSelf: 'center',
+    marginTop: 8,
+    padding: 8,
+  },
+  toggleModeText: {
+    fontSize: 14,
+    fontFamily: FontFamily.medium,
+    color: colors.textSecondary,
+    textDecorationLine: 'underline',
   },
 });

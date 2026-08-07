@@ -1,6 +1,6 @@
 import React, { ReactNode } from 'react';
 import { View, StyleSheet, useWindowDimensions, ViewStyle } from 'react-native';
-import { colors } from '@/core/theme';
+import { useTheme, colors } from '@/core/theme';
 
 interface TabletWrapperProps {
   children: ReactNode;
@@ -20,6 +20,8 @@ export function TabletWrapper({
   backgroundColor = colors.background,
   style,
 }: TabletWrapperProps) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
 
@@ -37,7 +39,7 @@ export function TabletWrapper({
   return <View style={[styles.mobileContainer, { backgroundColor }, style]}>{children}</View>;
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   tabletBackground: {
     flex: 1,
     backgroundColor: '#E5E7EB', // Tailwind gray-200 for the gutters

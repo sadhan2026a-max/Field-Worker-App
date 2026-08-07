@@ -6,3 +6,4 @@ export * from './FontFamily';
 export * from './FontSize';
 export * from './Borders';
 export * from './shadows';
+export * from './ThemeContext';

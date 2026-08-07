@@ -1,7 +1,8 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
-import { colors, radius } from '@/core/theme';
+import { radius, colors, useTheme } from '@/core/theme';
+
 import { Coordinates } from '@/domain/entities/Assignment';
 
 interface RouteMapPreviewProps {
@@ -11,6 +12,8 @@ interface RouteMapPreviewProps {
 }
 
 export function RouteMapPreview({ origin, destination, height = 260 }: RouteMapPreviewProps) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => useStyles(colors), [colors]);
   if (!origin) {
     // Fallback: If current location is loading or unavailable, center on destination
     return (
@@ -50,7 +53,7 @@ export function RouteMapPreview({ origin, destination, height = 260 }: RouteMapP
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any) => StyleSheet.create({
   map: {
     width: '100%',
     borderRadius: radius.lg,
