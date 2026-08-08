@@ -1,6 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, router } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -106,45 +106,106 @@ export function SummaryScreen() {
             </View>
           </View>
 
-          <View style={styles.divider} />
-
           {proofCaptured && (
-            <View style={styles.recapRow}>
-              <MaterialIcons name="camera-alt" size={24} color={colors.primary} />
-              <View style={styles.recapTextContainer}>
-                <Text style={styles.recapLabel}>Proof of Delivery</Text>
-                <Text style={styles.recapValue}>Captured</Text>
-              </View>
-            </View>
+            <>
+              <View style={styles.divider} />
+              <TouchableOpacity
+                style={styles.recapRow}
+                onPress={() => safeRouter.push({ pathname: '/assignment/[id]/proof', params: { id: assignment.id } })}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons name="camera-alt" size={24} color={colors.primary} />
+                <View style={styles.recapTextContainer}>
+                  <Text style={styles.recapLabel}>Proof of Delivery</Text>
+                  <Text style={styles.recapValue}>Captured</Text>
+                  {assignment.proofPhotoUri && (
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: 4 }}>
+                      <Text style={{ fontSize: 12, color: colors.textSecondary, marginRight: 4 }}>•</Text>
+                      <Text style={{ flex: 1, fontSize: 12, color: colors.textSecondary }}>Photo attached</Text>
+                    </View>
+                  )}
+                  {assignment.signatureUri && (
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: 4 }}>
+                      <Text style={{ fontSize: 12, color: colors.textSecondary, marginRight: 4 }}>•</Text>
+                      <Text style={{ flex: 1, fontSize: 12, color: colors.textSecondary }}>Signature attached</Text>
+                    </View>
+                  )}
+                  {assignment.deliveryNotes ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: 4 }}>
+                      <Text style={{ fontSize: 12, color: colors.textSecondary, marginRight: 4 }}>•</Text>
+                      <Text style={{ flex: 1, fontSize: 12, color: colors.textSecondary }}>Notes: {assignment.deliveryNotes}</Text>
+                    </View>
+                  ) : null}
+                </View>
+                <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </>
           )}
 
           {assignment.codAmount > 0 && (
             <>
               <View style={styles.divider} />
-              <View style={styles.recapRow}>
+              <TouchableOpacity
+                style={styles.recapRow}
+                onPress={() => safeRouter.push({ pathname: '/assignment/[id]/payment', params: { id: assignment.id } })}
+                activeOpacity={0.7}
+              >
                 <MaterialIcons name="payments" size={24} color={colors.primary} />
                 <View style={styles.recapTextContainer}>
                   <Text style={styles.recapLabel}>Payment Collection</Text>
                   <Text style={styles.recapValue}>
                     {paymentCollected ? `Collected ₹${(assignment.receivedAmount ?? 0).toLocaleString()}` : 'Pending / Not Completed'}
                   </Text>
+                  {paymentCollected && assignment.paymentMode && (
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: 4 }}>
+                      <Text style={{ fontSize: 12, color: colors.textSecondary, marginRight: 4 }}>•</Text>
+                      <Text style={{ flex: 1, fontSize: 12, color: colors.textSecondary }}>Mode: {assignment.paymentMode.toUpperCase()}</Text>
+                    </View>
+                  )}
+                  {paymentCollected && assignment.paymentReferenceNumber && (
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: 4 }}>
+                      <Text style={{ fontSize: 12, color: colors.textSecondary, marginRight: 4 }}>•</Text>
+                      <Text style={{ flex: 1, fontSize: 12, color: colors.textSecondary }}>Ref: {assignment.paymentReferenceNumber}</Text>
+                    </View>
+                  )}
                 </View>
-              </View>
+                <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
             </>
           )}
 
           {assignment.checklist && assignment.checklist.length > 0 && (
             <>
               <View style={styles.divider} />
-              <View style={styles.recapRow}>
+              <TouchableOpacity
+                style={styles.recapRow}
+                onPress={() => safeRouter.push({ pathname: '/assignment/[id]/checklist', params: { id: assignment.id } })}
+                activeOpacity={0.7}
+              >
                 <MaterialIcons name="checklist" size={24} color={colors.primary} />
                 <View style={styles.recapTextContainer}>
                   <Text style={styles.recapLabel}>Checklist</Text>
                   <Text style={styles.recapValue}>
                     {assignment.checklist.filter(c => c.isChecked || c.value).length} / {assignment.checklist.length} items filled
                   </Text>
+                  {assignment.checklist.filter(c => c.isChecked || c.value).map((item, index) => (
+                    <View key={index} style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: 4 }}>
+                      <Text style={{ fontSize: 12, color: colors.textSecondary, marginRight: 4 }}>•</Text>
+                      <Text style={{ flex: 1, fontSize: 12, color: colors.textSecondary }}>
+                        <Text style={{ fontWeight: '500', color: colors.textSecondary }}>{item.label}:</Text>{' '}
+                        {item.value ? (
+                          <Text style={{ color: '#00953bff' }}>{item.value}</Text>
+                        ) : item.isChecked ? (
+                          <MaterialIcons name="check" size={16} color="#019e2dff" />
+                        ) : (
+                          'No'
+                        )}
+                      </Text>
+                    </View>
+                  ))}
                 </View>
-              </View>
+                <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
             </>
           )}
         </Card>
@@ -171,10 +232,10 @@ export function SummaryScreen() {
       </ScrollView>
 
       <ScreenFooter>
-        <Button 
-          label={assignment.requiresDeliveryOtp && !assignment.deliveryOtpVerifiedAt ? "Verify OTP & Complete" : "Complete Job"} 
-          onPress={handleCompleteJob} 
-          loading={completeAssignment.isPending || verifyOtp.isPending} 
+        <Button
+          label={assignment.requiresDeliveryOtp && !assignment.deliveryOtpVerifiedAt ? "Verify OTP & Complete" : "Complete Job"}
+          onPress={handleCompleteJob}
+          loading={completeAssignment.isPending || verifyOtp.isPending}
         />
       </ScreenFooter>
     </View>
@@ -216,6 +277,12 @@ const useStyles = (colors: any) => StyleSheet.create({
     ...typography.body,
     color: colors.textPrimary,
     fontWeight: '500',
+  },
+  recapSubText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
+    fontSize: 12,
   },
   divider: {
     height: 1,

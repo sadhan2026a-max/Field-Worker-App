@@ -15,6 +15,8 @@ import { SignaturePad, SignaturePadHandle } from '@/components/ui/SignaturePad';
 import { radius, spacing, typography, colors, useTheme } from '@/core/theme';
 
 import { useAssignment, useSaveDeliveryProof, useCompleteAssignment } from '@/hooks/useAssignments';
+import { useAppSelector } from '@/store/hooks';
+import { selectCompletionRequirements } from '@/features/assignment/redux/assignmentSlice';
 
 export function ProofScreen() {
   const { colors } = useTheme();
@@ -24,6 +26,8 @@ export function ProofScreen() {
   const saveProof = useSaveDeliveryProof();
   const completeAssignment = useCompleteAssignment();
   const signaturePadRef = useRef<SignaturePadHandle>(null);
+  
+  const completionRequirements = useAppSelector(selectCompletionRequirements);
 
   const [photoUri, setPhotoUri] = useState<string | undefined>(assignment?.proofPhotoUri);
   const [hasSignature, setHasSignature] = useState(!!assignment?.signatureUri);
@@ -63,13 +67,15 @@ export function ProofScreen() {
     setSignatureData('');
   };
 
+  const reqs = assignment ? completionRequirements?.[assignment.type.toLowerCase()] : null;
+  const requiresPhoto = reqs ? reqs.requiresPhoto : true; // Fallback to true if unknown
+  const requiresSignature = reqs ? reqs.requiresSignature : assignment?.type !== 'inspection'; // Fallback
+
   const onSaveAndContinue = async () => {
-    if (!photoUri) {
+    if (requiresPhoto && !photoUri) {
       Toast.show({ type: 'error', text1: 'Proof photo required', text2: 'Please take a photo before continuing.' });
       return;
     }
-
-    const requiresSignature = assignment.type !== 'inspection';
 
     if (requiresSignature && (!hasSignature || !signatureData || signatureData.trim().length < 30)) {
       Toast.show({ type: 'error', text1: 'Customer signature required', text2: 'Please provide a clearer signature.' });
@@ -86,6 +92,9 @@ export function ProofScreen() {
 
       if (assignment.type === 'inspection') {
         safeRouter.push({ pathname: '/assignment/[id]/remarks', params: { id: assignment.id } });
+      } else if (reqs && !reqs.requiresPayment) {
+        // If the dynamic requirements say no payment needed, skip straight to summary
+        safeRouter.push({ pathname: '/assignment/[id]/summary', params: { id: assignment.id } });
       } else if (assignment.codAmount === 0 || assignment.type !== 'delivery') {
         safeRouter.push({ pathname: '/assignment/[id]/summary', params: { id: assignment.id } });
       } else {
@@ -111,7 +120,6 @@ export function ProofScreen() {
     }
   };
 
-  const requiresSignature = assignment.type !== 'inspection';
   const typeLabel = assignment.type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
   return (
@@ -124,19 +132,22 @@ export function ProofScreen() {
       >
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.sectionTitle}>{typeLabel} Proof</Text>
-        <Card style={styles.photoCard}>
-          <Text style={styles.label}>Take Photo</Text>
-          <Pressable style={styles.photoBox} onPress={takePhoto}>
-            {photoUri ? (
-              <Image source={{ uri: photoUri }} style={styles.photo} />
-            ) : (
-              <MaterialIcons name="photo-camera" size={32} color={colors.textSecondary} />
-            )}
-            <View style={styles.cameraButton}>
-               <MaterialIcons name="camera-alt" size={18} color={colors.textInverse} />
-            </View>
-          </Pressable>
-        </Card>
+        
+        {requiresPhoto && (
+          <Card style={styles.photoCard}>
+            <Text style={styles.label}>Take Photo</Text>
+            <Pressable style={styles.photoBox} onPress={takePhoto}>
+              {photoUri ? (
+                <Image source={{ uri: photoUri }} style={styles.photo} />
+              ) : (
+                <MaterialIcons name="photo-camera" size={32} color={colors.textSecondary} />
+              )}
+              <View style={styles.cameraButton}>
+                <MaterialIcons name="camera-alt" size={18} color={colors.textInverse} />
+              </View>
+            </Pressable>
+          </Card>
+        )}
 
         {requiresSignature && (
           <Card style={styles.signatureCard}>

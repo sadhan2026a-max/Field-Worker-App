@@ -11,8 +11,8 @@ import { useAssignment } from '@/features/assignment/hooks/useAssignments';
 import { saveServiceDetail } from '@/features/assignment/api/assignmentService';
 import { PartUsed } from '@/features/assignment/types/Assignment';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useAppDispatch } from '@/store/hooks';
-import { addAssignment } from '@/features/assignment/redux/assignmentSlice';
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
+import { addAssignment, selectCompletionRequirements } from '@/features/assignment/redux/assignmentSlice';
 
 export function ServiceDetailScreen() {
   const { colors } = useTheme();
@@ -20,6 +20,9 @@ export function ServiceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: assignment } = useAssignment(id as string);
   const dispatch = useAppDispatch();
+  const completionRequirements = useAppSelector(selectCompletionRequirements);
+  const reqs = assignment ? completionRequirements?.[assignment.type.toLowerCase()] : null;
+  const requiresServiceNotes = reqs ? reqs.requiresServiceNotes : true; // Fallback to true
 
   const [diagnosisNotes, setDiagnosisNotes] = useState(assignment?.serviceDetail?.diagnosisNotes || '');
   const [resolutionNotes, setResolutionNotes] = useState(assignment?.serviceDetail?.resolutionNotes || '');
@@ -93,7 +96,7 @@ export function ServiceDetailScreen() {
     safeRouter.push({ pathname: '/assignment/[id]/proof', params: { id: id as string } });
   };
 
-  const isFormValid = diagnosisNotes.length > 0 && resolutionNotes.length > 0;
+  const isFormValid = requiresServiceNotes ? (diagnosisNotes.length > 0 && resolutionNotes.length > 0) : true;
   const partsTotal = parts.reduce((sum, p) => sum + (p.quantity * p.unitPrice), 0);
 
   return (

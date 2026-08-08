@@ -10,12 +10,17 @@ import { spacing, typography, colors, useTheme } from '@/core/theme';
 import { useAssignment, useCompleteAssignment } from '@/features/assignment/hooks/useAssignments';
 import { saveSalesDetail } from '@/features/assignment/api/assignmentService';
 import { SalesOutcome } from '@/features/assignment/types/Assignment';
+import { useAppSelector } from '@/store/hooks';
+import { selectCompletionRequirements } from '@/features/assignment/redux/assignmentSlice';
 
 export function SalesDetailScreen() {
   const { colors } = useTheme();
   const styles = React.useMemo(() => useStyles(colors), [colors]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: assignment } = useAssignment(id as string);
+  const completionRequirements = useAppSelector(selectCompletionRequirements);
+  const reqs = assignment ? completionRequirements?.[assignment.type.toLowerCase()] : null;
+  const requiresSalesOutcome = reqs ? reqs.requiresSalesOutcome : true; // Fallback
 
   const [meetingNotes, setMeetingNotes] = useState('');
   const [outcome, setOutcome] = useState<SalesOutcome | ''>('');
@@ -30,8 +35,10 @@ export function SalesDetailScreen() {
   ];
 
   const handleComplete = async () => {
-    if (!meetingNotes || !outcome) return;
-    if (outcome === 'FollowUpNeeded' && !followUpDate) return;
+    if (requiresSalesOutcome) {
+      if (!meetingNotes || !outcome) return;
+      if (outcome === 'FollowUpNeeded' && !followUpDate) return;
+    }
 
     await saveSalesDetail(id as string, {
       meetingNotes,
@@ -50,9 +57,9 @@ export function SalesDetailScreen() {
     return date instanceof Date && !isNaN(date.getTime());
   };
 
-  const isFormValid = meetingNotes.length > 0 && 
-                      outcome !== '' && 
-                      (outcome !== 'FollowUpNeeded' || (followUpDate.length > 0 && isValidDate(followUpDate)));
+  const isFormValid = requiresSalesOutcome 
+    ? (meetingNotes.length > 0 && outcome !== '' && (outcome !== 'FollowUpNeeded' || (followUpDate.length > 0 && isValidDate(followUpDate))))
+    : true;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View, ScrollView, RefreshControl, Alert, Pressable } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, RefreshControl, Alert, Pressable, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -16,12 +16,13 @@ import { router } from 'expo-router';
 
 export default function ProfileScreen() {
   const dispatch = useAppDispatch();
-  const { colors, isDark, setTheme } = useTheme();
+  const { theme, colors, isDark, setTheme } = useTheme();
   const styles = React.useMemo(() => useStyles(colors), [colors]);
   const driver = useAppSelector(selectDriver);
   const workspaceSummary = useAppSelector(selectWorkspaceSummary);
   const assignments = useAppSelector(selectAssignments);
   const [refreshing, setRefreshing] = React.useState(false);
+  const [showThemeModal, setShowThemeModal] = React.useState(false);
   const isFocused = useIsFocused();
 
   const localCompletedCount = assignments?.filter(a => a.status === 'completed').length ?? 0;
@@ -124,32 +125,16 @@ export default function ProfileScreen() {
               <Text style={styles.sectionTitle}>Account Details</Text>
 
               <View style={styles.detailRow}>
-                <View style={[styles.detailIcon, { backgroundColor: palette.blue + '15' }]}>
-                  <MaterialIcons name={isDark ? "dark-mode" : "light-mode"} size={20} color={palette.blue} />
+                <View style={[styles.detailIcon, { backgroundColor: colors.primary + '15' }]}>
+                  <MaterialIcons name="palette" size={20} color={colors.primary} />
                 </View>
                 <View style={styles.detailContent}>
-                  <Text style={styles.detailLabel}>Dark Mode</Text>
-                  <Text style={styles.detailValue}>{isDark ? 'On' : 'Off'}</Text>
+                  <Text style={styles.detailLabel}>App Theme</Text>
                 </View>
-                <View>
-                   <Pressable 
-                      onPress={() => {
-                        console.log('Toggling theme to:', isDark ? 'light' : 'dark');
-                        setTheme(isDark ? 'light' : 'dark');
-                      }}
-                      style={({pressed}) => ({ 
-                        height: 32, 
-                        paddingHorizontal: 12, 
-                        borderRadius: 8, 
-                        backgroundColor: isDark ? palette.grey700 : palette.green,
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        opacity: pressed ? 0.8 : 1
-                      })}
-                   >
-                     <Text style={{ fontSize: 12, color: 'white', fontWeight: 'bold' }}>{isDark ? 'Light' : 'Dark'}</Text>
-                   </Pressable>
-                </View>
+                <Pressable onPress={() => setShowThemeModal(true)} style={{ flexDirection: 'row', alignItems: 'center', padding: 4 }}>
+                   <Text style={[styles.detailValue, { marginRight: 4 }]}>{theme.charAt(0).toUpperCase() + theme.slice(1)}</Text>
+                   <MaterialIcons name="arrow-drop-down" size={24} color={colors.textSecondary} />
+                </Pressable>
               </View>
 
               <View style={styles.divider} />
@@ -256,6 +241,29 @@ export default function ProfileScreen() {
         />
         <Text style={styles.versionText}>Version 1.0.0</Text>
       </ScrollView>
+
+      <Modal visible={showThemeModal} transparent animationType="fade">
+        <Pressable style={styles.modalOverlay} onPress={() => setShowThemeModal(false)}>
+          <View style={[styles.themeModalContent, { backgroundColor: colors.surface }]}>
+            <Text style={styles.themeModalTitle}>Select Theme</Text>
+            {['light', 'dark', 'blue', 'forest', 'ocean'].map((t) => (
+              <Pressable
+                key={t}
+                style={[styles.themeOptionRow, theme === t && { backgroundColor: colors.primary + '15' }]}
+                onPress={() => {
+                  setTheme(t as any);
+                  setShowThemeModal(false);
+                }}
+              >
+                <Text style={[styles.themeOptionText, theme === t && { color: colors.primary, fontWeight: 'bold' }]}>
+                  {t.charAt(0).toUpperCase() + t.slice(1)}
+                </Text>
+                {theme === t && <MaterialIcons name="check" size={20} color={colors.primary} />}
+              </Pressable>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -427,5 +435,38 @@ const useStyles = (colors: any) => StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.md,
     marginBottom: spacing.xl,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  themeModalContent: {
+    width: '80%',
+    borderRadius: 16,
+    padding: spacing.lg,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  themeModalTitle: {
+    ...typography.h3,
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+  },
+  themeOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    borderRadius: 8,
+  },
+  themeOptionText: {
+    ...typography.bodyMedium,
+    color: colors.textPrimary,
   },
 });

@@ -14,7 +14,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/shared/components/ui/Skeleton';
 import { ScreenFooter } from '@/components/ui/ScreenFooter';
 import { colors as lightColors, spacing, typography, palette, FontFamily, FontSize, useTheme } from '@/core/theme';
-import { useAssignment, useStartAssignment, useAcceptOffer, useDeclineOffer, useStartNavigation, useMarkArrived, useCompleteAssignment, useCancelAssignment } from '@/features/assignment/hooks/useAssignments';
+import { useAssignment, useStartAssignment, useAcceptOffer, useDeclineOffer, useStartNavigation, useMarkArrived, useCompleteAssignment, useReleaseAssignment } from '@/features/assignment/hooks/useAssignments';
 import { externalMapsUrl } from '@/shared/services/maps';
 import { useCurrentLocation } from '@/shared/utils/location';
 import { DistanceDisplay } from '@/features/assignment/components';
@@ -39,7 +39,7 @@ export function AssignmentDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [actionType, setActionType] = useState<'accept' | 'decline' | null>(null);
   
-  const cancelAssignment = useCancelAssignment();
+  const releaseAssignment = useReleaseAssignment();
   
   const [isNoteModalVisible, setNoteModalVisible] = useState(false);
   const [noteText, setNoteText] = useState('');
@@ -234,8 +234,8 @@ export function AssignmentDetailScreen() {
     try {
       await acceptOffer.mutateAsync(assignment.offerId ?? assignment.id);
       Toast.show({ type: 'success', text1: 'Offer Accepted!' });
-    } catch (error) {
-      Toast.show({ type: 'error', text1: 'Failed to accept offer' });
+    } catch (error: any) {
+      Toast.show({ type: 'error', text1: error?.message || 'Failed to accept offer' });
     } finally {
       setActionType(null);
     }
@@ -253,8 +253,8 @@ export function AssignmentDetailScreen() {
             await declineOffer.mutateAsync(assignment.offerId ?? assignment.id);
             Toast.show({ type: 'success', text1: 'Offer Declined' });
             router.back();
-          } catch (error) {
-            Toast.show({ type: 'error', text1: 'Failed to decline offer' });
+          } catch (error: any) {
+            Toast.show({ type: 'error', text1: error?.message || 'Failed to decline offer' });
           } finally {
             setActionType(null);
           }
@@ -263,20 +263,20 @@ export function AssignmentDetailScreen() {
     ]);
   };
 
-  const onCancelOrder = async () => {
+  const onReleaseOrder = async () => {
     if (!cancelReasonText.trim()) {
-      Toast.show({ type: 'error', text1: 'Please enter a cancellation reason' });
+      Toast.show({ type: 'error', text1: 'Please enter a release reason' });
       return;
     }
     setIsCancelling(true);
     try {
-      await cancelAssignment.mutateAsync({ id: assignment!.id, reason: cancelReasonText.trim() });
-      Toast.show({ type: 'success', text1: 'Order Cancelled successfully' });
+      await releaseAssignment.mutateAsync({ id: assignment!.id, reason: cancelReasonText.trim() });
+      Toast.show({ type: 'success', text1: 'Order Released successfully' });
       setCancelReasonText('');
       setCancelModalVisible(false);
-      refetch();
-    } catch (error) {
-      Toast.show({ type: 'error', text1: 'Failed to cancel order' });
+      router.back();
+    } catch (error: any) {
+      Toast.show({ type: 'error', text1: error?.message || 'Failed to release order' });
     } finally {
       setIsCancelling(false);
     }
@@ -558,13 +558,15 @@ export function AssignmentDetailScreen() {
                 onPress={onActionPress}
                 loading={isActionLoading}
               />
-              <Button
-                label="Cancel Order"
-                variant="outline"
-                onPress={() => setCancelModalVisible(true)}
-                style={{ borderColor: colors.danger, backgroundColor: 'transparent' }}
-                textStyle={{ color: colors.danger }}
-              />
+              {assignment.status === 'accepted' && (
+                <Button
+                  label="Release Order"
+                  variant="outline"
+                  onPress={() => setCancelModalVisible(true)}
+                  style={{ borderColor: colors.danger, backgroundColor: 'transparent' }}
+                  textStyle={{ color: colors.danger }}
+                />
+              )}
             </View>
           )}
         </ScreenFooter>
@@ -600,23 +602,23 @@ export function AssignmentDetailScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Cancel Order Modal */}
+      {/* Release Order Modal */}
       <Modal visible={isCancelModalVisible} transparent animationType="fade">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.danger }]}>Cancel Order</Text>
+              <Text style={[styles.modalTitle, { color: colors.danger }]}>Release Order</Text>
               <Pressable onPress={() => setCancelModalVisible(false)} style={styles.modalCloseButton}>
                 <MaterialIcons name="close" size={24} color={colors.textSecondary} />
               </Pressable>
             </View>
             <View style={styles.modalBody}>
               <Text style={{ ...typography.bodyMedium, color: colors.textSecondary, marginBottom: spacing.sm }}>
-                Please provide a reason for cancelling this order.
+                Please provide a reason for releasing this order.
               </Text>
               <TextInput
                 style={styles.modalInput}
-                placeholder="Enter cancellation reason..."
+                placeholder="Enter release reason..."
                 placeholderTextColor={colors.textSecondary}
                 multiline
                 numberOfLines={3}
@@ -627,7 +629,7 @@ export function AssignmentDetailScreen() {
             </View>
             <View style={styles.modalFooter}>
               <Button label="Back" variant="outline" onPress={() => setCancelModalVisible(false)} style={[styles.modalBtn, { borderColor: colors.border, backgroundColor: 'transparent' }]} textStyle={{ color: colors.textPrimary }} />
-              <Button label="Confirm Cancel" onPress={onCancelOrder} loading={isCancelling} style={[styles.modalBtn, { backgroundColor: colors.danger, borderColor: colors.danger }]} />
+              <Button label="Confirm Release" onPress={onReleaseOrder} loading={isCancelling} style={[styles.modalBtn, { backgroundColor: colors.danger, borderColor: colors.danger }]} />
             </View>
           </View>
         </KeyboardAvoidingView>

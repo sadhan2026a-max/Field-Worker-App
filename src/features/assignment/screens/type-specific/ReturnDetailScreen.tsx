@@ -10,12 +10,18 @@ import { spacing, typography, colors, useTheme } from '@/core/theme';
 import { useAssignment } from '@/features/assignment/hooks/useAssignments';
 import { getReturnReasons, saveReturnDetail } from '@/features/assignment/api/assignmentService';
 import { ReturnReasonOption } from '@/features/assignment/types/Assignment';
+import { useAppSelector } from '@/store/hooks';
+import { selectCompletionRequirements } from '@/features/assignment/redux/assignmentSlice';
 
 export function ReturnDetailScreen() {
   const { colors } = useTheme();
   const styles = React.useMemo(() => useStyles(colors), [colors]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: assignment } = useAssignment(id as string);
+  const completionRequirements = useAppSelector(selectCompletionRequirements);
+  const reqs = assignment ? completionRequirements?.[assignment.type.toLowerCase()] : null;
+  const requiresReturnReason = reqs ? reqs.requiresReturnReason : true; // Fallback
+  
   const [reasons, setReasons] = useState<ReturnReasonOption[]>([]);
   const [selectedReasonId, setSelectedReasonId] = useState<string>('');
   const [conditionNotes, setConditionNotes] = useState<string>('');
@@ -29,7 +35,7 @@ export function ReturnDetailScreen() {
   }, []);
 
   const handleContinue = async () => {
-    if (!selectedReasonId) return;
+    if (requiresReturnReason && !selectedReasonId) return;
     await saveReturnDetail(id as string, { returnReasonOptionId: selectedReasonId, conditionNotes });
     safeRouter.push({ pathname: '/assignment/[id]/proof', params: { id: id as string } });
   };
@@ -44,18 +50,24 @@ export function ReturnDetailScreen() {
         <Text style={styles.title}>Verify Return</Text>
         <Text style={styles.subtitle}>Order #{assignment?.code}</Text>
 
-        <Text style={styles.label}>Select Return Reason *</Text>
-        <View style={styles.reasonsContainer}>
-          {reasons.map((reason) => (
-            <Button
-              key={reason.id}
-              label={reason.label}
-              variant={selectedReasonId === reason.id ? 'primary' : 'outline'}
-              onPress={() => setSelectedReasonId(reason.id)}
-              style={styles.reasonButton}
-            />
-          ))}
-        </View>
+        {requiresReturnReason ? (
+          <>
+            <Text style={styles.label}>Select Return Reason *</Text>
+            <View style={styles.reasonsContainer}>
+              {reasons.map((reason) => (
+                <Button
+                  key={reason.id}
+                  label={reason.label}
+                  variant={selectedReasonId === reason.id ? 'primary' : 'outline'}
+                  onPress={() => setSelectedReasonId(reason.id)}
+                  style={styles.reasonButton}
+                />
+              ))}
+            </View>
+          </>
+        ) : (
+          <Text style={styles.label}>Return reason not required for this order.</Text>
+        )}
 
         <Text style={styles.label}>Condition Notes</Text>
         <TextInput
@@ -70,7 +82,11 @@ export function ReturnDetailScreen() {
       </ScrollView>
 
       <ScreenFooter>
-        <Button label="Continue to Proof" onPress={handleContinue} disabled={!selectedReasonId} />
+        <Button 
+          label="Continue to Proof" 
+          onPress={handleContinue} 
+          disabled={requiresReturnReason && !selectedReasonId} 
+        />
       </ScreenFooter>
     </SafeAreaView>
   );

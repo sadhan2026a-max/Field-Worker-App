@@ -155,9 +155,9 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   avatar: {
-    width: 38,
-    height: 48,
-    borderRadius: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#FFFFFF20',
     alignItems: 'center',
     justifyContent: 'center',

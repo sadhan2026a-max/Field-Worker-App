@@ -74,10 +74,10 @@ export function AssignmentsScreen() {
       'completed': 6,
       'cancelled': 7,
     };
-    
+
     const pA = priority[a.status] || 99;
     const pB = priority[b.status] || 99;
-    
+
     if (pA !== pB) return pA - pB;
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
@@ -96,8 +96,8 @@ export function AssignmentsScreen() {
     activeTab === 'all'
       ? allAssignments
       : activeTab === 'pending'
-      ? pendingAssignments
-      : completedAssignments;
+        ? pendingAssignments
+        : completedAssignments;
 
   // driver status already extracted above
 
@@ -156,7 +156,7 @@ export function AssignmentsScreen() {
                 <Skeleton width={140} height={16} borderRadius={4} style={{ marginTop: 4 }} />
                 <Skeleton width={200} height={12} borderRadius={4} style={{ marginTop: 8 }} />
                 <Skeleton width={160} height={12} borderRadius={4} style={{ marginTop: 4 }} />
-                
+
                 <View style={[styles.cardBottomRow, { marginTop: 12 }]}>
                   <Skeleton width={80} height={12} borderRadius={4} />
                   <Skeleton width={70} height={20} borderRadius={6} />
@@ -173,76 +173,76 @@ export function AssignmentsScreen() {
           onRefresh={onRefresh}
           refreshing={false}
           renderItem={({ item }) => (
-          <Pressable onPress={() => router.push({ pathname: '/assignment/[id]', params: { id: item.id } })}>
-            <Card style={styles.card}>
-              {/* Left Side: Icon Circle */}
-              <View style={styles.cardIconContainer}>
-                <View style={[styles.iconCircle, { backgroundColor: getCardIcon(item.status === 'pending' ? 'generic' : item.type, colors).bg }]}>
-                  <MaterialIcons
-                    name={getCardIcon(item.status === 'pending' ? 'generic' : item.type, colors).icon}
-                    size={20}
-                    color={palette.white}
-                  />
-                </View>
-              </View>
-
-              {/* Content */}
-              <View style={styles.cardContent}>
-                {/* Top Row */}
-                <View style={styles.cardTopRow}>
-                  <Text style={styles.code} numberOfLines={1} ellipsizeMode="tail">{item.code}</Text>
-                  {item.status !== 'pending' && (
-                    <View style={styles.typeBadge}>
-                      <Text style={styles.typeBadgeText}>{formatAssignmentType(item.type)}</Text>
-                    </View>
-                  )}
-                  <View style={{ flex: 1 }} />
-                  <StatusBadge status={item.status} />
-                </View>
-
-                {/* Customer Info */}
-                <Text style={styles.customerName}>{item.customer.name}</Text>
-                {item.status !== 'completed' && item.status !== 'cancelled' && (
-                  <DistanceDisplay
-                    style={styles.distance}
-                    currentLocation={currentLocation}
-                    targetLocation={item.customer.location}
-                    targetAddress={item.customer.address}
-                    backendDistanceKm={item.distanceKm}
-                  />
-                )}
-                <Text style={styles.address} numberOfLines={2}>
-                  {item.customer.address}
-                </Text>
-
-                {/* Bottom Row (COD & Hint) */}
-                <View style={styles.cardBottomRow}>
-                  {(() => {
-                    let hint = null;
-                    if (item.status === 'accepted') hint = 'Start Navigation';
-                    else if (item.status === 'en_route') hint = "I've Arrived";
-                    else if (item.status === 'arrived') hint = 'Start Job';
-                    else if (item.status === 'in_progress') hint = item.type === 'other' ? 'Complete Job' : 'Continue Job';
-                    
-                    if (!hint) return <View style={{ flex: 1 }} />;
-                    return (
-                      <Text style={styles.actionHint}>
-                        {hint} →
-                      </Text>
-                    );
-                  })()}
-                  
-                  <View style={styles.codContainer}>
-                    <Text style={styles.codLabel}>
-                      COD: ₹{(item.codAmount ?? 0).toLocaleString()}
-                    </Text>
+            <Pressable onPress={() => router.push({ pathname: '/assignment/[id]', params: { id: item.id } })}>
+              <Card style={styles.card}>
+                {/* Left Side: Icon Circle */}
+                <View style={styles.cardIconContainer}>
+                  <View style={[styles.iconCircle, { backgroundColor: getCardIcon(item.status === 'pending' ? 'generic' : item.type, colors).bg }]}>
+                    <MaterialIcons
+                      name={getCardIcon(item.status === 'pending' ? 'generic' : item.type, colors).icon}
+                      size={20}
+                      color={palette.white}
+                    />
                   </View>
                 </View>
-              </View>
-            </Card>
-          </Pressable>
-        )}
-      />
+
+                {/* Content */}
+                <View style={styles.cardContent}>
+                  {/* Top Row */}
+                  <View style={styles.cardTopRow}>
+                    <Text style={styles.code} numberOfLines={1} ellipsizeMode="tail">{item.code}</Text>
+                    {item.status !== 'pending' && (
+                      <View style={styles.typeBadge}>
+                        <Text style={styles.typeBadgeText}>{formatAssignmentType(item.type)}</Text>
+                      </View>
+                    )}
+                    <View style={{ flex: 1 }} />
+                    <StatusBadge status={item.status} />
+                  </View>
+
+                  {/* Customer Info */}
+                  <Text style={styles.customerName}>{item.customer.name}</Text>
+                  {item.status !== 'completed' && item.status !== 'cancelled' && (
+                    <DistanceDisplay
+                      style={styles.distance}
+                      currentLocation={currentLocation}
+                      targetLocation={item.customer.location}
+                      targetAddress={item.customer.address}
+                      backendDistanceKm={item.distanceKm}
+                    />
+                  )}
+                  <Text style={styles.address} numberOfLines={2}>
+                    {item.customer.address}
+                  </Text>
+
+                  {/* Bottom Row (COD & Hint) */}
+                  <View style={styles.cardBottomRow}>
+                    {(() => {
+                      let hint = null;
+                      if (item.status === 'accepted') hint = 'Start Navigation';
+                      else if (item.status === 'en_route') hint = "I've Arrived";
+                      else if (item.status === 'arrived') hint = 'Start Job';
+                      else if (item.status === 'in_progress') hint = item.type === 'other' ? 'Complete Job' : 'Continue Job';
+
+                      if (!hint) return <View style={{ flex: 1 }} />;
+                      return (
+                        <Text style={styles.actionHint}>
+                          {hint} →
+                        </Text>
+                      );
+                    })()}
+
+                    <View style={styles.codContainer}>
+                      <Text style={styles.codLabel}>
+                        COD: ₹{(item.codAmount ?? 0).toLocaleString()}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </Card>
+            </Pressable>
+          )}
+        />
       )}
     </SafeAreaView>
   );

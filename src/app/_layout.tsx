@@ -4,11 +4,12 @@ import { store } from '@/store';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { NotificationService } from '@/core/services/NotificationService';
 import * as Notifications from 'expo-notifications';
-import { fetchAssignments, fetchWorkspaceSummary } from '@/features/assignment/redux/assignmentSlice';
+import { fetchAssignments, fetchWorkspaceSummary, fetchOrderCompletionRequirements, restoreAssignments, restoreWorkspaceSummary, setHydrated } from '@/features/assignment/redux/assignmentSlice';
 import { fetchNotifications } from '@/features/notification/redux/notificationSlice';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState, Component } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
@@ -81,13 +82,41 @@ function AppBootstrap({ children }: { children: React.ReactNode }) {
   const isLoading = useAppSelector(selectIsLoading);
 
   useEffect(() => {
-    logger.info('bootstrap', '≡ƒÜÇ SidhaHisab Rider starting up ΓÇö dispatching initAuth');
+    logger.info('bootstrap', '👋 SidhaHisab Rider starting up — dispatching initAuth');
     dispatch(initAuth())
       .then((result) => {
-        logger.info('bootstrap', 'Γ£à initAuth completed', result);
+        logger.info('bootstrap', '✅ initAuth completed', result);
       })
       .catch((err) => {
-        logger.error('bootstrap', 'Γ¥î initAuth failed', err);
+        logger.error('bootstrap', '❌ initAuth failed', err);
+      });
+
+    // 1. HYDRATE ASSIGNMENTS FROM STORAGE BEFORE DISPATCHING ANY ASSIGNMENT ACTIONS
+    // This prevents persistenceMiddleware from overwriting saved state with initial empty state
+    Promise.all([
+      AsyncStorage.getItem('persisted_assignments'),
+      AsyncStorage.getItem('persisted_workspace_summary')
+    ])
+      .then(([assignmentsData, summaryData]) => {
+        if (assignmentsData) {
+          const parsed = JSON.parse(assignmentsData);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            dispatch(restoreAssignments(parsed));
+          }
+        }
+        if (summaryData) {
+          const parsed = JSON.parse(summaryData);
+          if (parsed) {
+            dispatch(restoreWorkspaceSummary(parsed));
+          }
+        }
+      })
+      .catch((e) => logger.error('bootstrap', 'Failed to restore assignments', e))
+      .finally(() => {
+        // Mark as hydrated so persistence middleware can start saving
+        dispatch(setHydrated());
+        // 2. NOW fetch dynamic completion requirements (safe to do now)
+        dispatch(fetchOrderCompletionRequirements());
       });
 
     // Set up push notification listeners
@@ -97,20 +126,17 @@ function AppBootstrap({ children }: { children: React.ReactNode }) {
         body: notification.request.content.body
       });
 
-      // Auto-refresh data when push arrives with a slight delay
-      // to avoid race conditions where the push arrives before the backend DB transaction completes.
-      setTimeout(() => {
-        dispatch(fetchAssignments());
-        dispatch(fetchNotifications());
+      // Auto-refresh data immediately when push arrives
+      dispatch(fetchAssignments());
+      dispatch(fetchNotifications());
 
-        const currentDriver = store.getState().auth.driver;
-        if (currentDriver?.id) {
-          dispatch(fetchWorkspaceSummary(currentDriver.id));
-        }
-      }, 2000);
+      const currentDriver = store.getState().auth.driver;
+      if (currentDriver?.id) {
+        dispatch(fetchWorkspaceSummary(currentDriver.id));
+      }
     });
 
-        const responseListener = NotificationService.addNotificationResponseReceivedListener((response) => {
+    const responseListener = NotificationService.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data;
       logger.info('notification', 'Notification clicked', {
         actionId: response.actionIdentifier,
@@ -329,7 +355,7 @@ export default function RootLayout() {
     return null;
   }
 
-  logger.info('layout', '≡ƒû╝  Rendering navigation tree');
+  logger.info('layout', '🪄  Rendering navigation tree');
 
   return (
     <RootErrorBoundary>

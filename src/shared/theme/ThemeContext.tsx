@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColorScheme } from 'react-native';
-import { lightColors, darkColors, AppColors } from './colors';
+import { lightColors, darkColors, blueColors, forestColors, oceanColors, AppColors } from './colors';
 
-type ThemeType = 'light' | 'dark' | 'system';
+type ThemeType = 'light' | 'dark' | 'system' | 'blue' | 'forest' | 'ocean';
 
 interface ThemeContextType {
   theme: ThemeType;
@@ -32,7 +32,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const loadTheme = async () => {
       try {
         const storedTheme = await AsyncStorage.getItem(THEME_STORAGE_KEY);
-        if (storedTheme === 'light' || storedTheme === 'dark' || storedTheme === 'system') {
+        if (storedTheme === 'light' || storedTheme === 'dark' || storedTheme === 'system' || storedTheme === 'blue' || storedTheme === 'forest' || storedTheme === 'ocean') {
           setThemeState(storedTheme as ThemeType);
         }
       } catch (e) {
@@ -53,8 +53,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const isDark = theme === 'system' ? systemColorScheme === 'dark' : theme === 'dark';
-  const colors = isDark ? darkColors : lightColors;
+  const isDark = theme === 'system' ? systemColorScheme === 'dark' : (theme === 'dark' || theme === 'blue' || theme === 'forest' || theme === 'ocean');
+  const colors = theme === 'ocean' ? oceanColors : (theme === 'forest' ? forestColors : (theme === 'blue' ? blueColors : (isDark ? darkColors : lightColors)));
 
   if (!isReady) return null;
 

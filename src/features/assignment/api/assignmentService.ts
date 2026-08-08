@@ -14,6 +14,7 @@ import {
   ChecklistItemDto,
   QrOrderSummaryDto,
   QrAcceptResponse,
+  OrderCompletionRequirementDto,
 } from '@/features/assignment/types/Assignment';
 import { DriverWorkspaceSummary } from '@/domain/entities/Driver';
 import { logger } from '@/core/utils/logger';
@@ -46,7 +47,7 @@ function mapOrderStatus(status: string): Assignment['status'] {
     case 'arrived': return 'arrived';
     case 'inprogress':
     case 'in_progress': return 'in_progress';
-    case 'completed': 
+    case 'completed':
     case 'delivered': return 'completed';
     case 'cancelled':
     case 'failed': return 'cancelled';
@@ -57,7 +58,7 @@ function mapOrderStatus(status: string): Assignment['status'] {
 function extractCustomerName(order: OrderDto): string {
   let name = order.customerNameSnapshot || 'Unknown customer';
   const address = order.deliveryAddress || order.pickupAddress || '';
-  
+
   // If the backend returned a generic walk-in name, try to parse it from the address string
   if (name === 'Walk-in Customer' && address) {
     const match = address.match(/Name:\s*(.+?)Address Line 1:/i);
@@ -79,9 +80,9 @@ function mapOrderDtoToAssignment(order: OrderDto, offerId?: string): Assignment 
       name: extractCustomerName(order),
       phone: order.customerPhoneSnapshot || 'N/A',
       address: order.deliveryAddress || order.pickupAddress || 'Address not available',
-      location: { 
-        latitude: (order as any).deliveryLatitude || (order as any).pickupLatitude || (order as any).latitude || 0, 
-        longitude: (order as any).deliveryLongitude || (order as any).pickupLongitude || (order as any).longitude || 0 
+      location: {
+        latitude: (order as any).deliveryLatitude || (order as any).pickupLatitude || (order as any).latitude || 0,
+        longitude: (order as any).deliveryLongitude || (order as any).pickupLongitude || (order as any).longitude || 0
       },
     },
     distanceKm: order.deliveryChargeDistanceKm || 0,
@@ -118,23 +119,23 @@ function mapOrderDtoToAssignment(order: OrderDto, offerId?: string): Assignment 
       : undefined,
     serviceDetail: order.serviceVisitDetail
       ? {
-          complaintDescription: order.serviceVisitDetail.complaintDescription,
-          productRef: order.serviceVisitDetail.productRef,
-          diagnosisNotes: order.serviceVisitDetail.diagnosisNotes,
-          resolutionNotes: order.serviceVisitDetail.resolutionNotes,
-          partsUsed: order.serviceVisitDetail.partsUsed?.map((p) => ({
-            partName: p.partName,
-            quantity: p.quantity,
-            unitPrice: p.unitPrice,
-          })),
-        }
+        complaintDescription: order.serviceVisitDetail.complaintDescription,
+        productRef: order.serviceVisitDetail.productRef,
+        diagnosisNotes: order.serviceVisitDetail.diagnosisNotes,
+        resolutionNotes: order.serviceVisitDetail.resolutionNotes,
+        partsUsed: order.serviceVisitDetail.partsUsed?.map((p) => ({
+          partName: p.partName,
+          quantity: p.quantity,
+          unitPrice: p.unitPrice,
+        })),
+      }
       : undefined,
     salesDetail: order.salesVisitDetail
       ? {
-          meetingNotes: order.salesVisitDetail.meetingNotes,
-          outcome: order.salesVisitDetail.outcome,
-          followUpDate: order.salesVisitDetail.followUpDate,
-        }
+        meetingNotes: order.salesVisitDetail.meetingNotes,
+        outcome: order.salesVisitDetail.outcome,
+        followUpDate: order.salesVisitDetail.followUpDate,
+      }
       : undefined,
     requiresDeliveryOtp: order.requiresDeliveryOtp,
     deliveryOtpVerifiedAt: order.deliveryOtpVerifiedAt,
@@ -149,15 +150,15 @@ async function fetchOrderAsAssignment(id: string, offerId?: string): Promise<Ass
       return { data: [] };
     })
   ]);
-  
+
   const assignment = mapOrderDtoToAssignment(orderResponse.data, offerId);
-  
+
   assignment.timeline = (historyResponse.data || []).map((h) => ({
     status: h.toStatus || h.fromStatus || 'Pending',
     timestamp: h.createdAt,
     notes: h.notes,
   }));
-  
+
   return assignment;
 }
 
@@ -201,7 +202,7 @@ export async function getAssignments(status?: Assignment['status'] | string): Pr
   try {
     const backendStatus = status ? status.charAt(0).toUpperCase() + status.slice(1) : undefined;
     let url = backendStatus ? `/api/v1/driver/assignments?status=${backendStatus}` : '/api/v1/driver/assignments';
-    
+
     const response = await api.get(url);
     offers = Array.isArray(response.data) ? response.data : (response.data?.items || []);
     logger.debug('assignment', `RAW OFFERS FROM API (${backendStatus || 'all'}):`, JSON.stringify(offers.slice(0, 2)));
@@ -288,7 +289,15 @@ export async function getAssignments(status?: Assignment['status'] | string): Pr
 
 export async function acceptOffer(offerId: string): Promise<Assignment> {
   logger.info('assignment', 'Accepting assignment offer', { offerId });
-  const response = await api.post(`/api/v1/assignment-offers/${offerId}/accept`, {});
+  let response;
+  try {
+    response = await api.post(`/api/v1/assignment-offers/${offerId}/accept`, {});
+  } catch (error: any) {
+    if (error.response?.status === 409) {
+      throw new Error('This offer has already been processed or expired.');
+    }
+    throw error;
+  }
   const orderId: string | undefined = response.data?.orderId;
 
   if (!orderId) {
@@ -301,7 +310,7 @@ export async function acceptOffer(offerId: string): Promise<Assignment> {
     return await fetchOrderAsAssignment(orderId, offerId);
   } catch (e) {
     logger.warn('assignment', `Accepted order ${orderId} but failed to enrich it immediately`, e);
-    
+
     const rawOrderType = response.data?.orderType || response.data?.type || 'Delivery';
     const mappedType = ORDER_TYPE_MAP[rawOrderType] ?? 'other';
 
@@ -334,7 +343,14 @@ export async function addOrderNote(orderId: string, notes: string): Promise<void
 
 export async function declineOffer(offerId: string): Promise<void> {
   logger.info('assignment', 'Declining assignment offer', { offerId });
-  await api.post(`/api/v1/assignment-offers/${offerId}/decline`, {});
+  try {
+    await api.post(`/api/v1/assignment-offers/${offerId}/decline`, {});
+  } catch (error: any) {
+    if (error.response?.status === 409) {
+      throw new Error('This offer has already been processed or expired.');
+    }
+    throw error;
+  }
 }
 
 export async function getAssignmentById(id: string): Promise<Assignment | undefined> {
@@ -384,16 +400,16 @@ export async function saveDeliveryProof(
   if (proof.proofPhotoUri) {
     formData.append('Photos', { uri: proof.proofPhotoUri, name: 'photo.jpg', type: 'image/jpeg' } as any);
   }
-  
+
   if (proof.signatureUri) {
     // proof.signatureUri contains raw SVG path data. We must save it to a file first.
     const svgContent = `<svg width="300" height="150" xmlns="http://www.w3.org/2000/svg"><path d="${proof.signatureUri}" stroke="black" stroke-width="2.5" fill="none" /></svg>`;
     const signatureFileUri = FileSystem.cacheDirectory + `signature_${id}.svg`;
     await FileSystem.writeAsStringAsync(signatureFileUri, svgContent, { encoding: FileSystem.EncodingType.UTF8 });
-    
+
     formData.append('Signature', { uri: signatureFileUri, name: 'signature.svg', type: 'image/svg+xml' } as any);
   }
-  
+
   if (proof.deliveryNotes) {
     formData.append('Notes', proof.deliveryNotes);
   }
@@ -501,9 +517,9 @@ export async function saveChecklist(
 ): Promise<Assignment> {
   logger.info('assignment', 'Saving checklist', { id });
   await api.put(`/api/v1/orders/${id}/checklist`, {
-    items: items.map((item) => ({ 
-      id: item.id, 
-      isChecked: Boolean(item.isChecked), 
+    items: items.map((item) => ({
+      id: item.id,
+      isChecked: Boolean(item.isChecked),
       notes: item.notes || null,
       value: (item.value !== undefined && item.value !== null && typeof item.value !== 'boolean') ? String(item.value) : null
     })),
@@ -559,4 +575,30 @@ export async function cancelAssignment(id: string, reason: string): Promise<Assi
   const response = await api.post<OrderDto>(`/api/v1/orders/${id}/cancel`, { reason });
   logger.info('assignment', 'Assignment cancelled', { id });
   return mapOrderDtoToAssignment(response.data);
+}
+
+export async function releaseAssignment(id: string, reason?: string): Promise<Assignment> {
+  logger.info('assignment', 'Releasing assignment', { id, reason });
+  try {
+    const payload = reason ? { reason } : {};
+    const response = await api.post<OrderDto>(`/api/v1/orders/${id}/release`, payload);
+    logger.info('assignment', 'Assignment released', { id });
+    return mapOrderDtoToAssignment(response.data);
+  } catch (error: any) {
+    if (error.response?.status === 409) {
+      throw new Error('You cannot release this order anymore as it has already progressed.');
+    }
+    throw error;
+  }
+}
+
+export async function fetchOrderCompletionRequirements(): Promise<OrderCompletionRequirementDto[]> {
+  logger.info('assignment', 'Fetching order completion requirements');
+  try {
+    const response = await api.get<OrderCompletionRequirementDto[]>('/api/v1/order-completion-requirements');
+    return response.data || [];
+  } catch (e) {
+    logger.warn('assignment', `API fetch failed for order-completion-requirements: ${e}`);
+    throw e;
+  }
 }

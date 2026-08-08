@@ -81,6 +81,45 @@ export const darkColors = {
   },
 };
 
+export const blueColors = {
+  ...darkColors,
+  primary: palette.blue,
+  primaryDark: '#1D4ED8',
+  primaryLight: '#60A5FA',
+  background: '#0f172a',
+  surface: '#1e293b',
+  border: '#334155',
+  textPrimary: '#f8fafc',
+  textSecondary: '#cbd5e1',
+  textInverse: '#0f172a',
+};
+
+export const forestColors = {
+  ...darkColors,
+  primary: palette.green,
+  primaryDark: '#14532d',
+  primaryLight: '#4ade80',
+  background: '#052e16',
+  surface: '#14532d',
+  border: '#166534',
+  textPrimary: '#f0fdf4',
+  textSecondary: '#bbf7d0',
+  textInverse: '#052e16',
+};
+
+export const oceanColors = {
+  ...darkColors,
+  primary: '#0891b2',
+  primaryDark: '#164e63',
+  primaryLight: '#22d3ee',
+  background: '#083344',
+  surface: '#164e63',
+  border: '#155e75',
+  textPrimary: '#cffafe',
+  textSecondary: '#67e8f9',
+  textInverse: '#083344',
+};
+
 // Keeping 'colors' export pointing to lightColors to avoid breaking files that haven't been refactored yet.
 export const colors = lightColors;
 

@@ -24,6 +24,7 @@ import {
   updateOrderItems as updateOrderItemsThunk,
   verifyOrderOtp as verifyOrderOtpThunk,
   cancelAssignment as cancelAssignmentThunk,
+  releaseAssignment as releaseAssignmentThunk,
   restoreAssignments,
   restoreWorkspaceSummary,
 } from '@/features/assignment/redux/assignmentSlice';
@@ -72,20 +73,7 @@ export function useAssignments(status?: Assignment['status'] | string) {
   const listStatus = useAppSelector(selectListStatus);
 
   useEffect(() => {
-    // Load persisted assignments
-    AsyncStorage.getItem('persisted_assignments')
-      .then((data) => {
-        if (data) {
-          const parsed = JSON.parse(data);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            dispatch(restoreAssignments(parsed));
-          }
-        }
-      })
-      .catch(console.error)
-      .finally(() => {
-        dispatch(fetchAssignmentsThunk(status));
-      });
+    dispatch(fetchAssignmentsThunk(status));
   }, [dispatch, status]);
 
   const refetch = () => dispatch(fetchAssignmentsThunk(status)).unwrap();
@@ -247,6 +235,22 @@ export function useCancelAssignment() {
     isPending,
     mutateAsync: async (params: { id: string; reason: string }) => {
       const result = await dispatch(cancelAssignmentThunk(params)).unwrap();
+      const payload = { orderId: result.id, offerId: result.offerId, orderNumber: result.code };
+      dispatch(markRelatedNotificationsRead(payload));
+      dispatch(markRelatedNotificationsAsReadThunk(payload));
+      return result;
+    },
+  };
+}
+
+export function useReleaseAssignment() {
+  const dispatch = useAppDispatch();
+  const isPending = useAppSelector(selectIsMutating);
+
+  return {
+    isPending,
+    mutateAsync: async (params: { id: string; reason?: string }) => {
+      const result = await dispatch(releaseAssignmentThunk(params)).unwrap();
       const payload = { orderId: result.id, offerId: result.offerId, orderNumber: result.code };
       dispatch(markRelatedNotificationsRead(payload));
       dispatch(markRelatedNotificationsAsReadThunk(payload));

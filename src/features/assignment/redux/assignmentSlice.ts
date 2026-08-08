@@ -3,6 +3,7 @@ import { Assignment, PaymentMode } from '@/domain/entities/Assignment';
 import { DriverWorkspaceSummary } from '@/domain/entities/Driver';
 import * as assignmentService from '@/services/assignmentService';
 import { logger } from '@/core/utils/logger';
+import { OrderCompletionRequirementDto } from '@/features/assignment/types/Assignment';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -16,6 +17,8 @@ interface AssignmentState {
   detailStatus: LoadStatus;
   isMutating: boolean;
   error: string | null;
+  completionRequirements: Record<string, OrderCompletionRequirementDto> | null;
+  isHydrated: boolean;
 }
 
 const initialState: AssignmentState = {
@@ -26,14 +29,24 @@ const initialState: AssignmentState = {
   detailStatus: 'idle',
   isMutating: false,
   error: null,
+  completionRequirements: null,
+  isHydrated: false,
 };
 
 function upsertAssignment(state: AssignmentState, assignment: Assignment) {
   const index = state.items.findIndex((item) => item.id === assignment.id);
   if (index >= 0) {
+    const currentStatus = state.items[index].status;
+    
+    // Prevent downgrading an active status to 'pending' if the backend returned stale offer data
+    let newStatus = assignment.status;
+    if (newStatus === 'pending' && currentStatus !== 'pending' && currentStatus !== 'cancelled') {
+      newStatus = currentStatus;
+    }
+    
     // Merge (not replace) so fields the source response doesn't carry — e.g. offerId,
     // only present on the initial offers-list load — survive later partial updates.
-    state.items[index] = { ...state.items[index], ...assignment };
+    state.items[index] = { ...state.items[index], ...assignment, status: newStatus };
   } else {
     state.items.push(assignment);
   }
@@ -149,6 +162,20 @@ export const cancelAssignment = createAsyncThunk<Assignment, { id: string; reaso
   }
 );
 
+export const releaseAssignment = createAsyncThunk<Assignment, { id: string; reason?: string }>(
+  'assignment/releaseAssignment',
+  async (params) => {
+    return await assignmentService.releaseAssignment(params.id, params.reason);
+  }
+);
+
+export const fetchOrderCompletionRequirements = createAsyncThunk<OrderCompletionRequirementDto[]>(
+  'assignment/fetchOrderCompletionRequirements',
+  async () => {
+    return await assignmentService.fetchOrderCompletionRequirements();
+  }
+);
+
 // ─── Slice ────────────────────────────────────────────────────────────────────
 
 const assignmentSlice = createSlice({
@@ -171,6 +198,9 @@ const assignmentSlice = createSlice({
         state.workspaceSummary = action.payload;
         state.summaryStatus = 'succeeded';
       }
+    },
+    setHydrated: (state) => {
+      state.isHydrated = true;
     },
   },
   extraReducers: (builder) => {
@@ -231,6 +261,19 @@ const assignmentSlice = createSlice({
       .addCase(cancelAssignment.rejected, (state, action) => {
         state.isMutating = false;
         state.error = action.error.message || 'Failed to cancel assignment';
+      })
+      // releaseAssignment
+      .addCase(releaseAssignment.pending, (state) => {
+        state.isMutating = true;
+        state.error = null;
+      })
+      .addCase(releaseAssignment.fulfilled, (state, action) => {
+        state.isMutating = false;
+        state.items = state.items.filter((i) => i.id !== action.payload.id);
+      })
+      .addCase(releaseAssignment.rejected, (state, action) => {
+        state.isMutating = false;
+        state.error = action.error.message || 'Failed to release assignment';
       });
 
     builder
@@ -297,7 +340,7 @@ const assignmentSlice = createSlice({
             if (thunk.typePrefix === completeAssignment.typePrefix) {
               payload = { ...payload, status: 'completed' };
             }
-            
+
             upsertAssignment(state, payload);
 
             // Immediately reflect completion in the dashboard summary
@@ -341,18 +384,26 @@ const assignmentSlice = createSlice({
       .addCase(declineOffer.rejected, (state, action) => {
         state.isMutating = false;
         state.error = action.error.message ?? 'Failed to decline offer';
+      })
+      .addCase(fetchOrderCompletionRequirements.fulfilled, (state, action) => {
+        const reqMap: Record<string, OrderCompletionRequirementDto> = {};
+        action.payload.forEach((req) => {
+          reqMap[req.orderType.toLowerCase()] = req;
+        });
+        state.completionRequirements = reqMap;
       });
   },
 });
 
 export const assignmentReducer = assignmentSlice.reducer;
-export const { addAssignment, clearError, restoreAssignments, restoreWorkspaceSummary } = assignmentSlice.actions;
+export const { addAssignment, clearError, restoreAssignments, restoreWorkspaceSummary, setHydrated } = assignmentSlice.actions;
 
 // ─── Selectors ────────────────────────────────────────────────────────────────
 
 type StateWithAssignment = { assignment: AssignmentState };
 
 export const selectAssignments = (state: StateWithAssignment) => state.assignment.items;
+export const selectCompletionRequirements = (state: StateWithAssignment) => state.assignment.completionRequirements;
 export const selectWorkspaceSummary = (state: StateWithAssignment) => state.assignment.workspaceSummary;
 export const selectListStatus = (state: StateWithAssignment) => state.assignment.listStatus;
 export const selectSummaryStatus = (state: StateWithAssignment) => state.assignment.summaryStatus;

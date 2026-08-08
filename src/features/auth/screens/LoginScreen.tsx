@@ -95,8 +95,8 @@ export function LoginScreen() {
   const onSubmit = async (values: LoginForm) => {
     setIsSubmitting(true);
     try {
-      await dispatch(loginThunk({ 
-        phone: values.phone, 
+      await dispatch(loginThunk({
+        phone: values.phone,
         pin: loginMode === 'pin' ? values.pin : undefined,
         password: loginMode === 'password' ? values.password : undefined
       })).unwrap();
@@ -151,7 +151,7 @@ export function LoginScreen() {
               <Controller
                 control={control}
                 name="pin"
-                rules={{ 
+                rules={{
                   required: 'PIN is required',
                   minLength: { value: 6, message: 'PIN must be at least 6 digits' }
                 }}
@@ -181,7 +181,7 @@ export function LoginScreen() {
               <Controller
                 control={control}
                 name="password"
-                rules={{ 
+                rules={{
                   required: 'Password is required'
                 }}
                 render={({ field }) => (
@@ -333,7 +333,7 @@ const useStyles = (colors: any) => StyleSheet.create({
   },
   inputFieldError: {
     borderColor: colors.danger,
-    backgroundColor: '#FEF2F2',
+    backgroundColor: colors.danger + '15',
   },
   leftIconContainer: {
     justifyContent: 'center',
@@ -363,9 +363,9 @@ const useStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#FEF2F2',
+    backgroundColor: colors.danger + '15',
     borderWidth: 1,
-    borderColor: colors.dangerLight,
+    borderColor: colors.danger,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,

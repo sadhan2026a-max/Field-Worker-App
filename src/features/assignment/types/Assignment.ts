@@ -286,3 +286,15 @@ export interface OrderListResponse {
   pageSize: number;
   totalCount: number;
 }
+
+export interface OrderCompletionRequirementDto {
+  orderType: string;
+  requiresPhoto: boolean;
+  requiresSignature: boolean;
+  requiresPayment: boolean;
+  requiresReturnReason: boolean;
+  requiresChecklist: boolean;
+  requiresServiceNotes: boolean;
+  requiresSalesOutcome: boolean;
+  isCustomized: boolean;
+}
