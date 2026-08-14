@@ -75,6 +75,7 @@ export function ReturnDetailScreen() {
           multiline
           numberOfLines={4}
           placeholder="E.g. Box opened, item unused..."
+          placeholderTextColor={colors.textSecondary}
           value={conditionNotes}
           onChangeText={setConditionNotes}
           textAlignVertical="top"

@@ -117,7 +117,7 @@ export interface Assignment {
   completedAt?: string;
   assignedDriverId?: string | null;
   assignedDriverName?: string | null;
-  proofPhotoUri?: string;
+  proofPhotoUris?: string[];
   signatureUri?: string;
   deliveryNotes?: string;
   paymentMode?: PaymentMode;

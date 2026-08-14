@@ -106,6 +106,52 @@ export function SummaryScreen() {
             </View>
           </View>
 
+          {assignment.type === 'service_visit' && assignment.serviceDetail && (
+            <>
+              <View style={styles.divider} />
+              <TouchableOpacity
+                style={styles.recapRow}
+                onPress={() => safeRouter.push({ pathname: '/assignment/[id]/service', params: { id: assignment.id } })}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons name="build" size={24} color={colors.primary} />
+                <View style={styles.recapTextContainer}>
+                  <Text style={styles.recapLabel}>Service Details</Text>
+                  <Text style={styles.recapValue}>
+                    {assignment.serviceDetail.partsUsed && assignment.serviceDetail.partsUsed.length > 0
+                      ? `${assignment.serviceDetail.partsUsed.length} part(s) used`
+                      : 'Completed'}
+                  </Text>
+                  {assignment.serviceDetail.partsUsed?.map((part: any, idx: number) => (
+                    <View key={idx} style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: 4 }}>
+                      <Text style={{ fontSize: 12, color: colors.textSecondary, marginRight: 4 }}>•</Text>
+                      <Text style={{ flex: 1, fontSize: 12, color: colors.textSecondary }}>
+                        {part.partName} ({part.quantity} x ₹{part.unitPrice})
+                      </Text>
+                    </View>
+                  ))}
+                  {assignment.serviceDetail.diagnosisNotes && (
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: 4 }}>
+                      <Text style={{ fontSize: 12, color: colors.textSecondary, marginRight: 4 }}>•</Text>
+                      <Text style={{ flex: 1, fontSize: 12, color: colors.textSecondary }}>
+                        <Text style={{ fontWeight: '500', color: colors.textSecondary }}>Diagnosis:</Text> {assignment.serviceDetail.diagnosisNotes}
+                      </Text>
+                    </View>
+                  )}
+                  {assignment.serviceDetail.resolutionNotes && (
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: 4 }}>
+                      <Text style={{ fontSize: 12, color: colors.textSecondary, marginRight: 4 }}>•</Text>
+                      <Text style={{ flex: 1, fontSize: 12, color: colors.textSecondary }}>
+                        <Text style={{ fontWeight: '500', color: colors.textSecondary }}>Resolution:</Text> {assignment.serviceDetail.resolutionNotes}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </>
+          )}
+
           {proofCaptured && (
             <>
               <View style={styles.divider} />
@@ -118,7 +164,7 @@ export function SummaryScreen() {
                 <View style={styles.recapTextContainer}>
                   <Text style={styles.recapLabel}>Proof of Delivery</Text>
                   <Text style={styles.recapValue}>Captured</Text>
-                  {assignment.proofPhotoUri && (
+                  {assignment.proofPhotoUris && assignment.proofPhotoUris.length > 0 && (
                     <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: 4 }}>
                       <Text style={{ fontSize: 12, color: colors.textSecondary, marginRight: 4 }}>•</Text>
                       <Text style={{ flex: 1, fontSize: 12, color: colors.textSecondary }}>Photo attached</Text>
@@ -194,9 +240,9 @@ export function SummaryScreen() {
                       <Text style={{ flex: 1, fontSize: 12, color: colors.textSecondary }}>
                         <Text style={{ fontWeight: '500', color: colors.textSecondary }}>{item.label}:</Text>{' '}
                         {item.value ? (
-                          <Text style={{ color: '#00953bff' }}>{item.value}</Text>
+                          <Text style={{ color: colors.primary }}>{item.value}</Text>
                         ) : item.isChecked ? (
-                          <MaterialIcons name="check" size={16} color="#019e2dff" />
+                          <MaterialIcons name="check" size={16} color={colors.primary} />
                         ) : (
                           'No'
                         )}
@@ -293,7 +339,7 @@ const useStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     padding: spacing.lg,
     gap: spacing.md,
-    backgroundColor: '#fff8f0', // Slight orange/warning tint
+    backgroundColor: colors.warning + '15',
   },
   otpTextContainer: {
     flex: 1,

@@ -33,6 +33,7 @@ export function InspectionRemarksScreen() {
           multiline
           numberOfLines={6}
           placeholder="Enter remarks here..."
+          placeholderTextColor={colors.textSecondary}
           value={remarks}
           onChangeText={setRemarks}
           textAlignVertical="top"
@@ -49,10 +50,14 @@ export function InspectionRemarksScreen() {
 const useStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { flex: 1, padding: spacing.lg },
-  title: { ...typography.h2,
-    color: colors.textPrimary, marginBottom: spacing.sm },
-  subtitle: { ...typography.body,
-    color: colors.textSecondary, marginBottom: spacing.xl },
+  title: {
+    ...typography.h2,
+    color: colors.textPrimary, marginBottom: spacing.sm
+  },
+  subtitle: {
+    ...typography.body,
+    color: colors.textSecondary, marginBottom: spacing.xl
+  },
   textArea: {
     backgroundColor: colors.surface,
     borderWidth: 1,

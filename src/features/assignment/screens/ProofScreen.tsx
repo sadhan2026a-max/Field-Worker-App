@@ -29,14 +29,14 @@ export function ProofScreen() {
   
   const completionRequirements = useAppSelector(selectCompletionRequirements);
 
-  const [photoUri, setPhotoUri] = useState<string | undefined>(assignment?.proofPhotoUri);
+  const [photoUris, setPhotoUris] = useState<string[]>(assignment?.proofPhotoUris || []);
   const [hasSignature, setHasSignature] = useState(!!assignment?.signatureUri);
   const [signatureData, setSignatureData] = useState(assignment?.signatureUri || '');
   const [notes, setNotes] = useState(assignment?.deliveryNotes || '');
 
   useEffect(() => {
     if (assignment) {
-      if (assignment.proofPhotoUri && !photoUri) setPhotoUri(assignment.proofPhotoUri);
+      if (assignment.proofPhotoUris && photoUris.length === 0) setPhotoUris(assignment.proofPhotoUris);
       if (assignment.signatureUri && !signatureData) {
         setSignatureData(assignment.signatureUri);
         setHasSignature(true);
@@ -57,7 +57,7 @@ export function ProofScreen() {
     }
     const result = await ImagePicker.launchCameraAsync({ quality: 0.6 });
     if (!result.canceled) {
-      setPhotoUri(result.assets[0].uri);
+      setPhotoUris((prev) => [...prev, result.assets[0].uri]);
     }
   };
 
@@ -72,7 +72,7 @@ export function ProofScreen() {
   const requiresSignature = reqs ? reqs.requiresSignature : assignment?.type !== 'inspection'; // Fallback
 
   const onSaveAndContinue = async () => {
-    if (requiresPhoto && !photoUri) {
+    if (requiresPhoto && photoUris.length === 0) {
       Toast.show({ type: 'error', text1: 'Proof photo required', text2: 'Please take a photo before continuing.' });
       return;
     }
@@ -85,7 +85,7 @@ export function ProofScreen() {
     try {
       await saveProof.mutateAsync({
         id: assignment.id,
-        proofPhotoUri: photoUri,
+        proofPhotoUris: photoUris,
         signatureUri: requiresSignature ? signatureData : undefined,
         deliveryNotes: notes,
       });
@@ -135,17 +135,38 @@ export function ProofScreen() {
         
         {requiresPhoto && (
           <Card style={styles.photoCard}>
-            <Text style={styles.label}>Take Photo</Text>
-            <Pressable style={styles.photoBox} onPress={takePhoto}>
-              {photoUri ? (
-                <Image source={{ uri: photoUri }} style={styles.photo} />
-              ) : (
-                <MaterialIcons name="photo-camera" size={32} color={colors.textSecondary} />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
+              <Text style={styles.label}>Photos ({photoUris.length})</Text>
+              {photoUris.length > 0 && (
+                <Pressable onPress={takePhoto} style={styles.addMoreButton}>
+                  <MaterialIcons name="add-a-photo" size={16} color={colors.primary} />
+                  <Text style={styles.addMoreText}>Add</Text>
+                </Pressable>
               )}
-              <View style={styles.cameraButton}>
-                <MaterialIcons name="camera-alt" size={18} color={colors.textInverse} />
-              </View>
-            </Pressable>
+            </View>
+
+            {photoUris.length === 0 ? (
+              <Pressable style={styles.photoBox} onPress={takePhoto}>
+                <MaterialIcons name="photo-camera" size={32} color={colors.textSecondary} />
+                <View style={styles.cameraButton}>
+                  <MaterialIcons name="camera-alt" size={18} color={colors.textInverse} />
+                </View>
+              </Pressable>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.md }}>
+                {photoUris.map((uri, index) => (
+                  <View key={index} style={styles.photoThumbnailContainer}>
+                    <Image source={{ uri }} style={styles.photoThumbnail} />
+                    <Pressable 
+                      style={styles.removePhotoButton} 
+                      onPress={() => setPhotoUris(prev => prev.filter((_, i) => i !== index))}
+                    >
+                      <MaterialIcons name="close" size={16} color={colors.textInverse} />
+                    </Pressable>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
           </Card>
         )}
 
@@ -249,5 +270,39 @@ const useStyles = (colors: any) => StyleSheet.create({
     minHeight: 80,
     height: 'auto',
     textAlignVertical: 'top',
+  },
+  addMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  addMoreText: {
+    ...typography.caption,
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  photoThumbnailContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  photoThumbnail: {
+    width: '100%',
+    height: '100%',
+  },
+  removePhotoButton: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

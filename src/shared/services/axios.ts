@@ -163,7 +163,9 @@ api.interceptors.response.use(
       }
     }
 
-    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+    const isAuthEndpoint = originalRequest?.url?.includes('/auth/login') || originalRequest?.url?.includes('/auth/refresh') || originalRequest?.url?.includes('/auth/logout') || originalRequest?.url?.includes('/device-tokens');
+
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry && !isAuthEndpoint) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });

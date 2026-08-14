@@ -47,7 +47,9 @@ export function Button({
       style={({ pressed }) => [
         styles.base,
         !!icon && styles.baseWithIcon,
-        variantStyles[variant],
+        variant === 'primary' && styles.variantPrimary,
+        variant === 'secondary' && styles.variantSecondary,
+        variant === 'outline' && styles.variantOutline,
         (disabled && !loading) && styles.disabled,
         pressed && !isDisabled && styles.pressed,
         style,
@@ -72,12 +74,7 @@ const useStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
-    // Shadow
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.27,
-    shadowRadius: 4.65,
-    elevation: 6,
+    // No shadow
   },
   baseWithIcon: {
     flexDirection: 'row',
@@ -99,10 +96,17 @@ const useStyles = (colors: any) => StyleSheet.create({
   outlineLabel: {
     color: colors.primary,
   },
+  variantPrimary: {
+    backgroundColor: colors.primary,
+  },
+  variantSecondary: {
+    backgroundColor: colors.textPrimary,
+  },
+  variantOutline: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
 });
-
-const variantStyles: Record<Variant, ViewStyle> = {
-  primary: { backgroundColor: colors.primary },
-  secondary: { backgroundColor: colors.textPrimary },
-  outline: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.primary, shadowOpacity: 0, elevation: 0 },
-};

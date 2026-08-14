@@ -127,6 +127,7 @@ export function ServiceDetailScreen() {
           <TextInput
             style={[styles.textArea, { marginTop: spacing.md }]}
             placeholder="Diagnosis Notes *"
+            placeholderTextColor={colors.textSecondary}
             value={diagnosisNotes}
             onChangeText={setDiagnosisNotes}
             multiline
@@ -135,7 +136,7 @@ export function ServiceDetailScreen() {
           />
 
           <Text style={styles.sectionTitle}>2. Resolution</Text>
-          <TextInput style={styles.textArea} placeholder="Resolution Notes *" value={resolutionNotes} onChangeText={setResolutionNotes} multiline numberOfLines={3} textAlignVertical="top" />
+          <TextInput style={styles.textArea} placeholder="Resolution Notes *" placeholderTextColor={colors.textSecondary} value={resolutionNotes} onChangeText={setResolutionNotes} multiline numberOfLines={3} textAlignVertical="top" />
 
           <Text style={styles.sectionTitle}>3. Parts Used</Text>
           {parts.map((p, i) => (
@@ -150,10 +151,10 @@ export function ServiceDetailScreen() {
           ))}
 
           <View style={styles.addPartCard}>
-            <TextInput style={styles.input} placeholder="Part Name" value={newPartName} onChangeText={setNewPartName} />
+            <TextInput style={styles.input} placeholder="Part Name" placeholderTextColor={colors.textSecondary} value={newPartName} onChangeText={setNewPartName} />
             <View style={styles.row}>
-              <TextInput style={[styles.input, { flex: 1 }]} placeholder="Qty" keyboardType="numeric" value={newPartQty} onChangeText={setNewPartQty} />
-              <TextInput style={[styles.input, { flex: 1, marginLeft: spacing.sm }]} placeholder="Price" keyboardType="numeric" value={newPartPrice} onChangeText={setNewPartPrice} />
+              <TextInput style={[styles.input, { flex: 1 }]} placeholder="Qty" placeholderTextColor={colors.textSecondary} keyboardType="numeric" value={newPartQty} onChangeText={setNewPartQty} />
+              <TextInput style={[styles.input, { flex: 1, marginLeft: spacing.sm }]} placeholder="Price" placeholderTextColor={colors.textSecondary} keyboardType="numeric" value={newPartPrice} onChangeText={setNewPartPrice} />
             </View>
             <Button label="Add Part" variant="outline" onPress={addPart} style={{ marginTop: spacing.sm }} />
           </View>

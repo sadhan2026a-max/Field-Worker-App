@@ -132,7 +132,9 @@ export default function ProfileScreen() {
                   <Text style={styles.detailLabel}>App Theme</Text>
                 </View>
                 <Pressable onPress={() => setShowThemeModal(true)} style={{ flexDirection: 'row', alignItems: 'center', padding: 4 }}>
-                   <Text style={[styles.detailValue, { marginRight: 4 }]}>{theme.charAt(0).toUpperCase() + theme.slice(1)}</Text>
+                   <Text style={[styles.detailValue, { marginRight: 4 }]}>
+                     {theme.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase()).replace('Indigo Orange', 'Indigo + Orange')}
+                   </Text>
                    <MaterialIcons name="arrow-drop-down" size={24} color={colors.textSecondary} />
                 </Pressable>
               </View>
@@ -246,21 +248,24 @@ export default function ProfileScreen() {
         <Pressable style={styles.modalOverlay} onPress={() => setShowThemeModal(false)}>
           <View style={[styles.themeModalContent, { backgroundColor: colors.surface }]}>
             <Text style={styles.themeModalTitle}>Select Theme</Text>
-            {['light', 'dark', 'blue', 'forest', 'ocean'].map((t) => (
-              <Pressable
-                key={t}
-                style={[styles.themeOptionRow, theme === t && { backgroundColor: colors.primary + '15' }]}
-                onPress={() => {
-                  setTheme(t as any);
-                  setShowThemeModal(false);
-                }}
-              >
-                <Text style={[styles.themeOptionText, theme === t && { color: colors.primary, fontWeight: 'bold' }]}>
-                  {t.charAt(0).toUpperCase() + t.slice(1)}
-                </Text>
-                {theme === t && <MaterialIcons name="check" size={20} color={colors.primary} />}
-              </Pressable>
-            ))}
+            {['royalPurple', 'navyBlue', 'indigoOrange', 'darkTheme', 'tealLogistics'].map((t) => {
+              const label = t.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase());
+              return (
+                <Pressable
+                  key={t}
+                  style={[styles.themeOptionRow, theme === t && { backgroundColor: colors.primary + '15' }]}
+                  onPress={() => {
+                    setTheme(t as any);
+                    setShowThemeModal(false);
+                  }}
+                >
+                  <Text style={[styles.themeOptionText, theme === t && { color: colors.primary, fontWeight: 'bold' }]}>
+                    {label.replace('Indigo Orange', 'Indigo + Orange')}
+                  </Text>
+                  {theme === t && <MaterialIcons name="check" size={20} color={colors.primary} />}
+                </Pressable>
+              );
+            })}
           </View>
         </Pressable>
       </Modal>

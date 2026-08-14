@@ -96,7 +96,7 @@ const useStyles = (colors: any) => StyleSheet.create({
   summaryCard: {
     marginTop: spacing.xl,
     padding: spacing.lg,
-    backgroundColor: colors.primaryLight,
+    backgroundColor: colors.primary + '20',
     borderRadius: 8,
     flexDirection: 'row',
     justifyContent: 'space-between',

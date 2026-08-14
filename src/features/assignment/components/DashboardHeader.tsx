@@ -1,19 +1,18 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View, Platform, ActivityIndicator } from 'react-native';
+import { Pressable, TouchableOpacity, StyleSheet, Text, View, Platform, ActivityIndicator, Image } from 'react-native';
 import { colors, spacing, FontFamily, palette } from '@/core/theme';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useAppSelector } from '@/store/hooks';
-import { selectUnreadCount } from '@/features/notification/redux/notificationSlice';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '@/core/theme';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TenantInfo } from '@/features/auth/api/authService';
-import { Image } from 'react-native';
 
 function getTimeGreeting(): string {
   const hour = new Date().getHours();
-  if (hour < 12) return 'Good Morning';
-  if (hour < 17) return 'Good Afternoon';
-  return 'Good Evening';
+  if (hour < 12) return 'Good Morning ☀️';
+  if (hour < 17) return 'Good Afternoon 🌤️';
+  return 'Good Evening 🌙';
 }
 
 function getInitials(name: string): string {
@@ -36,91 +35,98 @@ interface DashboardHeaderProps {
 
 export function DashboardHeader({ driverName, isAvailable, isTogglingAvailability, tenant, unreadCount, onToggleAvailability }: DashboardHeaderProps) {
   const insets = useSafeAreaInsets();
+  const { colors: themeColors } = useTheme();
+  const styles = React.useMemo(() => useStyles(themeColors), [themeColors]);
 
   return (
     <View style={styles.headerWrapper}>
-      <View style={[styles.banner, { paddingTop: insets.top + 6 }]}>
-        {/* Decorative circle */}
+      <LinearGradient
+        colors={isAvailable ? (themeColors.headerGradient as [string, string, ...string[]] || [themeColors.primaryDark, themeColors.primary]) : ['#1E293B', '#334155', '#475569']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.banner, { paddingTop: insets.top + 8 }]}
+      >
         <View style={styles.decorCircle1} />
         <View style={styles.decorCircle2} />
+        <View style={styles.decorGlow} />
 
         <View style={styles.topRow}>
-          <View style={styles.avatarContainer}>
-            {tenant?.logoUrl ? (
-              <Image source={{ uri: tenant.logoUrl }} style={styles.tenantLogo} />
-            ) : (
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{getInitials(tenant?.name || driverName)}</Text>
-              </View>
-            )}
+          <View style={styles.avatarWrapper}>
+            <View style={[styles.avatarGlowRing, isAvailable ? styles.avatarGlowOnline : styles.avatarGlowOffline]}>
+              {tenant?.logoUrl ? (
+                <Image source={{ uri: tenant.logoUrl }} style={styles.tenantLogo} />
+              ) : (
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>{getInitials(tenant?.name || driverName)}</Text>
+                </View>
+              )}
+            </View>
             <View style={[styles.statusDot, !isAvailable && styles.statusDotOffline]} />
           </View>
 
-          {/* Greeting */}
           <View style={styles.greetingGroup}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: -4 }}>
-              <Text style={[styles.greeting, { marginBottom: 0, flexShrink: 1, marginRight: 8 }]} numberOfLines={1}>
+            <View style={styles.subTitleRow}>
+              <Text style={styles.greeting} numberOfLines={1}>
                 {tenant?.name || getTimeGreeting()}
               </Text>
-
-              {/* Right Actions */}
-              <View style={styles.rightActions}>
-                <Pressable style={styles.customSwitchContainer} onPress={onToggleAvailability}>
-                  <Text style={[styles.switchLabel, !isAvailable && styles.switchLabelOffline]}>
-                    {isAvailable ? 'Online' : 'Offline'}
-                  </Text>
-                  <View style={[styles.switchTrack, isAvailable ? styles.switchTrackOnline : styles.switchTrackOffline]}>
-                    <View style={[styles.switchThumb, isAvailable ? styles.switchThumbOnline : styles.switchThumbOffline, { justifyContent: 'center', alignItems: 'center' }]}>
-                      {isTogglingAvailability && (
-                        <ActivityIndicator size="small" color={isAvailable ? '#FFFFFF' : colors.primary} style={{ transform: [{ scale: 0.75 }] }} />
-                      )}
-                    </View>
-                  </View>
-                </Pressable>
-
-                <Pressable
-                  style={styles.iconButton}
-                  onPress={() => router.push('/notifications')}
-                >
-                  <MaterialIcons name="notifications-none" size={24} color="#FFFFFF" />
-                  {isAvailable && unreadCount > 0 && (
-                    <View style={styles.notifBadge}>
-                      <Text style={styles.notifBadgeText}>
-                        {unreadCount > 99 ? '99+' : unreadCount}
-                      </Text>
-                    </View>
-                  )}
-                </Pressable>
-              </View>
             </View>
+
             <Text style={styles.name} numberOfLines={1}>{driverName}</Text>
           </View>
+
+          <View style={styles.rightActions}>
+            <TouchableOpacity style={styles.customSwitchContainer} onPress={onToggleAvailability} activeOpacity={0.8}>
+              <View style={[styles.switchTrack, isAvailable ? styles.switchTrackOnline : styles.switchTrackOffline]}>
+                <View style={[styles.switchThumb, isAvailable ? styles.switchThumbOnline : styles.switchThumbOffline]}>
+                  {isTogglingAvailability ? (
+                    <ActivityIndicator size="small" color={isAvailable ? themeColors.primary : '#FFFFFF'} style={{ transform: [{ scale: 0.65 }] }} />
+                  ) : (
+                    <MaterialIcons name={isAvailable ? 'power-settings-new' : 'pause'} size={12} color={isAvailable ? themeColors.primary : '#64748B'} />
+                  )}
+                </View>
+              </View>
+            </TouchableOpacity>
+
+            <Pressable
+              style={styles.iconButton}
+              onPress={() => router.push('/notifications')}
+              android_ripple={{ color: 'rgba(255,255,255,0.2)' }}
+            >
+              <MaterialIcons name="notifications-none" size={22} color="#FFFFFF" />
+              {isAvailable && unreadCount > 0 && (
+                <View style={styles.notifBadge}>
+                  <Text style={styles.notifBadgeText}>
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </Text>
+                </View>
+              )}
+            </Pressable>
+          </View>
         </View>
-      </View>
+      </LinearGradient>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (themeColors: any) => StyleSheet.create({
   headerWrapper: {
     marginHorizontal: -12,
     marginTop: -12,
-    marginBottom: 14,
+    marginBottom: 16,
   },
   banner: {
-    backgroundColor: '#1FA855',
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 8,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    paddingBottom: 16,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
     overflow: 'hidden',
+    position: 'relative',
     ...Platform.select({
       ios: {
-        shadowColor: '#1FA855',
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.3,
-        shadowRadius: 16,
+        shadowOpacity: 0.25,
+        shadowRadius: 12,
       },
       android: {
         elevation: 8,
@@ -131,16 +137,25 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -30,
     right: -30,
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    backgroundColor: 'rgba(255,255,255,0.06)',
   },
   decorCircle2: {
     position: 'absolute',
-    bottom: -20,
+    bottom: -30,
     left: -20,
-    width: 60,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  decorGlow: {
+    position: 'absolute',
+    top: 0,
+    left: '30%',
+    width: 100,
     height: 60,
     borderRadius: 30,
     backgroundColor: 'rgba(255,255,255,0.05)',
@@ -148,114 +163,94 @@ const styles = StyleSheet.create({
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    justifyContent: 'space-between',
   },
-  avatarContainer: {
+  avatarWrapper: {
     position: 'relative',
     marginRight: 10,
   },
+  avatarGlowRing: {
+    padding: 2.5,
+    borderRadius: 26,
+  },
+  avatarGlowOnline: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  avatarGlowOffline: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF20',
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(255,255,255,0.25)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#FFFFFF40',
+    borderColor: 'rgba(255,255,255,0.4)',
   },
   tenantLogo: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#FFFFFF40',
+    borderColor: 'rgba(255,255,255,0.6)',
   },
   avatarText: {
-    fontSize: 15,
+    fontSize: 16,
     fontFamily: FontFamily.bold,
     color: '#FFFFFF',
   },
   statusDot: {
     position: 'absolute',
-    bottom: 1,
-    right: 1,
+    bottom: 2,
+    right: 2,
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#4ADE80',
-    borderWidth: 2.5,
-    borderColor: '#1FA855',
+    backgroundColor: '#22C55E',
+    borderWidth: 2,
+    borderColor: themeColors.primaryDark,
   },
   statusDotOffline: {
     backgroundColor: '#9CA3AF',
+    borderColor: '#334155',
   },
   greetingGroup: {
     flex: 1,
+    marginRight: 8,
+  },
+  subTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
   },
   greeting: {
     fontSize: 11,
     fontFamily: FontFamily.medium,
-    color: 'rgba(255,255,255,0.8)',
-    marginBottom: 2,
+    color: 'rgba(255,255,255,0.82)',
   },
   name: {
     fontSize: 18,
     fontFamily: FontFamily.bold,
     color: '#FFFFFF',
+    letterSpacing: -0.2,
   },
   rightActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  iconButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  notifBadge: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    backgroundColor: '#EF4444',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#1FA855',
-    paddingHorizontal: 4,
-  },
-  notifBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontFamily: FontFamily.bold,
-    lineHeight: 13,
+    gap: 10,
   },
   customSwitchContainer: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  switchLabel: {
-    fontSize: 13,
-    fontFamily: FontFamily.bold,
-    color: '#FFFFFF',
-  },
-  switchLabelOffline: {
-    color: 'rgba(255,255,255,0.7)',
+    justifyContent: 'center',
   },
   switchTrack: {
-    width: 38,
-    height: 22,
-    borderRadius: 11,
+    width: 44,
+    height: 24,
+    borderRadius: 12,
     padding: 2,
     justifyContent: 'center',
   },
@@ -263,26 +258,58 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   switchTrackOffline: {
-    backgroundColor: 'rgba(0,0,0,0.2)',
+    backgroundColor: 'rgba(0,0,0,0.3)',
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: 'rgba(255,255,255,0.35)',
   },
   switchThumb: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   switchThumbOnline: {
-    backgroundColor: '#168A44',
-    alignSelf: 'flex-end',
+    transform: [{ translateX: 22 }],
+    backgroundColor: '#FFFFFF',
+    ...Platform.select({
+      ios: { shadowColor: themeColors.primary, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3 },
+      android: { elevation: 3 },
+    }),
   },
   switchThumbOffline: {
-    backgroundColor: '#D1D5DB',
-    alignSelf: 'flex-start',
+    transform: [{ translateX: 2 }],
+    backgroundColor: '#E2E8F0',
+  },
+  iconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+  },
+  notifBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: themeColors.primaryDark,
+    paddingHorizontal: 4,
+  },
+  notifBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontFamily: FontFamily.bold,
+    lineHeight: 11,
   },
 });

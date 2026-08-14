@@ -317,7 +317,7 @@ const useStyles = (colors: any) => StyleSheet.create({
     marginBottom: spacing.md,
   },
   containerChecked: {
-    borderColor: palette.green,
+    borderColor: colors.primary,
     backgroundColor: colors.surface,
   },
   headerRow: {
@@ -334,14 +334,14 @@ const useStyles = (colors: any) => StyleSheet.create({
     fontSize: 15,
   },
   labelChecked: {
-    color: palette.green,
+    color: colors.primary,
   },
-  required: { color: palette.red },
+  required: { color: colors.danger },
   checkCircleFilled: {
     width: 24,
     height: 24,
     borderRadius: 4,
-    backgroundColor: palette.green,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -363,10 +363,10 @@ const useStyles = (colors: any) => StyleSheet.create({
     ...typography.body,
     color: colors.textPrimary,
   },
-  inputError: { borderColor: palette.red },
+  inputError: { borderColor: colors.danger },
   errorText: {
     ...typography.caption,
-    color: palette.red,
+    color: colors.danger,
     marginTop: -spacing.xs,
     marginBottom: spacing.sm,
   },
@@ -455,6 +455,6 @@ const useStyles = (colors: any) => StyleSheet.create({
   signatureHeader: { flexDirection: 'row', justifyContent: 'space-between' },
   signatureLabel: { ...typography.caption, color: colors.textSecondary },
   clearLabel: { ...typography.caption, color: colors.primary, fontWeight: '600' },
-  fallbackContainer: { padding: spacing.md, backgroundColor: palette.grey100, borderRadius: 6 },
+  fallbackContainer: { padding: spacing.md, backgroundColor: colors.border, borderRadius: 6 },
   fallbackText: { ...typography.caption, color: colors.textSecondary, fontStyle: 'italic' }
 });

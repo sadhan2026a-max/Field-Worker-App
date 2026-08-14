@@ -392,13 +392,15 @@ export async function startAssignment(id: string): Promise<Assignment> {
 
 export async function saveDeliveryProof(
   id: string,
-  proof: { proofPhotoUri?: string; signatureUri?: string; deliveryNotes?: string },
+  proof: { proofPhotoUris?: string[]; signatureUri?: string; deliveryNotes?: string },
 ): Promise<Assignment> {
-  logger.info('assignment', 'Saving delivery proof', { id, hasPhoto: !!proof.proofPhotoUri, hasSignature: !!proof.signatureUri });
+  logger.info('assignment', 'Saving delivery proof', { id, hasPhotos: !!(proof.proofPhotoUris && proof.proofPhotoUris.length > 0), hasSignature: !!proof.signatureUri });
 
   const formData = new FormData();
-  if (proof.proofPhotoUri) {
-    formData.append('Photos', { uri: proof.proofPhotoUri, name: 'photo.jpg', type: 'image/jpeg' } as any);
+  if (proof.proofPhotoUris && proof.proofPhotoUris.length > 0) {
+    proof.proofPhotoUris.forEach((uri, index) => {
+      formData.append('Photos', { uri, name: `photo_${index}.jpg`, type: 'image/jpeg' } as any);
+    });
   }
 
   if (proof.signatureUri) {

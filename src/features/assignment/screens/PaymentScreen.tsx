@@ -159,7 +159,7 @@ const useStyles = (colors: any) => StyleSheet.create({
   },
   modeOptionSelected: {
     borderColor: colors.primary,
-    backgroundColor: colors.primaryLight,
+    backgroundColor: colors.primary + '20',
   },
   modeLabel: {
     ...typography.caption,

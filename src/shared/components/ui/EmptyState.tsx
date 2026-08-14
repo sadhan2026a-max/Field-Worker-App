@@ -24,8 +24,7 @@ export function EmptyState({
   const { colors, isDark } = useTheme();
   
   const actualTint = tint || colors.primary;
-  // If in dark mode and using default primary, make the background translucent so it doesn't look too bright
-  const defaultTintLight = isDark ? 'rgba(31,168,85,0.15)' : (colors as any).primaryLight || 'rgba(31,168,85,0.15)';
+  const defaultTintLight = colors.primary + '20';
   const actualTintLight = tintLight || defaultTintLight;
 
   const styles = React.useMemo(() => useStyles(colors), [colors]);

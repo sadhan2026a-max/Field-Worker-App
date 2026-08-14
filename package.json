@@ -1,5 +1,5 @@
 {
-  "name": "sidhahisab-rider",
+  "name": "sidhahisab-field-operation",
   "version": "1.0.0",
   "main": "expo-router/entry",
   "dependencies": {
@@ -52,6 +52,8 @@
   "devDependencies": {
     "@types/jscodeshift": "^17.3.0",
     "@types/react": "~19.0.10",
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~9.2.0",
     "jscodeshift": "^17.4.0",
     "typescript": "~5.8.3"
   },

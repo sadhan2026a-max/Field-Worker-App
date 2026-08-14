@@ -2,7 +2,7 @@ import { FontAwesome, MaterialIcons } from '@expo/vector-icons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { safeRouter } from '@/shared/utils/navigation';
 import type { ReactNode } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View, Alert, RefreshControl, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View, Alert, RefreshControl, Modal, TextInput, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import React, { useState } from 'react';
@@ -22,6 +22,30 @@ import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { selectDriver } from '@/features/auth/redux/authSlice';
 import { addOrderNoteThunk } from '@/features/assignment/redux/assignmentSlice';
 
+const getFormattedTimelineStatus = (status: string, assignmentType: string) => {
+  const s = status.toLowerCase();
+  if (s === 'delivery_started' || s === 'delivery started') {
+    if (assignmentType === 'service' || assignmentType === 'installation' || assignmentType === 'other') return 'Job Started';
+    if (assignmentType === 'pickup') return 'Pickup Started';
+    if (assignmentType === 'sales') return 'Sales Started';
+    if (assignmentType === 'return') return 'Return Started';
+    return 'Delivery Started';
+  }
+  return status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+};
+
+const getFormattedTimelineNotes = (notes: string, assignmentType: string) => {
+  if (!notes) return notes;
+  const n = notes.trim().toLowerCase();
+  if (n === 'delivery started') {
+    if (assignmentType === 'service' || assignmentType === 'installation' || assignmentType === 'other') return 'Job Started';
+    if (assignmentType === 'pickup') return 'Pickup Started';
+    if (assignmentType === 'sales') return 'Sales Started';
+    if (assignmentType === 'return') return 'Return Started';
+  }
+  return notes;
+};
+
 export function AssignmentDetailScreen() {
   const { colors } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -38,9 +62,9 @@ export function AssignmentDetailScreen() {
 
   const [refreshing, setRefreshing] = useState(false);
   const [actionType, setActionType] = useState<'accept' | 'decline' | null>(null);
-  
+
   const releaseAssignment = useReleaseAssignment();
-  
+
   const [isNoteModalVisible, setNoteModalVisible] = useState(false);
   const [noteText, setNoteText] = useState('');
   const [isSavingNote, setIsSavingNote] = useState(false);
@@ -145,20 +169,7 @@ export function AssignmentDetailScreen() {
   const comingSoon = () => Toast.show({ type: 'warning', text1: 'Coming soon' });
 
   const allQuickActions: { key: string; icon: ReactNode; bg: string; label: string; onPress: () => void }[] = [
-    {
-      key: 'call',
-      icon: <MaterialIcons name="call" size={20} color={colors.primary} />,
-      bg: colors.primaryLight,
-      label: 'Call',
-      onPress: () => Linking.openURL(`tel:${assignment.customer.phone}`),
-    },
-    {
-      key: 'whatsapp',
-      icon: <FontAwesome name="whatsapp" size={20} color={colors.primary} />,
-      bg: colors.primaryLight,
-      label: 'WhatsApp',
-      onPress: () => Linking.openURL(`https://wa.me/${assignment.customer.phone.replace(/\D/g, '')}`),
-    },
+
     {
       key: 'navigate',
       icon: <MaterialIcons name="near-me" size={20} color={colors.accent} />,
@@ -204,9 +215,19 @@ export function AssignmentDetailScreen() {
   ];
 
   const quickActions = allQuickActions.filter(action => {
-    if (assignment?.status === 'pending' && (action.key === 'call' || action.key === 'whatsapp')) {
-      return false;
+
+    if (action.key === 'payment') {
+      return ['delivery', 'pickup', 'return'].includes(assignment.type) || (assignment.codAmount ?? 0) > 0;
     }
+
+    if (action.key === 'signature') {
+      return ['delivery', 'pickup', 'return', 'installation', 'service_visit'].includes(assignment.type);
+    }
+
+    if (action.key === 'photo') {
+      return ['delivery', 'pickup', 'return', 'inspection', 'installation', 'service_visit'].includes(assignment.type);
+    }
+
     return true;
   });
 
@@ -384,7 +405,7 @@ export function AssignmentDetailScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.green]} tintColor={palette.green} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} tintColor={colors.primary} />
         }
       >
         <View style={styles.codeHeader}>
@@ -411,7 +432,7 @@ export function AssignmentDetailScreen() {
         )}
 
         {/* Customer Profile Card */}
-        <Card style={styles.customerCard}>
+        <View style={styles.customerCard}>
           <View style={styles.customerHeader}>
             <Avatar name={assignment.customer.name} size={52} />
             <View style={styles.customerInfo}>
@@ -425,26 +446,20 @@ export function AssignmentDetailScreen() {
           {/* Call & WhatsApp buttons — only show for active orders (not pending, completed, or cancelled) */}
           {assignment.status !== 'pending' && assignment.status !== 'completed' && assignment.status !== 'cancelled' && (
             <View style={styles.customerActions}>
-              <Pressable
-                style={[styles.actionBtn, styles.callBtn]}
-                onPress={() => Linking.openURL(`tel:${assignment.customer.phone}`)}
-              >
-                <MaterialIcons name="call" size={18} color={colors.primary} />
+              <TouchableOpacity style={[styles.actionBtn, styles.actionBtnCall]} onPress={() => Linking.openURL(`tel:${assignment.customer.phone}`)}>
+                <MaterialIcons name="call" size={18} color="#FFFFFF" />
                 <Text style={styles.actionBtnText}>Call Customer</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.actionBtn, styles.waBtn]}
-                onPress={() => Linking.openURL(`https://wa.me/${assignment.customer.phone.replace(/\D/g, '')}`)}
-              >
-                <FontAwesome name="whatsapp" size={18} color={colors.primary} />
-                <Text style={styles.actionBtnText}>WhatsApp Chat</Text>
-              </Pressable>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.actionBtn, styles.actionBtnWa]} onPress={() => Linking.openURL(`whatsapp://send?phone=${assignment.customer.phone.replace(/\D/g, '')}`)}>
+                <FontAwesome name="whatsapp" size={18} color="#FFFFFF" />
+                <Text style={styles.actionBtnText}>WhatsApp</Text>
+              </TouchableOpacity>
             </View>
           )}
-        </Card>
+        </View>
 
         {/* Delivery Address Card */}
-        <Card style={styles.addressCard}>
+        <View style={styles.addressCard}>
           <View style={styles.pinContainer}>
             <MaterialIcons name="place" size={24} color={colors.textPrimary} />
           </View>
@@ -465,51 +480,103 @@ export function AssignmentDetailScreen() {
               />
             )}
           </View>
-        </Card>
+        </View>
 
         {/* Order Details Card */}
-        <Card style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Order Details</Text>
-          <Text style={styles.orderSummary}>
-            {assignment.itemCount > 0 ? `${assignment.itemCount} items` : 'No items'} • Total ₹{(assignment.totalAmount ?? 0).toLocaleString()}
-          </Text>
-          <Text style={styles.codSummary}>
-            COD: ₹{(assignment.codAmount ?? 0).toLocaleString()}
-          </Text>
-        </Card>
+        {(['delivery', 'pickup', 'return'].includes(assignment.type) || assignment.itemCount > 0) && (
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Order Details</Text>
+            <Text style={styles.orderSummary}>
+              {assignment.itemCount > 0 ? `${assignment.itemCount} items` : 'No items'} • Total ₹{(assignment.totalAmount ?? 0).toLocaleString()}
+            </Text>
+            <Text style={styles.codSummary}>
+              COD: ₹{(assignment.codAmount ?? 0).toLocaleString()}
+            </Text>
+          </View>
+        )}
 
-        {/* Delivery Instructions Card */}
-        <Card style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Delivery Instructions</Text>
-          <Text style={styles.instructionsText}>
-            {assignment.deliveryInstructions || 'Please call before delivery.'}
-          </Text>
-        </Card>
+        {/* Instructions Card */}
+        {(['delivery', 'pickup', 'return'].includes(assignment.type) || assignment.deliveryInstructions) && (
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>
+              {['sales_visit', 'service_visit', 'inspection', 'installation'].includes(assignment.type)
+                ? 'Special Instructions'
+                : (assignment.type === 'pickup' ? 'Pickup Instructions' : assignment.type === 'return' ? 'Return Instructions' : 'Delivery Instructions')}
+            </Text>
+            <Text style={styles.instructionsText}>
+              {assignment.deliveryInstructions || 'Please coordinate with the customer.'}
+            </Text>
+          </View>
+        )}
 
-        {/* Order History / Timeline Card */}
+        {/* Order Tracking / Timeline Card */}
         {assignment.timeline && assignment.timeline.length > 0 && (
-          <Card style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>Order History</Text>
+          <View style={[styles.sectionCard, { padding: 16 }, (assignment.status === 'completed' || assignment.status === 'cancelled' || assignment.status === 'pending' || isAssignedToOther) ? { borderBottomWidth: 0 } : null]}>
+            <Text style={[styles.sectionTitle, { marginBottom: 16 }]}>Order Tracking</Text>
             <View style={styles.timelineContainer}>
-              {assignment.timeline.map((item, index) => (
-                <View key={index} style={styles.timelineItem}>
-                  <View style={styles.timelineIconContainer}>
-                    <View style={styles.timelineDot} />
-                    {index < assignment.timeline!.length - 1 && <View style={styles.timelineLine} />}
+              {assignment.timeline.map((item, index) => {
+                const isLast = index === assignment.timeline!.length - 1;
+
+                const getTimelineIcon = (status: string) => {
+                  const s = status.toLowerCase();
+                  if (s.includes('pending') || s.includes('create')) return 'schedule';
+                  if (s.includes('accept') || s.includes('offer')) return 'assignment-turned-in';
+                  if (s.includes('route')) return 'local-shipping';
+                  if (s.includes('arriv')) return 'place';
+                  if (s.includes('progress') || s.includes('start')) return 'play-arrow';
+                  if (s.includes('complet') || s.includes('done')) return 'check';
+                  if (s.includes('cancel') || s.includes('reject')) return 'close';
+                  if (s.includes('fail')) return 'error-outline';
+                  return 'adjust';
+                };
+
+                return (
+                  <View key={index} style={styles.timelineItem}>
+                    <View style={styles.timelineTimeContainer}>
+                      <Text style={styles.timelineTimeLeftText}>
+                        {new Date(item.timestamp).toLocaleString(undefined, {
+                          hour: '2-digit', minute: '2-digit'
+                        })}
+                      </Text>
+                      <Text style={styles.timelineDateLeftText}>
+                        {new Date(item.timestamp).toLocaleString(undefined, {
+                          month: 'short', day: 'numeric'
+                        })}
+                      </Text>
+                    </View>
+                    <View style={styles.timelineIconContainer}>
+                      <View style={[
+                        styles.timelineNode, 
+                        isLast ? styles.timelineNodeCurrent : styles.timelineNodeCompleted,
+                        item.status.toLowerCase().includes('cancel') ? styles.timelineNodeCancelled : null
+                      ]}>
+                        <MaterialIcons
+                          name={getTimelineIcon(item.status) as any}
+                          size={14}
+                          color={isLast || item.status.toLowerCase().includes('cancel') ? (item.status.toLowerCase().includes('cancel') ? colors.danger : colors.primary) : '#FFFFFF'}
+                        />
+                      </View>
+                      {!isLast && <View style={styles.timelineLine} />}
+                    </View>
+                    <View style={[styles.timelineContent, isLast ? styles.timelineContentCurrent : null]}>
+                      <View style={styles.timelineHeaderRow}>
+                        <Text style={[
+                          styles.timelineStatus, 
+                          isLast ? styles.timelineStatusCurrent : styles.timelineStatusCompleted,
+                          item.status.toLowerCase().includes('cancel') ? styles.timelineStatusCancelled : null
+                        ]}>
+                          {getFormattedTimelineStatus(item.status, assignment.type)}
+                        </Text>
+                      </View>
+                      {!!item.notes && (
+                        <Text style={styles.timelineNotes}>{getFormattedTimelineNotes(item.notes, assignment.type)}</Text>
+                      )}
+                    </View>
                   </View>
-                  <View style={styles.timelineContent}>
-                    <Text style={styles.timelineStatus}>{item.status}</Text>
-                    <Text style={styles.timelineTime}>
-                      {new Date(item.timestamp).toLocaleString(undefined, {
-                        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                      })}
-                    </Text>
-                    {!!item.notes && <Text style={styles.timelineNotes}>{item.notes}</Text>}
-                  </View>
-                </View>
-              ))}
+                );
+              })}
             </View>
-          </Card>
+          </View>
         )}
 
         {/* Quick Actions Grid — only show for active orders (not pending, completed, or cancelled) */}
@@ -536,37 +603,34 @@ export function AssignmentDetailScreen() {
             <View style={{ flexDirection: 'row', gap: spacing.md }}>
               <Button
                 label="Decline"
-                variant="outline"
                 onPress={onDecline}
                 loading={actionType === 'decline' && declineOffer.isPending}
                 disabled={actionType === 'accept' && acceptOffer.isPending}
-                style={{ flex: 1, borderColor: colors.danger, backgroundColor: 'transparent' }}
-                textStyle={{ color: colors.danger }}
+                style={{ flex: 1, borderColor: colors.danger, backgroundColor: colors.danger }}
               />
               <Button
                 label="Accept Offer"
                 onPress={onAccept}
                 loading={actionType === 'accept' && acceptOffer.isPending}
                 disabled={actionType === 'decline' && declineOffer.isPending}
-                style={{ flex: 1, backgroundColor: palette.green, borderColor: palette.green }}
+                style={{ flex: 1, backgroundColor: colors.primary, borderColor: colors.primary }}
               />
             </View>
           ) : (
-            <View style={{ gap: spacing.md, width: '100%' }}>
+            <View style={{ flexDirection: 'row', gap: spacing.md, width: '100%' }}>
+              {assignment.status === 'accepted' && (
+                <Button
+                  label="Release Order"
+                  onPress={() => setCancelModalVisible(true)}
+                  style={{ flex: 1, borderColor: colors.danger, backgroundColor: colors.danger }}
+                />
+              )}
               <Button
                 label={actionLabel}
                 onPress={onActionPress}
                 loading={isActionLoading}
+                style={{ flex: 1 }}
               />
-              {assignment.status === 'accepted' && (
-                <Button
-                  label="Release Order"
-                  variant="outline"
-                  onPress={() => setCancelModalVisible(true)}
-                  style={{ borderColor: colors.danger, backgroundColor: 'transparent' }}
-                  textStyle={{ color: colors.danger }}
-                />
-              )}
             </View>
           )}
         </ScreenFooter>
@@ -595,7 +659,7 @@ export function AssignmentDetailScreen() {
               />
             </View>
             <View style={styles.modalFooter}>
-              <Button label="Cancel" variant="outline" onPress={() => setNoteModalVisible(false)} style={[styles.modalBtn, { borderColor: colors.danger, backgroundColor: 'transparent' }]} textStyle={{ color: colors.danger }} />
+              <Button label="Cancel" onPress={() => setNoteModalVisible(false)} style={[styles.modalBtn, { borderColor: colors.danger, backgroundColor: colors.danger }]} />
               <Button label="Save Note" onPress={onSaveNote} loading={isSavingNote} style={styles.modalBtn} />
             </View>
           </View>
@@ -650,6 +714,8 @@ const useStyles = (colors: any) => StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     backgroundColor: colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   backButton: {
     padding: spacing.xs,
@@ -661,14 +727,17 @@ const useStyles = (colors: any) => StyleSheet.create({
     color: colors.textPrimary,
   },
   content: {
-    padding: spacing.md,
-    gap: spacing.md,
+    paddingBottom: 24,
+    backgroundColor: colors.background,
   },
   codeHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: spacing.xs,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   codeText: {
     ...typography.h2,
@@ -691,6 +760,7 @@ const useStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.dangerLight,
     padding: spacing.md,
+    margin: 16,
     borderRadius: 8,
     gap: spacing.sm,
   },
@@ -700,8 +770,12 @@ const useStyles = (colors: any) => StyleSheet.create({
     flex: 1,
   },
   customerCard: {
-    padding: 12,
-    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 10,
+    backgroundColor: colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   customerHeader: {
     flexDirection: 'row',
@@ -738,25 +812,36 @@ const useStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.md,
-    borderRadius: 12,
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 19,
   },
-  callBtn: {
-    backgroundColor: colors.primaryLight,
+  actionBtnCall: {
+    backgroundColor: colors.primary,
   },
-  waBtn: {
-    backgroundColor: colors.primaryLight,
+  actionBtnWa: {
+    backgroundColor: colors.primary,
   },
   actionBtnText: {
-    fontFamily: FontFamily.medium,
-    fontSize: 10,
-    color: colors.primary,
+    fontFamily: FontFamily.bold,
+    fontSize: 13,
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
+  },
+  declineBtnText: {
+    color: colors.danger,
+    fontFamily: FontFamily.bold,
+    fontSize: 13,
+    letterSpacing: 0.2,
   },
   addressCard: {
     flexDirection: 'row',
-    padding: 12,
-    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+    backgroundColor: colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   pinContainer: {
     justifyContent: 'flex-start',
@@ -786,8 +871,12 @@ const useStyles = (colors: any) => StyleSheet.create({
     marginTop: 4,
   },
   sectionCard: {
-    padding: 12,
-    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 4,
+    backgroundColor: colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   sectionTitle: {
     ...typography.bodyMedium,
@@ -814,16 +903,20 @@ const useStyles = (colors: any) => StyleSheet.create({
     color: colors.textPrimary,
   },
   actionsSection: {
-    gap: spacing.md,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 10,
+    backgroundColor: colors.background,
+    borderBottomWidth: 0,
   },
   quickActionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    rowGap: spacing.md,
+    justifyContent: 'flex-start',
+    gap: 10,
   },
   quickAction: {
-    width: '22%',
+    width: 72,
     alignItems: 'center',
     gap: spacing.xs,
   },
@@ -840,49 +933,120 @@ const useStyles = (colors: any) => StyleSheet.create({
     color: colors.textPrimary,
     textAlign: 'center',
   },
+  actionButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary + '15',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  declineBtn: {
+    backgroundColor: colors.danger + '10',
+    borderWidth: 1,
+    borderColor: colors.danger,
+  },
+  acceptBtn: {
+    backgroundColor: colors.primary,
+    elevation: 2,
+  },
   timelineContainer: {
-    marginTop: spacing.sm,
+    marginTop: 0,
   },
   timelineItem: {
     flexDirection: 'row',
   },
+  timelineTimeContainer: {
+    width: 50,
+    alignItems: 'flex-end',
+    marginRight: 8,
+    height: 20,
+    justifyContent: 'center',
+  },
+  timelineTimeLeftText: {
+    ...typography.caption,
+    fontSize: 10,
+    fontFamily: FontFamily.bold,
+    color: colors.textPrimary,
+  },
+  timelineDateLeftText: {
+    ...typography.caption,
+    fontSize: 9,
+    color: colors.textSecondary,
+  },
   timelineIconContainer: {
     alignItems: 'center',
-    width: 24,
-    marginRight: spacing.sm,
+    width: 20,
+    marginRight: 10,
   },
-  timelineDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+  timelineNode: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  timelineNodeCompleted: {
     backgroundColor: colors.primary,
-    marginTop: 4,
+  },
+  timelineNodeCurrent: {
+    backgroundColor: colors.primary + '20',
+    borderWidth: 2,
+    borderColor: colors.primary,
+  },
+  timelineNodeCancelled: {
+    backgroundColor: colors.danger + '10',
+    borderWidth: 2,
+    borderColor: colors.danger,
   },
   timelineLine: {
     flex: 1,
     width: 2,
-    backgroundColor: colors.border,
-    marginTop: 4,
-    marginBottom: 4,
+    backgroundColor: colors.primary + '30',
+    marginTop: -2,
+    marginBottom: -2,
+    zIndex: 1,
   },
   timelineContent: {
     flex: 1,
-    paddingBottom: spacing.lg,
+    paddingBottom: 12,
+    paddingTop: 0,
+  },
+  timelineContentCurrent: {
+    paddingBottom: 4,
+  },
+  timelineHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 0,
   },
   timelineStatus: {
     ...typography.bodyMedium,
-    fontFamily: FontFamily.semiBold,
+    fontFamily: FontFamily.bold,
+    fontSize: 13,
+  },
+  timelineStatusCompleted: {
     color: colors.textPrimary,
+  },
+  timelineStatusCurrent: {
+    color: colors.textPrimary,
+  },
+  timelineStatusCancelled: {
+    color: '#EF4444',
   },
   timelineTime: {
     ...typography.caption,
+    fontSize: 11,
     color: colors.textSecondary,
-    marginTop: 2,
   },
   timelineNotes: {
     ...typography.caption,
     color: colors.textSecondary,
     fontStyle: 'italic',
+    fontSize: 11,
     marginTop: 2,
   },
   modalOverlay: {

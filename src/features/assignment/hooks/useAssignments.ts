@@ -76,7 +76,15 @@ export function useAssignments(status?: Assignment['status'] | string) {
     dispatch(fetchAssignmentsThunk(status));
   }, [dispatch, status]);
 
-  const refetch = () => dispatch(fetchAssignmentsThunk(status)).unwrap();
+  const refetch = async () => {
+    await dispatch(fetchAssignmentsThunk(status)).unwrap();
+    if (!status) {
+      // Fetch active statuses explicitly to recover them if they were dropped from local state
+      dispatch(fetchAssignmentsThunk('in_progress'));
+      dispatch(fetchAssignmentsThunk('en_route'));
+      dispatch(fetchAssignmentsThunk('accepted'));
+    }
+  };
 
   const data = status ? items.filter((item) => item.status === status) : items;
   return { data, isLoading: listStatus === 'idle' || listStatus === 'loading', refetch };
@@ -138,7 +146,7 @@ export function useSaveDeliveryProof() {
 
   return {
     isPending,
-    mutateAsync: (params: { id: string; proofPhotoUri?: string; signatureUri?: string; deliveryNotes?: string }) =>
+    mutateAsync: (params: { id: string; proofPhotoUris?: string[]; signatureUri?: string; deliveryNotes?: string }) =>
       dispatch(saveDeliveryProofThunk(params)).unwrap(),
   };
 }

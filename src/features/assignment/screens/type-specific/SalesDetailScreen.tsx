@@ -73,6 +73,7 @@ export function SalesDetailScreen() {
           multiline
           numberOfLines={4}
           placeholder="Enter notes..."
+          placeholderTextColor={colors.textSecondary}
           value={meetingNotes}
           onChangeText={setMeetingNotes}
           textAlignVertical="top"
@@ -97,6 +98,7 @@ export function SalesDetailScreen() {
             <TextInput
               style={[styles.input, followUpDate.length > 0 && !isValidDate(followUpDate) && styles.inputError]}
               placeholder="YYYY-MM-DD"
+              placeholderTextColor={colors.textSecondary}
               value={followUpDate}
               onChangeText={setFollowUpDate}
               keyboardType="number-pad"

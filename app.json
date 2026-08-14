@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "SidhaHisab Rider",
-    "slug": "sidhahisab-rider",
+    "name": "SidhaHisab Field Operation",
+    "slug": "sidhahisab-field-operation",
     "version": "1.0.0",
     "orientation": "default",
-    "icon": "./assets/sidhahisab-fieldoperation.png",
+    "icon": "./assets/app-logo.png",
     "platforms": [
       "ios",
       "android",
       "web"
     ],
-    "scheme": "sidhahisabrider",
+    "scheme": "sidhahisabfieldoperation",
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
     "ios": {
@@ -18,9 +18,9 @@
       "bundleIdentifier": "com.sidhahisab.rider.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSLocationWhenInUseUsageDescription": "SidhaHisab Rider uses your location to show your position on the map and calculate delivery routes.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "SidhaHisab Rider tracks your location in the background while you are on an active delivery so dispatch and customers can see your live position.",
-        "NSCameraUsageDescription": "SidhaHisab Rider uses the camera to capture proof of delivery photos."
+        "NSLocationWhenInUseUsageDescription": "SidhaHisab Field Operation uses your location to show your position on the map and calculate delivery routes.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "SidhaHisab Field Operation tracks your location in the background while you are on an active delivery so dispatch and customers can see your live position.",
+        "NSCameraUsageDescription": "SidhaHisab Field Operation uses the camera to capture proof of delivery photos."
       }
     },
     "android": {
@@ -28,8 +28,8 @@
       "googleServicesFile": "./google-services.json",
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
-        "backgroundColor": "#FFFFFF",
-        "foregroundImage": "./assets/sidhahisab-fieldoperation.png"
+        "backgroundColor": "#4B13AB",
+        "foregroundImage": "./assets/app-logo-padded.png"
       },
       "edgeToEdgeEnabled": true,
       "softwareKeyboardLayoutMode": "pan",
@@ -58,26 +58,26 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "SidhaHisab Rider uses the camera to capture proof of delivery photos."
+          "cameraPermission": "SidhaHisab Field Operation uses the camera to capture proof of delivery photos."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "SidhaHisab Rider needs access to your photos to attach delivery proof images."
+          "photosPermission": "SidhaHisab Field Operation needs access to your photos to attach delivery proof images."
         }
       ],
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "SidhaHisab Rider uses your location to show your position on the map and calculate delivery routes.",
-          "locationAlwaysAndWhenInUsePermission": "SidhaHisab Rider tracks your location in the background during active deliveries."
+          "locationWhenInUsePermission": "SidhaHisab Field Operation uses your location to show your position on the map and calculate delivery routes.",
+          "locationAlwaysAndWhenInUsePermission": "SidhaHisab Field Operation tracks your location in the background during active deliveries."
         }
       ],
       [
         "expo-splash-screen",
         {
-          "image": "./assets/sidhahisab-fieldoperation.png",
+          "image": "./assets/splash.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"

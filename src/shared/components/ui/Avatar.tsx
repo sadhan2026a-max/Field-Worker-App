@@ -31,7 +31,7 @@ export function Avatar({ name, size = 44, style }: AvatarProps) {
 
 const useStyles = (colors: any) => StyleSheet.create({
   circle: {
-    backgroundColor: colors.primaryLight,
+    backgroundColor: colors.primary + '20',
     alignItems: 'center',
     justifyContent: 'center',
   },

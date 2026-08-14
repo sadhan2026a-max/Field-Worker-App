@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColorScheme } from 'react-native';
-import { lightColors, darkColors, blueColors, forestColors, oceanColors, AppColors } from './colors';
+import { royalPurple, navyBlue, indigoOrange, darkTheme, tealLogistics, AppColors } from './colors';
 
-type ThemeType = 'light' | 'dark' | 'system' | 'blue' | 'forest' | 'ocean';
+type ThemeType = 'royalPurple' | 'navyBlue' | 'indigoOrange' | 'darkTheme' | 'tealLogistics';
 
 interface ThemeContextType {
   theme: ThemeType;
@@ -13,9 +13,9 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType>({
-  theme: 'system',
+  theme: 'royalPurple',
   isDark: false,
-  colors: lightColors,
+  colors: royalPurple,
   setTheme: () => {},
 });
 
@@ -25,14 +25,14 @@ const THEME_STORAGE_KEY = '@app_theme';
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const systemColorScheme = useColorScheme();
-  const [theme, setThemeState] = useState<ThemeType>('system');
+  const [theme, setThemeState] = useState<ThemeType>('royalPurple');
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     const loadTheme = async () => {
       try {
         const storedTheme = await AsyncStorage.getItem(THEME_STORAGE_KEY);
-        if (storedTheme === 'light' || storedTheme === 'dark' || storedTheme === 'system' || storedTheme === 'blue' || storedTheme === 'forest' || storedTheme === 'ocean') {
+        if (storedTheme && ['royalPurple', 'navyBlue', 'indigoOrange', 'darkTheme', 'tealLogistics'].includes(storedTheme)) {
           setThemeState(storedTheme as ThemeType);
         }
       } catch (e) {
@@ -53,8 +53,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const isDark = theme === 'system' ? systemColorScheme === 'dark' : (theme === 'dark' || theme === 'blue' || theme === 'forest' || theme === 'ocean');
-  const colors = theme === 'ocean' ? oceanColors : (theme === 'forest' ? forestColors : (theme === 'blue' ? blueColors : (isDark ? darkColors : lightColors)));
+  const isDark = theme === 'darkTheme';
+  const colors = 
+    theme === 'navyBlue' ? navyBlue :
+    theme === 'indigoOrange' ? indigoOrange :
+    theme === 'darkTheme' ? darkTheme :
+    theme === 'tealLogistics' ? tealLogistics :
+    royalPurple;
 
   if (!isReady) return null;
 

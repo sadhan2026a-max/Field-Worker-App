@@ -4,7 +4,7 @@ import { store } from '@/store';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { NotificationService } from '@/core/services/NotificationService';
 import * as Notifications from 'expo-notifications';
-import { fetchAssignments, fetchWorkspaceSummary, fetchOrderCompletionRequirements, restoreAssignments, restoreWorkspaceSummary, setHydrated } from '@/features/assignment/redux/assignmentSlice';
+import { fetchAssignments, fetchWorkspaceSummary, fetchOrderCompletionRequirements, restoreAssignments, restoreWorkspaceSummary, setHydrated, fetchAssignmentById } from '@/features/assignment/redux/assignmentSlice';
 import { fetchNotifications } from '@/features/notification/redux/notificationSlice';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -134,6 +134,12 @@ function AppBootstrap({ children }: { children: React.ReactNode }) {
       if (currentDriver?.id) {
         dispatch(fetchWorkspaceSummary(currentDriver.id));
       }
+
+      const data = notification.request.content.data;
+      const orderId = data?.relatedOrderId || data?.orderId || data?.assignmentId || data?.id;
+      if (orderId) {
+        dispatch(fetchAssignmentById(String(orderId)));
+      }
     });
 
     const responseListener = NotificationService.addNotificationResponseReceivedListener((response) => {
@@ -174,100 +180,85 @@ function AppBootstrap({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// ΓöÇΓöÇΓöÇ Root layout ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-
 const toastConfig = {
-  error: (props: any) => (
-    <View style={{
-      width: '100%',
-      backgroundColor: '#DC2626', // Red color for error
-      paddingHorizontal: 24,
-      paddingVertical: 16,
-      flexDirection: 'row',
-      alignItems: 'center',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: -2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 4,
-    }}>
-      <MaterialIcons name="error" size={24} color="#FFFFFF" />
-      <View style={{ marginLeft: 12, flex: 1 }}>
-        <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 15 }}>{props.text1}</Text>
-        {props.text2 ? <Text style={{ color: '#FEE2E2', fontSize: 13, marginTop: 2 }}>{props.text2}</Text> : null}
-      </View>
-    </View>
-  ),
-  success: (props: any) => (
-    <View style={{
-      width: '100%',
-      backgroundColor: '#16A34A', // Green color for success
-      paddingHorizontal: 24,
-      paddingVertical: 16,
-      flexDirection: 'row',
-      alignItems: 'center',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: -2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 4,
-    }}>
-      <MaterialIcons name="check-circle" size={24} color="#FFFFFF" />
-      <View style={{ marginLeft: 12, flex: 1 }}>
-        <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 15 }}>{props.text1}</Text>
-        {props.text2 ? <Text style={{ color: '#DCFCE7', fontSize: 13, marginTop: 2 }}>{props.text2}</Text> : null}
-      </View>
-    </View>
-  ),
-  warning: (props: any) => (
-    <View style={{
-      width: '90%',
-      alignSelf: 'center',
-      backgroundColor: 'rgba(245, 158, 11, 0.5)', // Amber color with 50% opacity
-      paddingHorizontal: 20,
-      paddingTop: 28,
-      paddingBottom: 16,
-      alignItems: 'center',
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: '#FDE68A',
-      shadowColor: '#F59E0B',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 12,
-      elevation: 8,
-      marginTop: 20,
-      marginBottom: 30, // Float above bottom edge
-    }}>
+  error: (props: any) => {
+    const { isDark } = useTheme();
+    const bg = isDark ? '#7f1d1d' : '#DC2626';
+    const text1 = '#FFFFFF';
+    const text2 = 'rgba(255, 255, 255, 0.9)';
+
+    return (
       <View style={{
-        position: 'absolute',
-        top: -20,
-        backgroundColor: '#f26e35ff', // Keep icon background solid for contrast
-        borderRadius: 20,
-        width: 40,
-        height: 40,
-        justifyContent: 'center',
+        alignSelf: 'center',
+        backgroundColor: bg,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 12,
+        flexDirection: 'row',
         alignItems: 'center',
-        borderWidth: 2,
-        borderColor: '#FEF3C7',
-        shadowColor: '#F59E0B',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.8,
-        shadowRadius: 6,
-        elevation: 6,
+        minWidth: 200,
+        maxWidth: '90%',
       }}>
-        <MaterialIcons name="priority-high" size={24} color="#FFFFFF" />
+        <MaterialIcons name="error" size={20} color="#FFFFFF" />
+        <View style={{ marginLeft: 10, flex: 1 }}>
+          <Text style={{ color: text1, fontWeight: 'bold', fontSize: 13 }}>{props.text1 || 'Error'}</Text>
+          {props.text2 ? <Text style={{ color: text2, fontSize: 12, marginTop: 1 }}>{props.text2}</Text> : null}
+        </View>
       </View>
-      <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 15, textAlign: 'center' }}>
-        {props.text1 || 'Warning'}
-      </Text>
-      {props.text2 ? (
-        <Text style={{ color: '#FEF3C7', fontSize: 13, textAlign: 'center', marginTop: 2 }}>
-          {props.text2}
-        </Text>
-      ) : null}
-    </View>
-  )
+    );
+  },
+  success: (props: any) => {
+    const { isDark, colors } = useTheme();
+    const bg = colors.primary;
+    const text1 = '#FFFFFF';
+    const text2 = 'rgba(255, 255, 255, 0.9)';
+
+    return (
+      <View style={{
+        alignSelf: 'center',
+        backgroundColor: bg,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        minWidth: 200,
+        maxWidth: '90%',
+      }}>
+        <MaterialIcons name="check-circle" size={20} color="#FFFFFF" />
+        <View style={{ marginLeft: 10, flex: 1 }}>
+          <Text style={{ color: text1, fontWeight: 'bold', fontSize: 13 }}>{props.text1}</Text>
+          {props.text2 ? <Text style={{ color: text2, fontSize: 12, marginTop: 1 }}>{props.text2}</Text> : null}
+        </View>
+      </View>
+    );
+  },
+  warning: (props: any) => {
+    const { isDark, colors } = useTheme();
+    const bg = colors.warning;
+    const text1 = '#FFFFFF';
+    const text2 = 'rgba(255, 255, 255, 0.9)';
+
+    return (
+      <View style={{
+        alignSelf: 'center',
+        backgroundColor: bg,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        minWidth: 200,
+        maxWidth: '90%',
+      }}>
+        <MaterialIcons name="warning" size={20} color="#FFFFFF" />
+        <View style={{ marginLeft: 10, flex: 1 }}>
+          <Text style={{ color: text1, fontWeight: 'bold', fontSize: 13 }}>{props.text1 || 'Warning'}</Text>
+          {props.text2 ? <Text style={{ color: text2, fontSize: 12, marginTop: 1 }}>{props.text2}</Text> : null}
+        </View>
+      </View>
+    );
+  }
 };
 
 function RootNavigator() {
@@ -300,7 +291,7 @@ function RootNavigator() {
           <Stack.Screen name="assignment/[id]" options={{ headerShown: false }} />
         </Stack>
       </TabletWrapper>
-      <Toast position="bottom" bottomOffset={0} config={toastConfig} />
+      <Toast position="bottom" bottomOffset={100} config={toastConfig} />
     </>
   );
 }

@@ -81,12 +81,12 @@ export const startAssignment = createAsyncThunk<Assignment, string>(
 
 export const saveDeliveryProof = createAsyncThunk<
   Assignment,
-  { id: string; proofPhotoUri?: string; signatureUri?: string; deliveryNotes?: string }
+  { id: string; proofPhotoUris?: string[]; signatureUri?: string; deliveryNotes?: string }
 >('assignment/saveDeliveryProof', async (params) => {
   const result = await assignmentService.saveDeliveryProof(params.id, params);
   return {
     ...result,
-    proofPhotoUri: params.proofPhotoUri,
+    proofPhotoUris: params.proofPhotoUris,
     signatureUri: params.signatureUri,
     deliveryNotes: params.deliveryNotes,
   };

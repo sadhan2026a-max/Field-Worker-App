@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
-import { StyleSheet, Text, View, Platform, Alert, Pressable } from 'react-native';
+import { StyleSheet, Text, View, Platform, Alert, Pressable, Linking, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import Toast from 'react-native-toast-message';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
-import { spacing, shadows, FontFamily, palette, colors, useTheme } from '@/core/theme';
+import { spacing, FontFamily, palette, useTheme } from '@/core/theme';
 
 import { Assignment } from '@/domain/entities/Assignment';
 import { DistanceDisplay } from '@/features/assignment/components';
@@ -23,15 +24,40 @@ function getStatusLabel(status: string): string {
   return labels[status] || status;
 }
 
-function getStatusColor(status: string): { text: string; bg: string } {
-  const statusColors: Record<string, { text: string; bg: string }> = {
-    pending: { text: palette.orange, bg: palette.orangeLight },
-    accepted: { text: palette.purple, bg: palette.purpleLight },
-    en_route: { text: palette.blue, bg: palette.blueLight },
-    arrived: { text: palette.grey700, bg: palette.grey100 },
-    in_progress: { text: palette.blue, bg: palette.blueLight },
-  };
-  return statusColors[status] || { text: palette.grey700, bg: palette.grey100 };
+function getStatusTheme(status: string): { text: string; bg: string; border: string } {
+  switch (status) {
+    case 'pending':
+      return { text: '#D97706', bg: '#FEF3C7', border: '#FCD34D' };
+    case 'accepted':
+      return { text: '#7C3AED', bg: '#F3E8FF', border: '#DDD6FE' };
+    case 'en_route':
+      return { text: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' };
+    case 'arrived':
+      return { text: '#059669', bg: '#ECFDF5', border: '#A7F3D0' };
+    case 'in_progress':
+      return { text: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' };
+    default:
+      return { text: '#4B5563', bg: '#F3F4F6', border: '#E5E7EB' };
+  }
+}
+
+function getTypeIconAndLabel(type: string): { icon: keyof typeof MaterialIcons.glyphMap; label: string; bg: string; color: string } {
+  switch (type) {
+    case 'delivery':
+      return { icon: 'local-shipping', label: 'Delivery', bg: '#DBEAFE', color: '#1E40AF' };
+    case 'pickup':
+      return { icon: 'archive', label: 'Pickup', bg: '#FEF3C7', color: '#92400E' };
+    case 'return':
+      return { icon: 'assignment-return', label: 'Return', bg: '#FEE2E2', color: '#991B1B' };
+    case 'installation':
+      return { icon: 'build', label: 'Installation', bg: '#DCFCE7', color: '#166534' };
+    case 'inspection':
+      return { icon: 'fact-check', label: 'Inspection', bg: '#F3E8FF', color: '#6B21A8' };
+    case 'service_visit':
+      return { icon: 'engineering', label: 'Service', bg: '#E0E7FF', color: '#3730A3' };
+    default:
+      return { icon: 'shopping-bag', label: 'Assignment', bg: '#F3F4F6', color: '#374151' };
+  }
 }
 
 interface NextDeliveryCardProps {
@@ -43,7 +69,8 @@ export function NextDeliveryCard({ assignment, onStart }: NextDeliveryCardProps)
   const { colors } = useTheme();
   const styles = React.useMemo(() => useStyles(colors), [colors]);
   const currentLocation = useCurrentLocation();
-  const statusColor = getStatusColor(assignment.status);
+  const statusTheme = getStatusTheme(assignment.status);
+  const typeInfo = getTypeIconAndLabel(assignment.type);
 
   const acceptOffer = useAcceptOffer();
   const declineOffer = useDeclineOffer();
@@ -82,78 +109,133 @@ export function NextDeliveryCard({ assignment, onStart }: NextDeliveryCardProps)
     ]);
   };
 
+  const handlePhoneCall = () => {
+    if (assignment.customer.phone && assignment.customer.phone !== 'N/A') {
+      Linking.openURL(`tel:${assignment.customer.phone}`).catch(() => {
+        Toast.show({ type: 'error', text1: 'Could not open phone dialer' });
+      });
+    } else {
+      Toast.show({ type: 'info', text1: 'Phone number unavailable' });
+    }
+  };
+
   return (
-    <Pressable 
-      style={[styles.card, { backgroundColor: colors.background }]}
+    <Pressable
+      style={styles.cardContainer}
       onPress={() => {
         if (assignment.status !== 'pending') {
           router.push({ pathname: '/assignment/[id]', params: { id: assignment.id } });
         }
       }}
     >
+      {/* Top Accent Strip removed per user request */}
+
       <View style={styles.content}>
-        {/* Status Badge */}
-        <View style={styles.statusRow}>
-          <View style={[styles.statusBadge, { backgroundColor: colors.background }]}>
-            <View style={[styles.statusDot, { backgroundColor: statusColor.text }]} />
-            <Text style={[styles.statusText, { color: statusColor.text }]}>
+        {/* Top Badges Row */}
+        <View style={styles.topBadgesRow}>
+          <View style={styles.typeAndCodeGroup}>
+            <Text style={styles.orderCode}>#{assignment.code}</Text>
+          </View>
+
+          <View style={[styles.statusBadge, { backgroundColor: statusTheme.bg, borderColor: statusTheme.border }]}>
+            <View style={[styles.statusDot, { backgroundColor: statusTheme.text }]} />
+            <Text style={[styles.statusText, { color: statusTheme.text }]}>
               {getStatusLabel(assignment.status)}
             </Text>
           </View>
-          <Text style={styles.orderCode}>#{assignment.code}</Text>
         </View>
 
-        {/* Customer Info */}
-        <View style={styles.row}>
-          <Avatar name={assignment.customer.name} size={44} />
-          <View style={styles.meta}>
-            <Text style={styles.name}>{assignment.customer.name}</Text>
-            {assignment.customer.location.latitude === 0 && assignment.customer.location.longitude === 0 ? (
-              <Text style={styles.distance}>
-                {assignment.customer.address !== 'Address will be available after acceptance'
-                  ? assignment.customer.address
-                  : 'Pending — address after acceptance'}
-              </Text>
-            ) : (
-              <DistanceDisplay
-                style={styles.distance}
-                currentLocation={currentLocation}
-                targetLocation={assignment.customer.location}
-                targetAddress={assignment.customer.address}
-                backendDistanceKm={assignment.distanceKm}
-              />
-            )}
+        {/* Customer Details Row */}
+        <View style={styles.customerRow}>
+          <Avatar name={assignment.customer.name} size={40} />
+
+          <View style={styles.customerMeta}>
+            <View style={styles.nameRow}>
+              <Text style={styles.customerName} numberOfLines={1}>{assignment.customer.name}</Text>
+            </View>
+
+            {assignment.customer.location.latitude !== 0 || assignment.customer.location.longitude !== 0 ? (
+              <View style={styles.locationPillRow}>
+                <MaterialIcons name="navigation" size={13} color={colors.primary} />
+                <DistanceDisplay
+                  style={styles.distanceText}
+                  currentLocation={currentLocation}
+                  targetLocation={assignment.customer.location}
+                  targetAddress={assignment.customer.address}
+                  backendDistanceKm={assignment.distanceKm}
+                />
+              </View>
+            ) : null}
+
+            <Text style={styles.addressText} numberOfLines={2}>
+              {assignment.customer.address !== 'Address will be available after acceptance'
+                ? assignment.customer.address
+                : 'Address details available upon acceptance'}
+            </Text>
           </View>
+
+          {/* Quick Call Action Button */}
+          {assignment.customer.phone && assignment.customer.phone !== 'N/A' && (
+            <Pressable
+              style={styles.callButton}
+              onPress={handlePhoneCall}
+              android_ripple={{ color: colors.primary + '33' }}
+            >
+              <MaterialIcons name="phone" size={18} color={colors.primary} />
+            </Pressable>
+          )}
         </View>
 
-        {/* Action Button */}
+
+
+        {/* Action Button Section */}
         {assignment.status === 'pending' ? (
-          <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs }}>
-            <Button
-              label="Decline"
-              variant="outline"
+          <View style={styles.dualButtonRow}>
+            <Pressable
               onPress={onDecline}
-              loading={actionType === 'decline' && declineOffer.isPending}
               disabled={actionType === 'accept' && acceptOffer.isPending}
-              style={{ ...styles.button, flex: 1, borderColor: palette.red }}
-              textStyle={{ ...styles.buttonText, color: palette.red }}
-            />
-            <Button
-              label="Accept Offer"
+              style={({ pressed }) => [
+                styles.declineButton,
+                (actionType === 'accept' && acceptOffer.isPending) && { opacity: 0.5 },
+                pressed && { opacity: 0.85 }
+              ]}
+            >
+              {actionType === 'decline' && declineOffer.isPending ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <>
+                  <MaterialIcons name="cancel" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={styles.declineButtonText}>Decline</Text>
+                </>
+              )}
+            </Pressable>
+            <Pressable
               onPress={onAccept}
-              loading={actionType === 'accept' && acceptOffer.isPending}
-              disabled={actionType === 'decline' && declineOffer.isPending}
-              style={{ ...styles.button, flex: 1, backgroundColor: palette.green }}
-              textStyle={styles.buttonText}
-            />
+              style={styles.acceptGradientWrapper}
+            >
+              <LinearGradient
+                colors={colors.headerGradient as [string, string, ...string[]] || [colors.primary, colors.primaryDark]}
+                style={styles.acceptButtonGradient}
+              >
+                <MaterialIcons name="check-circle" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                <Text style={styles.acceptButtonText}>
+                  {actionType === 'accept' && acceptOffer.isPending ? 'Accepting...' : 'Accept'}
+                </Text>
+              </LinearGradient>
+            </Pressable>
           </View>
         ) : (
-          <Button
-            label="Start Job"
-            onPress={onStart}
-            style={styles.button}
-            textStyle={styles.buttonText}
-          />
+          <Pressable onPress={onStart} style={styles.actionGradientWrapper}>
+            <LinearGradient
+              colors={colors.headerGradient as [string, string, ...string[]] || [colors.primaryDark, colors.primary]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.startJobGradient}
+            >
+              <Text style={styles.startJobText}>Start Job</Text>
+              <MaterialIcons name="arrow-forward" size={18} color="#FFFFFF" />
+            </LinearGradient>
+          </Pressable>
         )}
       </View>
     </Pressable>
@@ -161,30 +243,61 @@ export function NextDeliveryCard({ assignment, onStart }: NextDeliveryCardProps)
 }
 
 const useStyles = (colors: any) => StyleSheet.create({
-  card: {
+  cardContainer: {
     backgroundColor: colors.surface,
     borderRadius: 16,
     overflow: 'hidden',
-    marginBottom: spacing.lg,
-    position: 'relative',
+    marginBottom: spacing.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: 'rgba(0, 0, 0, 0.03)', // This smooths out the jagged edges (anti-aliasing)
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 15 },
+      android: { elevation: 2 },
+    }),
+  },
+  topAccentBar: {
+    height: 4,
+    width: '100%',
   },
   content: {
-    padding: 14,
+    padding: 12,
   },
-  statusRow: {
+  topBadgesRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 10,
   },
+  typeAndCodeGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  typeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    gap: 4,
+  },
+  typeBadgeText: {
+    fontSize: 11,
+    fontFamily: FontFamily.bold,
+    letterSpacing: 0.2,
+  },
+  orderCode: {
+    fontSize: 12,
+    fontFamily: FontFamily.bold,
+    color: colors.textPrimary,
+  },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
     gap: 5,
   },
   statusDot: {
@@ -193,42 +306,111 @@ const useStyles = (colors: any) => StyleSheet.create({
     borderRadius: 3,
   },
   statusText: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: FontFamily.bold,
-    textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
-  orderCode: {
-    fontSize: 12,
-    fontFamily: FontFamily.medium,
-    color: colors.textSecondary,
-  },
-  row: {
+  customerRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 10,
-    marginBottom: 12,
+    marginBottom: 10,
   },
-  meta: {
+  customerMeta: {
     flex: 1,
   },
-  name: {
-    fontSize: 14,
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  customerName: {
+    fontSize: 15,
     fontFamily: FontFamily.bold,
     color: colors.textPrimary,
   },
-  distance: {
+  locationPillRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  distanceText: {
     fontSize: 12,
     fontFamily: FontFamily.semiBold,
+    color: colors.primary,
+  },
+  addressText: {
+    fontSize: 12,
+    fontFamily: FontFamily.medium,
     color: colors.textSecondary,
     marginTop: 3,
+    lineHeight: 16,
   },
-  button: {
-    borderRadius: 12,
+  callButton: {
+    width: 38,
     height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.primary + '20',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.primary + '30',
   },
-  buttonText: {
+
+  dualButtonRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  declineButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.danger,
+    borderRadius: 12,
+    height: 40,
+  },
+  declineButtonText: {
     fontSize: 13,
     fontFamily: FontFamily.bold,
+    color: '#FFFFFF',
+  },
+  acceptGradientWrapper: {
+    flex: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  acceptButtonGradient: {
+    flexDirection: 'row',
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+  },
+  acceptButtonText: {
+    fontSize: 13,
+    fontFamily: FontFamily.bold,
+    color: '#FFFFFF',
+  },
+  actionGradientWrapper: {
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  startJobGradient: {
+    flexDirection: 'row',
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    gap: 8,
+    paddingHorizontal: 16,
+  },
+  startJobText: {
+    fontSize: 14,
+    fontFamily: FontFamily.bold,
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
   },
 });
+

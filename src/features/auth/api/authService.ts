@@ -69,6 +69,9 @@ export async function registerDeviceToken(token: string): Promise<void> {
 
 export async function removeDeviceToken(token: string): Promise<void> {
   try {
+    const riderToken = await AsyncStorage.getItem('riderToken');
+    if (!riderToken) return;
+    
     await api.delete(`/api/v1/drivers/me/device-tokens?token=${encodeURIComponent(token)}`);
   } catch (error) {
     console.error('Failed to remove device token:', error);

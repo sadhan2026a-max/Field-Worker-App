@@ -7,17 +7,17 @@ import { spacing, typography, palette, FontFamily, colors, useTheme } from '@/co
 
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { selectDriver } from '@/features/auth/redux/authSlice';
-import { 
-  fetchCashSettlements, 
-  fetchPayouts, 
-  selectCashSettlements, 
-  selectPayouts, 
+import {
+  fetchCashSettlements,
+  fetchPayouts,
+  selectCashSettlements,
+  selectPayouts,
   selectWalletLoading,
   selectWalletError
 } from '../redux/walletSlice';
 import { LedgerItem } from '../components/LedgerItem';
 import { TouchableOpacity } from 'react-native-gesture-handler';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 
 type Tab = 'cash' | 'payout';
 
@@ -31,8 +31,15 @@ export default function WalletScreen() {
   const isLoading = useAppSelector(selectWalletLoading);
   const error = useAppSelector(selectWalletError);
 
-  const [activeTab, setActiveTab] = useState<Tab>('cash');
+  const params = useLocalSearchParams<{ tab?: Tab }>();
+  const [activeTab, setActiveTab] = useState<Tab>(params.tab || 'cash');
   const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    if (params.tab && params.tab !== activeTab) {
+      setActiveTab(params.tab);
+    }
+  }, [params.tab]);
 
   const loadData = async (showRefreshIndicator = false) => {
     if (driver?.id) {
@@ -67,27 +74,27 @@ export default function WalletScreen() {
       </View>
 
       <View style={styles.tabContainer}>
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'cash' && styles.activeTab]} 
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'cash' && styles.activeTab]}
           onPress={() => setActiveTab('cash')}
         >
-          <MaterialIcons 
-            name="account-balance-wallet" 
-            size={18} 
-            color={activeTab === 'cash' ? colors.primary : colors.textSecondary} 
+          <MaterialIcons
+            name="account-balance-wallet"
+            size={18}
+            color={activeTab === 'cash' ? colors.primary : colors.textSecondary}
           />
           <Text style={[styles.tabText, activeTab === 'cash' && styles.activeTabText]}>
             Cash Settled
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'payout' && styles.activeTab]} 
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'payout' && styles.activeTab]}
           onPress={() => setActiveTab('payout')}
         >
-          <MaterialIcons 
-            name="account-balance" 
-            size={18} 
-            color={activeTab === 'payout' ? colors.primary : colors.textSecondary} 
+          <MaterialIcons
+            name="account-balance"
+            size={18}
+            color={activeTab === 'payout' ? colors.primary : colors.textSecondary}
           />
           <Text style={[styles.tabText, activeTab === 'payout' && styles.activeTabText]}>
             Payouts
@@ -111,25 +118,25 @@ export default function WalletScreen() {
             renderItem={({ item }) => <LedgerItem item={item} type={activeTab} />}
             contentContainerStyle={styles.listContent}
             refreshControl={
-              <RefreshControl 
-                refreshing={refreshing} 
-                onRefresh={onRefresh} 
-                colors={[colors.primary]} 
-                tintColor={colors.primary} 
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={[colors.primary]}
+                tintColor={colors.primary}
               />
             }
             ListEmptyComponent={() => (
               !isLoading ? (
                 <View style={styles.emptyContainer}>
-                  <MaterialIcons 
-                    name={activeTab === 'cash' ? 'account-balance-wallet' : 'account-balance'} 
-                    size={64} 
-                    color={palette.grey300} 
+                  <MaterialIcons
+                    name={activeTab === 'cash' ? 'account-balance-wallet' : 'account-balance'}
+                    size={64}
+                    color={palette.grey300}
                   />
                   <Text style={styles.emptyTitle}>No History Found</Text>
                   <Text style={styles.emptySubtitle}>
-                    {activeTab === 'cash' 
-                      ? 'You have not settled any cash yet.' 
+                    {activeTab === 'cash'
+                      ? 'You have not settled any cash yet.'
                       : 'You have not received any payouts yet.'}
                   </Text>
                 </View>

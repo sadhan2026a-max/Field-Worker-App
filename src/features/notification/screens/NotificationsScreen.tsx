@@ -5,7 +5,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchNotifications, markAsRead, selectNotifications, selectIsLoadingNotifications } from '../redux/notificationSlice';
-import { spacing, FontFamily, palette } from '@/core/theme';
+import { spacing, FontFamily, palette, typography } from '@/core/theme';
 import { useTheme } from '@/core/theme';
 import { NotificationDto } from '../types/Notification';
 
@@ -51,6 +51,14 @@ export function NotificationsScreen() {
     }
   };
 
+  const hasUnread = notifications.some(n => !n.readAt);
+
+  const handleMarkAllAsRead = () => {
+    notifications.filter(n => !n.readAt).forEach(n => {
+      dispatch(markAsRead(n.id));
+    });
+  };
+
   const renderItem = ({ item }: { item: NotificationDto }) => {
     const isUnread = !item.readAt;
 
@@ -86,13 +94,23 @@ export function NotificationsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Left-aligned header: back button + title side by side */}
+      {/* Header */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <MaterialIcons name="arrow-back" size={24} color={colors.textPrimary} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Notifications</Text>
+        <View style={styles.headerLeft}>
+          <Pressable onPress={() => router.back()} style={styles.backButton}>
+            <MaterialIcons name="arrow-back" size={24} color={colors.textPrimary} />
+          </Pressable>
+          <Text style={styles.headerTitle}>Notifications</Text>
+        </View>
+
+        {hasUnread && (
+          <Pressable onPress={handleMarkAllAsRead} style={styles.markAllReadButton}>
+            <MaterialIcons name="checklist" size={20} color={colors.primary} />
+            <Text style={styles.markAllReadText}>Mark as read</Text>
+          </Pressable>
+        )}
       </View>
+
 
       {isLoading && !refreshing && notifications.length === 0 ? (
         <View style={styles.centerContainer}>
@@ -128,11 +146,16 @@ const useStyles = (colors: any) => StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     backgroundColor: colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   backButton: {
     padding: spacing.xs,
@@ -142,6 +165,17 @@ const useStyles = (colors: any) => StyleSheet.create({
     fontSize: 18,
     fontFamily: FontFamily.bold,
     color: colors.textPrimary,
+  },
+  markAllReadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.xs,
+    gap: 4,
+  },
+  markAllReadText: {
+    ...typography.caption,
+    color: colors.primary,
+    fontFamily: FontFamily.semiBold,
   },
   listContent: {
     padding: spacing.md,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { FlatList, Pressable, StyleSheet, Text, View, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -49,13 +49,20 @@ export function AssignmentsScreen() {
   const dispatch = useAppDispatch();
   const { data: assignments, isLoading, refetch } = useAssignments();
   const currentLocation = useCurrentLocation();
-  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'completed'>('all');
+  const params = useLocalSearchParams<{ tab?: 'all' | 'pending' | 'completed' }>();
+  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'completed'>(params.tab || 'all');
 
   useEffect(() => {
     if (activeTab === 'completed') {
       dispatch(fetchAssignments('completed'));
     }
   }, [activeTab, dispatch]);
+
+  useEffect(() => {
+    if (params.tab && params.tab !== activeTab) {
+      setActiveTab(params.tab);
+    }
+  }, [params.tab]);
 
   const onRefresh = async () => {
     await refetch();
@@ -269,7 +276,7 @@ const useStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    backgroundColor: colors.primaryLight,
+    backgroundColor: colors.primary + '20',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderRadius: 999,
@@ -307,7 +314,7 @@ const useStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.border,
   },
   activeTab: {
-    backgroundColor: colors.primaryLight,
+    backgroundColor: colors.primary + '20',
   },
   tabLabel: {
     ...typography.bodyMedium,
