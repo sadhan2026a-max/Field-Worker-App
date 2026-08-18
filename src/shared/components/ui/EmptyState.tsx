@@ -26,6 +26,7 @@ export function EmptyState({
   const actualTint = tint || colors.primary;
   const defaultTintLight = colors.primary + '20';
   const actualTintLight = tintLight || defaultTintLight;
+  
 
   const styles = React.useMemo(() => useStyles(colors), [colors]);
   
