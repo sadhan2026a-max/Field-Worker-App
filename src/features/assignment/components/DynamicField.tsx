@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, Pressable, Platform, Modal, ScrollView, Image } from 'react-native';
-import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialIcons, Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { spacing, typography, palette, useTheme, radius } from '@/core/theme';
@@ -268,30 +268,34 @@ export function DynamicField({ template, item, onChange, onNotesChange }: Dynami
     }
   };
 
-  const isChecked = item.isChecked;
+  const isAnswered = item.value !== null && item.value !== undefined && String(item.value).trim() !== '';
+  const answeredYes = String(item.value) === 'true';
+  const answeredNo = String(item.value) === 'false';
 
   return (
-    <View style={[styles.container, isChecked && styles.containerChecked]}>
-      {itemType === 'Checkbox' ? (
-        <Pressable style={styles.headerRow} onPress={() => onChange(!item.isChecked)}>
-          <Text style={[styles.label, isChecked && styles.labelChecked]}>
-            {template.label}{template.isRequired && <Text style={styles.required}> *</Text>}
-          </Text>
-          {isChecked ? (
-            <View style={styles.checkCircleFilled}>
-              <MaterialIcons name="check" size={18} color="#fff" />
-            </View>
-          ) : (
-            <View style={styles.checkCircleEmpty} />
-          )}
-        </Pressable>
-      ) : (
-        <View style={styles.headerRow}>
-          <Text style={styles.label}>
-            {template.label}{template.isRequired && <Text style={styles.required}> *</Text>}
-          </Text>
-        </View>
-      )}
+    <View style={[styles.container, isAnswered && styles.containerChecked]}>
+      <View style={styles.headerRow}>
+        <Text style={styles.label}>
+          {template.label}{template.isRequired && <Text style={styles.required}> *</Text>}
+        </Text>
+
+        {itemType === 'Checkbox' && (
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <Pressable
+              style={[styles.smallToggleButton, answeredYes ? styles.toggleButtonActiveYes : null]}
+              onPress={() => onChange(true)}
+            >
+              <Feather name="check" size={18} color={answeredYes ? "#fff" : colors.textSecondary} />
+            </Pressable>
+            <Pressable
+              style={[styles.smallToggleButton, answeredNo ? styles.toggleButtonActiveNo : null]}
+              onPress={() => onChange(false)}
+            >
+              <Feather name="x" size={18} color={answeredNo ? "#fff" : colors.textSecondary} />
+            </Pressable>
+          </View>
+        )}
+      </View>
 
       {itemType !== 'Checkbox' && (
         <View style={styles.fieldWrapper}>
@@ -302,7 +306,6 @@ export function DynamicField({ template, item, onChange, onNotesChange }: Dynami
       {!validation.isValid && validation.errorMessage && (
         <Text style={styles.errorText}>{validation.errorMessage}</Text>
       )}
-
     </View>
   );
 }
@@ -456,5 +459,24 @@ const useStyles = (colors: any) => StyleSheet.create({
   signatureLabel: { ...typography.caption, color: colors.textSecondary },
   clearLabel: { ...typography.caption, color: colors.primary, fontWeight: '600' },
   fallbackContainer: { padding: spacing.md, backgroundColor: colors.border, borderRadius: 6 },
-  fallbackText: { ...typography.caption, color: colors.textSecondary, fontStyle: 'italic' }
+  fallbackText: { ...typography.caption, color: colors.textSecondary, fontStyle: 'italic' },
+
+  smallToggleButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  toggleButtonActiveYes: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
+  },
+  toggleButtonActiveNo: {
+    borderColor: colors.danger,
+    backgroundColor: colors.danger,
+  }
 });

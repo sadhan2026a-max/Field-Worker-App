@@ -70,13 +70,26 @@ export const loginThunk = createAsyncThunk<
     }
 
     return driver;
-  } catch (err) {
+  } catch (err: any) {
     logger.error('auth', 'Login failed', err);
     let errorMessage = 'Login failed';
-    if (err instanceof AxiosError && err.response?.data?.error) {
-      errorMessage = 'Login failed';
+    if (err instanceof AxiosError) {
+      if (err.response?.status === 404) {
+        errorMessage = 'Account does not exist.';
+      } else if (err.response?.status === 401) {
+        errorMessage = 'Incorrect password.';
+      } else {
+        errorMessage = err.response?.data?.message || err.response?.data?.error || 'Login failed';
+        // Map common backend strings just in case
+        const lowerMsg = errorMessage.toLowerCase();
+        if (lowerMsg.includes('not found') || lowerMsg.includes('exist') || lowerMsg.includes('no user') || lowerMsg.includes('invalid phone')) {
+          errorMessage = 'Account does not exist.';
+        } else if (lowerMsg.includes('invalid') || lowerMsg.includes('incorrect') || lowerMsg.includes('wrong') || lowerMsg.includes('credentials')) {
+          errorMessage = 'Incorrect password.';
+        }
+      }
     } else if (err instanceof Error) {
-      errorMessage = 'Login failed';
+      errorMessage = err.message || 'Login failed';
     }
     return rejectWithValue(errorMessage);
   }

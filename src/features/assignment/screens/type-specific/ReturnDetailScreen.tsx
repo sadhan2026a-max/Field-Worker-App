@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, ScrollView, ActivityIndicator } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { View, Text, StyleSheet, TextInput, ScrollView, ActivityIndicator, Pressable } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { safeRouter } from '@/shared/utils/navigation';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
@@ -10,7 +11,7 @@ import { spacing, typography, colors, useTheme } from '@/core/theme';
 import { useAssignment } from '@/features/assignment/hooks/useAssignments';
 import { getReturnReasons, saveReturnDetail } from '@/features/assignment/api/assignmentService';
 import { ReturnReasonOption } from '@/features/assignment/types/Assignment';
-import { useAppSelector } from '@/store/hooks';
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { selectCompletionRequirements } from '@/features/assignment/redux/assignmentSlice';
 
 export function ReturnDetailScreen() {
@@ -23,8 +24,8 @@ export function ReturnDetailScreen() {
   const requiresReturnReason = reqs ? reqs.requiresReturnReason : true; // Fallback
   
   const [reasons, setReasons] = useState<ReturnReasonOption[]>([]);
-  const [selectedReasonId, setSelectedReasonId] = useState<string>('');
-  const [conditionNotes, setConditionNotes] = useState<string>('');
+  const [selectedReasonId, setSelectedReasonId] = useState<string>(assignment?.returnDetail?.returnReasonOptionId || '');
+  const [conditionNotes, setConditionNotes] = useState<string>(assignment?.returnDetail?.conditionNotes || '');
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -33,6 +34,25 @@ export function ReturnDetailScreen() {
       setIsLoading(false);
     });
   }, []);
+
+  const dispatch = useAppDispatch();
+  useEffect(() => {
+    if (!assignment) return;
+    const timeout = setTimeout(() => {
+      dispatch({
+        type: 'assignment/addAssignment',
+        payload: {
+          ...assignment,
+          returnDetail: {
+            ...assignment.returnDetail,
+            returnReasonOptionId: selectedReasonId,
+            conditionNotes,
+          }
+        }
+      });
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [selectedReasonId, conditionNotes]);
 
   const handleContinue = async () => {
     if (requiresReturnReason && !selectedReasonId) return;
@@ -46,8 +66,14 @@ export function ReturnDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <Stack.Screen options={{ headerShown: false }} />
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Verify Return</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs }}>
+          <Pressable onPress={() => router.back()} style={{ marginRight: spacing.sm, marginLeft: -8, padding: spacing.xs }}>
+            <MaterialIcons name="arrow-back" size={28} color={colors.textPrimary} />
+          </Pressable>
+          <Text style={[styles.title, { marginBottom: 0 }]}>Verify Return</Text>
+        </View>
         <Text style={styles.subtitle}>Order #{assignment?.code}</Text>
 
         {requiresReturnReason ? (

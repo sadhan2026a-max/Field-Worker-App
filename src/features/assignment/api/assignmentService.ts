@@ -144,7 +144,7 @@ function mapOrderDtoToAssignment(order: OrderDto, offerId?: string): Assignment 
 
 async function fetchOrderAsAssignment(id: string, offerId?: string): Promise<Assignment> {
   const [orderResponse, historyResponse] = await Promise.all([
-    api.get<OrderDto>(`/api/v1/orders/${id}`),
+    api.get<OrderDto>(`/api/v1/orders/${id}`, { _suppressLog: true } as any),
     api.get<any[]>(`/api/v1/orders/${id}/history`).catch((e) => {
       logger.warn('assignment', `Failed to fetch history for order ${id}`, e);
       return { data: [] };
@@ -227,11 +227,9 @@ export async function getAssignments(status?: Assignment['status'] | string): Pr
     uniqueOffers.map((offer) => {
       const orderId = offer.orderId || offer.id;
       const os = offer.status?.toLowerCase();
-      // If it's merely offered, don't try to fetch the order detail, it will 403.
-      if (os === 'offered' || os === 'pending') {
-        return Promise.reject(new Error('Skip fetch for pending offer to avoid 403'));
-      }
-      return api.get<OrderDto>(`/api/v1/orders/${orderId}`);
+      // Let's attempt to fetch it to get real-time cancellation status.
+      // If it 403s because the backend truly restricts pending offers, we will handle it below.
+      return api.get<OrderDto>(`/api/v1/orders/${orderId}`, { _suppressLog: true } as any);
     })
   );
 
@@ -240,11 +238,21 @@ export async function getAssignments(status?: Assignment['status'] | string): Pr
     const orderId = offer.orderId || offer.id;
 
     if (result.status === 'fulfilled') {
-      return mapOrderDtoToAssignment(result.value.data, offer.orderId ? offer.id : undefined);
+      const assignment = mapOrderDtoToAssignment(result.value.data, offer.orderId ? offer.id : undefined);
+      const os = offer.status?.toLowerCase();
+      // If the backend offer is still pending, enforce the pending status locally
+      // unless the actual order has been cancelled by the admin.
+      if ((os === 'offered' || os === 'pending') && assignment.status !== 'cancelled') {
+        assignment.status = 'pending';
+      }
+      return assignment;
     }
 
-    // Only log warning if it was a real network error, not our deliberate skip
-    if (result.reason?.message !== 'Skip fetch for pending offer to avoid 403') {
+    // Check if it's a 403 (Forbidden). If so, the driver lost access (order reassigned).
+    const isForbidden = result.reason?.response?.status === 403;
+
+    // Only log warning if it was a real network error, not our deliberate skip or a 403 reassignment
+    if (result.reason?.message !== 'Skip fetch for pending offer to avoid 403' && !isForbidden) {
       logger.warn('assignment', `Failed to enrich order ${orderId} from offer`, result.reason);
     }
 
@@ -258,6 +266,17 @@ export async function getAssignments(status?: Assignment['status'] | string): Pr
     if (os === 'enroute' || os === 'en_route') mappedStatus = 'en_route';
     if (os === 'arrived') mappedStatus = 'arrived';
 
+    // If the driver is no longer authorized (403) to view this order:
+    // - For active orders, it means it was reassigned or cancelled -> mark as cancelled.
+    // - For pending offers, 403 is normal (driver hasn't accepted yet) -> keep as pending.
+    if (isForbidden) {
+      if (os === 'offered' || os === 'pending') {
+        mappedStatus = 'pending';
+      } else {
+        mappedStatus = 'cancelled';
+      }
+    }
+
     const rawOrderType = offer.orderType || offer.type || 'Delivery';
     const mappedType = ORDER_TYPE_MAP[rawOrderType] ?? 'other';
 
@@ -267,10 +286,11 @@ export async function getAssignments(status?: Assignment['status'] | string): Pr
       code: offer.orderNumber,
       type: mappedType,
       status: mappedStatus,
+      assignedDriverId: (isForbidden && mappedStatus === 'cancelled') ? 'another-driver' : undefined,
       customer: {
-        name: 'Customer',
+        name: (isForbidden && mappedStatus === 'cancelled') ? 'N/A' : 'Customer',
         phone: 'N/A',
-        address: 'Address will be available after acceptance',
+        address: (isForbidden && mappedStatus === 'cancelled') ? 'Order reassigned to another driver' : 'order details available after acceptance',
         location: { latitude: 0, longitude: 0 }
       },
       distanceKm: 0,
@@ -283,20 +303,57 @@ export async function getAssignments(status?: Assignment['status'] | string): Pr
   });
 
   const result = status ? mapped.filter((a) => a.status === status) : mapped;
-  logger.debug('assignment', `Loaded ${result.length} assignment(s)`, { status });
+  logger.debug('assignment', `Loaded ${result.length} assignment(s)`, {
+    status,
+    items: result.map(a => ({ id: a.id, status: a.status }))
+  });
   return result;
 }
 
 export async function acceptOffer(offerId: string): Promise<Assignment> {
   logger.info('assignment', 'Accepting assignment offer', { offerId });
+
+  // ── Pre-flight check ────────────────────────────────────────────────────────
+  // Before calling accept, verify the offer still exists and hasn't been
+  // cancelled by the admin. This guards against the backend bug where a
+  // cancelled order can still be "accepted" by the driver.
+  try {
+    const currentAssignments = await getAssignments();
+    const offer = currentAssignments.find((a) => a.id === offerId || a.offerId === offerId);
+    if (!offer) {
+      // Not in the pending list at all — it was already cancelled/withdrawn
+      logger.warn('assignment', `Pre-flight: offer ${offerId} not found in pending list, blocking accept`);
+      throw new Error('This offer has already been processed or expired.');
+    }
+    if (offer.status === 'cancelled') {
+      logger.warn('assignment', `Pre-flight: offer ${offerId} is cancelled, blocking accept`);
+      throw new Error('This offer has already been processed or expired.');
+    }
+  } catch (preflightError: any) {
+    if (preflightError.message?.includes('processed or expired')) {
+      throw preflightError; // re-throw our own guard error
+    }
+    // If the pre-flight API call itself fails (network?), proceed cautiously
+    logger.warn('assignment', 'Pre-flight check failed, proceeding with accept', preflightError);
+  }
+  // ────────────────────────────────────────────────────────────────────────────
+
   let response;
   try {
     response = await api.post(`/api/v1/assignment-offers/${offerId}/accept`, {});
   } catch (error: any) {
-    if (error.response?.status === 409) {
-      throw new Error('This offer has already been processed or expired.');
+    const status = error.response?.status;
+    const msg = error.response?.data?.message || error.response?.data?.error || '';
+
+    if (msg) {
+      throw new Error(msg);
     }
-    throw error;
+
+    if (status === 409) {
+      throw new Error('This offer is no longer available or already assigned.');
+    }
+
+    throw new Error('Failed to accept offer');
   }
   const orderId: string | undefined = response.data?.orderId;
 
@@ -346,10 +403,18 @@ export async function declineOffer(offerId: string): Promise<void> {
   try {
     await api.post(`/api/v1/assignment-offers/${offerId}/decline`, {});
   } catch (error: any) {
-    if (error.response?.status === 409) {
-      throw new Error('This offer has already been processed or expired.');
+    const status = error.response?.status;
+    const msg = error.response?.data?.message || error.response?.data?.error || '';
+
+    if (msg) {
+      throw new Error(msg);
     }
-    throw error;
+
+    if (status === 409) {
+      throw new Error('This offer is no longer available or already assigned.');
+    }
+
+    throw new Error('Failed to decline offer');
   }
 }
 
@@ -357,11 +422,36 @@ export async function getAssignmentById(id: string): Promise<Assignment | undefi
   logger.debug('assignment', 'Fetching assignment by id', { id });
   try {
     return await fetchOrderAsAssignment(id);
-  } catch (e) {
+  } catch (e: any) {
     logger.warn('assignment', `Failed to fetch order ${id} (may be unaccepted offer), falling back to offers list`, e);
+    const isForbidden = e?.response?.status === 403;
     try {
       const allAssignments = await getAssignments();
-      return allAssignments.find((a) => a.id === id);
+      const found = allAssignments.find((a) => a.id === id);
+      if (found) return found;
+
+      if (isForbidden) {
+        return {
+          id,
+          code: 'N/A',
+          type: 'other',
+          status: 'cancelled',
+          assignedDriverId: 'another-driver',
+          customer: {
+            name: 'N/A',
+            phone: 'N/A',
+            address: 'Order reassigned to another driver',
+            location: { latitude: 0, longitude: 0 },
+          },
+          distanceKm: 0,
+          etaMinutes: 0,
+          itemCount: 0,
+          totalAmount: 0,
+          codAmount: 0,
+          createdAt: new Date().toISOString(),
+        };
+      }
+      return undefined;
     } catch (fallbackError) {
       logger.warn('assignment', `Fallback to getAssignments failed`, fallbackError);
       return undefined;

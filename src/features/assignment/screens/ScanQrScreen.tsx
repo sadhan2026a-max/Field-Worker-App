@@ -110,9 +110,12 @@ export function ScanQrScreen() {
       refetchAssignments();
       router.replace({ pathname: '/assignment/[id]', params: { id: result.orderId } });
     } catch (e: any) {
-      const message = e?.response?.status === 409
-        ? 'This order has already been assigned to another driver.'
-        : 'Failed to assign this order. Please try again.';
+      let message = e?.response?.data?.message || e?.response?.data?.error;
+      if (!message) {
+        message = e?.response?.status === 409
+          ? 'This order is no longer available or already assigned.'
+          : 'Failed to assign this order. Please try again.';
+      }
       Toast.show({ type: 'error', text1: message });
       resetToScanning();
     }

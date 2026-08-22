@@ -14,7 +14,7 @@ import { selectDriver, selectTenant, toggleAvailability, fetchTenantThunk } from
 import { spacing, FontFamily, typography, useTheme } from '@/core/theme';
 import { useAssignments, useWorkspaceSummary } from '@/hooks/useAssignments';
 import { fetchNotifications, selectUnreadCount } from '@/features/notification/redux/notificationSlice';
-import { useIsFocused } from '@react-navigation/native';
+import { useIsFocused, useFocusEffect } from '@react-navigation/native';
 import { useEffect } from 'react';
 import { Assignment } from '@/features/assignment/types/Assignment';
 
@@ -142,8 +142,61 @@ export function WorkspaceScreen() {
     dispatch(fetchTenantThunk());
   }, [dispatch]);
 
+
+
   const [refreshing, setRefreshing] = useState(false);
   const [isTogglingAvailability, setIsTogglingAvailability] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  const previousPendingIds = React.useRef<string[]>([]);
+  const previousActiveIds = React.useRef<string[]>([]);
+
+  useEffect(() => {
+    if (allAssignments) {
+      const currentPendingIds = allAssignments
+        .filter(a => a.status === 'pending')
+        .map(a => a.id);
+
+      if (previousPendingIds.current.length > 0) {
+        const allCurrentIds = new Set(allAssignments.map(a => a.id));
+        const missedIds = previousPendingIds.current.filter(id => !allCurrentIds.has(id));
+
+        if (missedIds.length > 0) {
+          Toast.show({
+            type: 'error',
+            text1: 'Sorry! You missed this order',
+          });
+        }
+      }
+
+      previousPendingIds.current = currentPendingIds;
+
+      const currentActiveIds = allAssignments
+        .filter(a => ['accepted', 'en_route', 'in_progress'].includes(a.status))
+        .map(a => a.id);
+
+      if (previousActiveIds.current.length > 0) {
+        const allCurrentIds = new Set(allAssignments.map(a => a.id));
+        const cancelledIds = previousActiveIds.current.filter(id => !allCurrentIds.has(id));
+
+        if (cancelledIds.length > 0) {
+          Toast.show({
+            type: 'error',
+            text1: 'Order Cancelled',
+            text2: 'An active order was removed or cancelled.',
+          });
+        }
+      }
+
+      previousActiveIds.current = currentActiveIds;
+    }
+  }, [allAssignments]);
+
+  useEffect(() => {
+    if (!isSummaryLoading && !isAssignmentsLoading) {
+      setIsInitialLoad(false);
+    }
+  }, [isSummaryLoading, isAssignmentsLoading]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -199,7 +252,7 @@ export function WorkspaceScreen() {
           unreadCount={unreadCount}
           onToggleAvailability={() => {
             const hasActiveOrders = allAssignments?.some(a => activeStatuses.includes(a.status));
-            
+
             if (isAvailable && hasActiveOrders) {
               Toast.show({
                 type: 'error',
@@ -227,7 +280,7 @@ export function WorkspaceScreen() {
           }}
         />
 
-        {(isSummaryLoading || isAssignmentsLoading || refreshing) ? (
+        {isInitialLoad ? (
           <DashboardSkeleton colors={colors} styles={styles} />
         ) : (
           <>

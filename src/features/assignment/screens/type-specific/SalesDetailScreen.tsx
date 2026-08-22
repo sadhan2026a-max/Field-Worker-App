@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, ScrollView, Platform } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import React, { useState, useRef } from 'react';
+import { View, Text, StyleSheet, TextInput, ScrollView, Platform, Pressable } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { safeRouter } from '@/shared/utils/navigation';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
@@ -10,7 +12,7 @@ import { spacing, typography, colors, useTheme } from '@/core/theme';
 import { useAssignment, useCompleteAssignment } from '@/features/assignment/hooks/useAssignments';
 import { saveSalesDetail } from '@/features/assignment/api/assignmentService';
 import { SalesOutcome } from '@/features/assignment/types/Assignment';
-import { useAppSelector } from '@/store/hooks';
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { selectCompletionRequirements } from '@/features/assignment/redux/assignmentSlice';
 
 export function SalesDetailScreen() {
@@ -22,9 +24,63 @@ export function SalesDetailScreen() {
   const reqs = assignment ? completionRequirements?.[assignment.type.toLowerCase()] : null;
   const requiresSalesOutcome = reqs ? reqs.requiresSalesOutcome : true; // Fallback
 
-  const [meetingNotes, setMeetingNotes] = useState('');
-  const [outcome, setOutcome] = useState<SalesOutcome | ''>('');
-  const [followUpDate, setFollowUpDate] = useState(''); // Simplified to string for now
+  const dispatch = useAppDispatch();
+  const [meetingNotes, setMeetingNotes] = useState(assignment?.salesDetail?.meetingNotes || '');
+  const [outcome, setOutcome] = useState<SalesOutcome | ''>(assignment?.salesDetail?.outcome || '');
+  const initialDate = assignment?.salesDetail?.followUpDate || '';
+  const initialDisplayDate = initialDate.includes('-') && initialDate.split('-')[0].length === 4
+    ? `${initialDate.split('-')[2]}-${initialDate.split('-')[1]}-${initialDate.split('-')[0]}`
+    : initialDate;
+  const [followUpDate, setFollowUpDate] = useState(initialDisplayDate);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      const day = String(selectedDate.getDate()).padStart(2, '0');
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const year = selectedDate.getFullYear();
+      setFollowUpDate(`${day}-${month}-${year}`);
+    }
+  };
+
+  const getParsedDate = (val: string) => {
+    if (!val || val.length !== 10) return new Date();
+    const parts = val.split('-');
+    if (parts.length === 3) {
+      return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+    }
+    return new Date();
+  };
+
+  const handleDateTextChange = (text: string) => {
+    let cleaned = text.replace(/\D/g, '');
+    let formatted = '';
+    if (cleaned.length > 0) formatted += cleaned.substring(0, 2);
+    if (cleaned.length > 2) formatted += '-' + cleaned.substring(2, 4);
+    if (cleaned.length > 4) formatted += '-' + cleaned.substring(4, 8);
+    setFollowUpDate(formatted);
+  };
+
+  React.useEffect(() => {
+    if (!assignment) return;
+    const timeout = setTimeout(() => {
+      dispatch({
+        type: 'assignment/addAssignment',
+        payload: {
+          ...assignment,
+          salesDetail: {
+            ...assignment.salesDetail,
+            meetingNotes,
+            outcome: outcome || undefined,
+            followUpDate: followUpDate.length === 10 ? `${followUpDate.split('-')[2]}-${followUpDate.split('-')[1]}-${followUpDate.split('-')[0]}` : followUpDate,
+          }
+        }
+      });
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [meetingNotes, outcome, followUpDate]);
 
   const outcomes: { label: string; value: SalesOutcome }[] = [
     { label: 'Interested', value: 'Interested' },
@@ -40,10 +96,15 @@ export function SalesDetailScreen() {
       if (outcome === 'FollowUpNeeded' && !followUpDate) return;
     }
 
+    let formattedDateForBackend = followUpDate;
+    if (followUpDate && outcome === 'FollowUpNeeded' && followUpDate.length === 10) {
+      formattedDateForBackend = `${followUpDate.split('-')[2]}-${followUpDate.split('-')[1]}-${followUpDate.split('-')[0]}`;
+    }
+
     await saveSalesDetail(id as string, {
       meetingNotes,
       outcome: outcome as SalesOutcome,
-      followUpDate: outcome === 'FollowUpNeeded' ? followUpDate : undefined
+      followUpDate: outcome === 'FollowUpNeeded' ? formattedDateForBackend : undefined
     });
 
     // Sales skips proof/payment entirely
@@ -51,20 +112,30 @@ export function SalesDetailScreen() {
   };
 
   const isValidDate = (dateString: string) => {
-    const regex = /^\d{4}-\d{2}-\d{2}$/;
+    const regex = /^\d{2}-\d{2}-\d{4}$/;
     if (!regex.test(dateString)) return false;
-    const date = new Date(dateString);
-    return date instanceof Date && !isNaN(date.getTime());
+    const parts = dateString.split('-');
+    const d = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    const y = parseInt(parts[2], 10);
+    if (m < 1 || m > 12 || d < 1 || d > 31 || y < 1900 || y > 2100) return false;
+    return true;
   };
 
-  const isFormValid = requiresSalesOutcome 
+  const isFormValid = requiresSalesOutcome
     ? (meetingNotes.length > 0 && outcome !== '' && (outcome !== 'FollowUpNeeded' || (followUpDate.length > 0 && isValidDate(followUpDate))))
     : true;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Sales Visit</Text>
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScrollView ref={scrollViewRef} contentContainerStyle={styles.content}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs }}>
+          <Pressable onPress={() => router.back()} style={{ marginRight: spacing.sm, marginLeft: -8, padding: spacing.xs }}>
+            <MaterialIcons name="arrow-back" size={28} color={colors.textPrimary} />
+          </Pressable>
+          <Text style={[styles.title, { marginBottom: 0 }]}>Sales Visit</Text>
+        </View>
         <Text style={styles.subtitle}>Order #{assignment?.code}</Text>
 
         <Text style={styles.label}>Meeting Notes <Text style={styles.asterisk}>*</Text></Text>
@@ -95,26 +166,48 @@ export function SalesDetailScreen() {
         {outcome === 'FollowUpNeeded' && (
           <View>
             <Text style={styles.label}>Follow-up Date <Text style={styles.asterisk}>*</Text></Text>
-            <TextInput
-              style={[styles.input, followUpDate.length > 0 && !isValidDate(followUpDate) && styles.inputError]}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={colors.textSecondary}
-              value={followUpDate}
-              onChangeText={setFollowUpDate}
-              keyboardType="number-pad"
-            />
+            <View style={[styles.input, { flexDirection: 'row', alignItems: 'center', padding: 0 }]}>
+              <TextInput
+                style={[
+                  { flex: 1, padding: spacing.md, color: colors.textPrimary },
+                  followUpDate.length > 0 && !isValidDate(followUpDate) && styles.inputError
+                ]}
+                placeholder="DD-MM-YYYY"
+                placeholderTextColor={colors.textSecondary}
+                value={followUpDate}
+                onChangeText={handleDateTextChange}
+                keyboardType="number-pad"
+                maxLength={10}
+                onFocus={() => {
+                  setTimeout(() => {
+                    scrollViewRef.current?.scrollToEnd({ animated: true });
+                  }, 250);
+                }}
+              />
+              <Pressable onPress={() => setShowDatePicker(true)} style={{ padding: spacing.md }}>
+                <MaterialIcons name="calendar-today" size={24} color={colors.textSecondary} />
+              </Pressable>
+            </View>
             {followUpDate.length > 0 && !isValidDate(followUpDate) && (
-              <Text style={styles.errorText}>Please enter a valid date in YYYY-MM-DD format.</Text>
+              <Text style={styles.errorText}>Please enter a valid date in DD-MM-YYYY format.</Text>
+            )}
+            {showDatePicker && (
+              <DateTimePicker
+                value={getParsedDate(followUpDate)}
+                mode="date"
+                display="default"
+                onChange={handleDateChange}
+              />
             )}
           </View>
         )}
       </ScrollView>
 
       <ScreenFooter>
-        <Button 
-          label="Review Job" 
-          onPress={handleComplete} 
-          disabled={!isFormValid} 
+        <Button
+          label="Review Job"
+          onPress={handleComplete}
+          disabled={!isFormValid}
         />
       </ScreenFooter>
     </SafeAreaView>
@@ -123,13 +216,19 @@ export function SalesDetailScreen() {
 
 const useStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, paddingBottom: 100 },
-  title: { ...typography.h2,
-    color: colors.textPrimary, marginBottom: spacing.xs },
-  subtitle: { ...typography.body,
-    color: colors.textSecondary, marginBottom: spacing.xl },
-  label: { ...typography.h3,
-    color: colors.textPrimary, marginBottom: spacing.sm, marginTop: spacing.md },
+  content: { padding: spacing.lg, paddingBottom: 265 },
+  title: {
+    ...typography.h2,
+    color: colors.textPrimary, marginBottom: spacing.xs
+  },
+  subtitle: {
+    ...typography.body,
+    color: colors.textSecondary, marginBottom: spacing.xl
+  },
+  label: {
+    ...typography.h3,
+    color: colors.textPrimary, marginBottom: spacing.sm, marginTop: spacing.md
+  },
   outcomesContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   outcomeButton: { alignSelf: 'flex-start' },
   input: {

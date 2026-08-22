@@ -40,6 +40,9 @@
         "ACCESS_BACKGROUND_LOCATION",
         "CAMERA"
       ],
+      "notification": {
+        "defaultChannel": "default"
+      },
       "config": {
         "googleMaps": {
           "apiKey": "YOUR_DUMMY_API_KEY_HERE_REPLACE_LATER"

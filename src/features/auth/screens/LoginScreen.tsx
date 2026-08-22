@@ -1,4 +1,4 @@
-import React, { ReactNode, useState } from 'react';
+import React, { ReactNode, useState, useEffect, useRef } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Redirect, useRouter } from 'expo-router';
 import {
@@ -12,8 +12,11 @@ import {
   View,
   SafeAreaView,
   Image,
+  Animated,
+  Easing
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 
 import { Button } from '@/components/ui/Button';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -32,12 +35,31 @@ interface CustomInputProps extends TextInputProps {
   rightElement?: ReactNode;
   rightLabel?: ReactNode;
   error?: string;
+  submitCount?: number;
+  disableShake?: boolean;
 }
 
-function CustomInput({ label, leftIcon, rightElement, rightLabel, error, style, ...rest }: CustomInputProps) {
+function CustomInput({ label, leftIcon, rightElement, rightLabel, error, submitCount, disableShake, style, ...rest }: CustomInputProps) {
   const { colors } = useTheme();
   const styles = React.useMemo(() => useStyles(colors), [colors]);
   const [isFocused, setIsFocused] = useState(false);
+  
+  const shakeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (error && !disableShake) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      
+      shakeAnim.setValue(0);
+      Animated.sequence([
+        Animated.timing(shakeAnim, { toValue: -15, duration: 50, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 15, duration: 50, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: -15, duration: 50, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 15, duration: 50, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true })
+      ]).start();
+    }
+  }, [error, submitCount, disableShake]);
 
   return (
     <View style={styles.inputWrapper}>
@@ -45,11 +67,12 @@ function CustomInput({ label, leftIcon, rightElement, rightLabel, error, style, 
         <Text style={styles.inputLabel}>{label}</Text>
         {rightLabel && <View style={styles.rightLabelContainer}>{rightLabel}</View>}
       </View>
-      <View
+      <Animated.View
         style={[
           styles.inputFieldContainer,
           isFocused && styles.inputFieldFocused,
-          error ? styles.inputFieldError : null
+          error ? styles.inputFieldError : null,
+          !disableShake ? { transform: [{ translateX: shakeAnim }] } : null
         ]}
       >
         {leftIcon && <View style={styles.leftIconContainer}>{leftIcon}</View>}
@@ -61,7 +84,7 @@ function CustomInput({ label, leftIcon, rightElement, rightLabel, error, style, 
           {...rest}
         />
         {rightElement && <View style={styles.rightElementContainer}>{rightElement}</View>}
-      </View>
+      </Animated.View>
       {error ? <Text style={styles.inputErrorText}>{error}</Text> : null}
     </View>
   );
@@ -82,7 +105,8 @@ export function LoginScreen() {
   const {
     control,
     handleSubmit,
-    formState: { errors },
+    setError,
+    formState: { errors, submitCount },
   } = useForm<LoginForm>({ defaultValues: { phone: '', pin: '', password: '' } });
 
   if (driver) {
@@ -100,8 +124,18 @@ export function LoginScreen() {
         pin: loginMode === 'pin' ? values.pin : undefined,
         password: loginMode === 'password' ? values.password : undefined
       })).unwrap();
-    } catch (_err) {
-      // Error is already stored in Redux state by loginThunk.rejected
+    } catch (err: any) {
+      const errorMsg = String(err);
+      if (errorMsg === 'Account does not exist.') {
+        setError('phone', { type: 'manual', message: errorMsg });
+      } else if (errorMsg.includes('Incorrect') || errorMsg.includes('credentials') || errorMsg.includes('password')) {
+        setError(loginMode, { 
+          type: 'manual', 
+          message: loginMode === 'pin' ? 'Incorrect PIN.' : 'Incorrect password.' 
+        });
+      } else {
+        setError(loginMode, { type: 'manual', message: errorMsg });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -141,6 +175,8 @@ export function LoginScreen() {
                   value={field.value}
                   onChangeText={(text: string) => field.onChange(text.replace(/[^0-9]/g, ''))}
                   error={errors.phone?.message}
+                  submitCount={submitCount}
+                  disableShake={true}
                   leftIcon={<MaterialIcons name="phone" size={20} color={colors.textSecondary} />}
                 />
               )}
@@ -161,9 +197,11 @@ export function LoginScreen() {
                     placeholder="Enter your PIN"
                     secureTextEntry={!showPassword}
                     keyboardType="number-pad"
+                    maxLength={6}
                     value={field.value}
-                    onChangeText={field.onChange}
+                    onChangeText={(text: string) => field.onChange(text.replace(/[^0-9]/g, ''))}
                     error={errors.pin?.message}
+                    submitCount={submitCount}
                     leftIcon={<MaterialIcons name="lock" size={20} color={colors.textSecondary} />}
                     rightElement={
                       <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
@@ -192,6 +230,7 @@ export function LoginScreen() {
                     value={field.value}
                     onChangeText={field.onChange}
                     error={errors.password?.message}
+                    submitCount={submitCount}
                     leftIcon={<MaterialIcons name="lock" size={20} color={colors.textSecondary} />}
                     rightLabel={
                       <Pressable onPress={() => router.push('/forgot-password')}>
@@ -217,14 +256,6 @@ export function LoginScreen() {
                 {loginMode === 'pin' ? 'Login with Password instead' : 'Login with PIN instead'}
               </Text>
             </Pressable>
-
-            {/* Login Error */}
-            {authError ? (
-              <View style={styles.loginErrorContainer}>
-                <MaterialIcons name="error-outline" size={18} color={colors.danger} />
-                <Text style={styles.loginErrorText}>{authError}</Text>
-              </View>
-            ) : null}
 
             {/* Submit button */}
             <Button
@@ -333,7 +364,6 @@ const useStyles = (colors: any) => StyleSheet.create({
   },
   inputFieldError: {
     borderColor: colors.danger,
-    backgroundColor: colors.danger + '15',
   },
   leftIconContainer: {
     justifyContent: 'center',

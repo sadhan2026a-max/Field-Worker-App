@@ -289,15 +289,15 @@ const assignmentSlice = createSlice({
         // any offer that is locally 'pending' but missing from the payload has been
         // cancelled, withdrawn, or assigned to someone else. We must remove it.
         const requestedStatus = action.meta.arg;
-        if (!requestedStatus || requestedStatus === 'pending') {
-          const fetchedIds = new Set(action.payload.map((a) => a.id));
-          state.items = state.items.filter((item) => {
-            if (item.status === 'pending' && !fetchedIds.has(item.id)) {
-              return false;
-            }
-            return true;
-          });
-        }
+        const targetStatus = requestedStatus || 'pending';
+        
+        const fetchedIds = new Set(action.payload.map((a) => a.id));
+        state.items = state.items.filter((item) => {
+          if (item.status === targetStatus && !fetchedIds.has(item.id)) {
+            return false;
+          }
+          return true;
+        });
 
         for (const item of action.payload) {
           upsertAssignment(state, item);
@@ -372,6 +372,10 @@ const assignmentSlice = createSlice({
       .addCase(acceptOffer.rejected, (state, action) => {
         state.isMutating = false;
         state.error = action.error.message ?? 'Failed to accept offer';
+        if (state.error.includes('processed or expired')) {
+          const offerId = action.meta.arg;
+          state.items = state.items.filter((i) => i.offerId !== offerId && i.id !== offerId);
+        }
       })
       .addCase(declineOffer.pending, (state) => {
         state.isMutating = true;
@@ -379,11 +383,16 @@ const assignmentSlice = createSlice({
       })
       .addCase(declineOffer.fulfilled, (state, action) => {
         state.isMutating = false;
-        state.items = state.items.filter((i) => i.offerId !== action.payload);
+        const targetId = action.payload;
+        state.items = state.items.filter((i) => i.offerId !== targetId && i.id !== targetId);
       })
       .addCase(declineOffer.rejected, (state, action) => {
         state.isMutating = false;
         state.error = action.error.message ?? 'Failed to decline offer';
+        if (state.error.includes('processed or expired')) {
+          const targetId = action.meta.arg;
+          state.items = state.items.filter((i) => i.offerId !== targetId && i.id !== targetId);
+        }
       })
       .addCase(fetchOrderCompletionRequirements.fulfilled, (state, action) => {
         const reqMap: Record<string, OrderCompletionRequirementDto> = {};

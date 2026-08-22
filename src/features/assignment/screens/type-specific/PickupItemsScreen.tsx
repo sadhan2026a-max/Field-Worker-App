@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
+import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { ScreenFooter } from '@/components/ui/ScreenFooter';
@@ -58,8 +58,14 @@ export function PickupItemsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <Stack.Screen options={{ headerShown: false }} />
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Pickup Items</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs }}>
+          <Pressable onPress={() => router.back()} style={{ marginRight: spacing.sm, marginLeft: -8, padding: spacing.xs }}>
+            <MaterialIcons name="arrow-back" size={28} color={colors.textPrimary} />
+          </Pressable>
+          <Text style={[styles.title, { marginBottom: 0 }]}>Pickup Items</Text>
+        </View>
         <Text style={styles.subtitle}>Confirm items to collect for order #{assignment?.code}</Text>
 
         {assignment?.items && assignment.items.length > 0 ? (

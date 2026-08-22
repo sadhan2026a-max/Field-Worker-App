@@ -81,8 +81,8 @@ export function NextDeliveryCard({ assignment, onStart }: NextDeliveryCardProps)
     try {
       await acceptOffer.mutateAsync(assignment.offerId ?? assignment.id);
       Toast.show({ type: 'success', text1: 'Offer Accepted' });
-    } catch (error) {
-      Toast.show({ type: 'error', text1: 'Failed to accept offer' });
+    } catch (error: any) {
+      Toast.show({ type: 'info', text1: error?.message || 'Failed to accept offer' });
     } finally {
       setActionType(null);
     }
@@ -99,8 +99,8 @@ export function NextDeliveryCard({ assignment, onStart }: NextDeliveryCardProps)
           try {
             await declineOffer.mutateAsync(assignment.offerId ?? assignment.id);
             Toast.show({ type: 'success', text1: 'Offer Declined' });
-          } catch (error) {
-            Toast.show({ type: 'error', text1: 'Failed to decline offer' });
+          } catch (error: any) {
+            Toast.show({ type: 'info', text1: error?.message || 'Failed to decline offer' });
           } finally {
             setActionType(null);
           }

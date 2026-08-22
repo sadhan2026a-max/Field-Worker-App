@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert, Pressable } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { safeRouter } from '@/shared/utils/navigation';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
@@ -13,31 +14,47 @@ import { getChecklistTemplates, saveChecklist } from '@/features/assignment/api/
 import { ChecklistItem, ChecklistTemplateItem } from '@/features/assignment/types/Assignment';
 import { DynamicField } from '@/features/assignment/components/DynamicField';
 import { validateChecklistItem } from '@/features/assignment/utils/validation';
+import { useAppDispatch } from '@/store/hooks';
 
 export function ChecklistScreen() {
   const { colors } = useTheme();
   const styles = React.useMemo(() => useStyles(colors), [colors]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: assignment, isLoading: isAssignmentLoading } = useAssignment(id as string);
-  
+
   const [templates, setTemplates] = useState<ChecklistTemplateItem[]>([]);
   const [items, setItems] = useState<Record<string, ChecklistItem>>({});
-  
+  const dispatch = useAppDispatch();
+
+  useEffect(() => {
+    if (!assignment || Object.keys(items).length === 0) return;
+    const timeout = setTimeout(() => {
+      dispatch({
+        type: 'assignment/addAssignment',
+        payload: {
+          ...assignment,
+          checklist: Object.values(items)
+        }
+      });
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [items]);
+
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchTemplates = async () => {
     if (!assignment?.type) return;
-    
+
     setIsLoading(true);
     setError(null);
-    
+
     try {
       // Fetch templates based on assignment type (e.g., 'delivery' -> 'Delivery')
       // Ensure the first letter is capitalized to match backend enums
       const typeStr = assignment.type.charAt(0).toUpperCase() + assignment.type.slice(1);
-      
+
       let data: ChecklistTemplateItem[] = [];
       try {
         data = await getChecklistTemplates(typeStr);
@@ -58,9 +75,9 @@ export function ChecklistScreen() {
           throw templateErr;
         }
       }
-      
+
       setTemplates(data);
-      
+
       // Initialize items state
       const initialItems: Record<string, ChecklistItem> = {};
       data.forEach(t => {
@@ -79,7 +96,7 @@ export function ChecklistScreen() {
         };
       });
       setItems(initialItems);
-      
+
     } catch (err) {
       setError('Failed to load checklist. Please check your connection and try again.');
     } finally {
@@ -88,10 +105,10 @@ export function ChecklistScreen() {
   };
 
   useEffect(() => {
-    if (!isAssignmentLoading && assignment) {
+    if (!isAssignmentLoading && assignment && Object.keys(items).length === 0) {
       fetchTemplates();
     }
-  }, [isAssignmentLoading, assignment]);
+  }, [isAssignmentLoading, assignment?.id]);
 
   const updateItemValue = (templateId: string, val: any) => {
     setItems((prev) => ({
@@ -100,7 +117,7 @@ export function ChecklistScreen() {
         ...prev[templateId],
         value: val,
         isChecked: typeof val === 'boolean' ? val : !!val, // fallback for legacy
-        checkedAt: val ? new Date().toISOString() : null,
+        checkedAt: (val !== null && val !== undefined && val !== '') ? new Date().toISOString() : null,
       }
     }));
   };
@@ -136,12 +153,12 @@ export function ChecklistScreen() {
     try {
       const itemsArray = Object.values(items);
       await saveChecklist(id as string, itemsArray);
-      
+
       Toast.show({ type: 'success', text1: 'Checklist saved successfully' });
-      
+
       // Navigate to the next logical step based on assignment type
       safeRouter.push(`/assignment/${id}/proof`);
-      
+
     } catch (err) {
       Alert.alert('Error', 'Failed to save checklist. Please try again.');
     } finally {
@@ -169,8 +186,14 @@ export function ChecklistScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <Stack.Screen options={{ headerShown: false }} />
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Checklist</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs }}>
+          <Pressable onPress={() => router.back()} style={{ marginRight: spacing.sm, marginLeft: -8, padding: spacing.xs }}>
+            <MaterialIcons name="arrow-back" size={28} color={colors.textPrimary} />
+          </Pressable>
+          <Text style={[styles.title, { marginBottom: 0 }]}>Checklist</Text>
+        </View>
         <Text style={styles.subtitle}>Order #{assignment?.code}</Text>
 
         {templates.length === 0 ? (
@@ -191,11 +214,11 @@ export function ChecklistScreen() {
             ))
         )}
       </ScrollView>
-      
+
       <ScreenFooter>
-        <Button 
-          label={templates.length === 0 ? "Continue" : "Submit Checklist"} 
-          onPress={handleContinue} 
+        <Button
+          label={templates.length === 0 ? "Continue" : "Submit Checklist"}
+          onPress={handleContinue}
           loading={isSubmitting}
           disabled={isSubmitting}
         />
@@ -205,28 +228,28 @@ export function ChecklistScreen() {
 }
 
 const useStyles = (colors: any) => StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: colors.background 
+  container: {
+    flex: 1,
+    backgroundColor: colors.background
   },
   center: {
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.xl,
   },
-  content: { 
-    padding: spacing.lg, 
-    paddingBottom: 100 
+  content: {
+    padding: spacing.lg,
+    paddingBottom: 100
   },
-  title: { 
-    ...typography.h2, 
+  title: {
+    ...typography.h2,
     color: colors.textPrimary,
-    marginBottom: spacing.xs 
+    marginBottom: spacing.xs
   },
-  subtitle: { 
-    ...typography.body, 
-    color: colors.textSecondary, 
-    marginBottom: spacing.lg 
+  subtitle: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginBottom: spacing.lg
   },
   loadingText: {
     ...typography.body,

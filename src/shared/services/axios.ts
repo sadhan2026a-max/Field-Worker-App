@@ -101,9 +101,9 @@ api.interceptors.response.use(
     return response;
   },
   async (error: AxiosError) => {
-    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean; _suppressLog?: boolean };
 
-    if (__DEV__) {
+    if (__DEV__ && !originalRequest?._suppressLog) {
       const failedUrl = `${originalRequest?.baseURL ?? ''}${originalRequest?.url ?? ''}`;
       const status = error.response?.status ?? 'NETWORK_ERROR';
       const method = (originalRequest?.method ?? 'get').toUpperCase();

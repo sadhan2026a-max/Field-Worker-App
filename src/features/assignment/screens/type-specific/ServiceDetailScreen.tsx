@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, ScrollView, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { View, Text, StyleSheet, TextInput, ScrollView, KeyboardAvoidingView, Platform, Keyboard, Pressable } from 'react-native';
+import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { safeRouter } from '@/shared/utils/navigation';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
@@ -37,6 +37,25 @@ export function ServiceDetailScreen() {
       }
     }
   }, [assignment]);
+
+  React.useEffect(() => {
+    if (!assignment) return;
+    const timeout = setTimeout(() => {
+      dispatch({
+        type: 'assignment/addAssignment',
+        payload: {
+          ...assignment,
+          serviceDetail: {
+            ...assignment.serviceDetail,
+            diagnosisNotes,
+            resolutionNotes,
+            partsUsed: parts.length > 0 ? parts : undefined,
+          }
+        }
+      });
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [diagnosisNotes, resolutionNotes, parts]);
 
   const [newPartName, setNewPartName] = useState('');
   const [newPartQty, setNewPartQty] = useState('');
@@ -101,17 +120,23 @@ export function ServiceDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <Stack.Screen options={{ headerShown: false }} />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 80}
       >
-        <ScrollView 
+        <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={[styles.content, { paddingBottom: isKeyboardVisible ? spacing.lg : 100 }]} 
+          contentContainerStyle={[styles.content, { paddingBottom: isKeyboardVisible ? spacing.lg : 100 }]}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.title}>Service Visit</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs }}>
+            <Pressable onPress={() => router.back()} style={{ marginRight: spacing.sm, marginLeft: -8, padding: spacing.xs }}>
+              <MaterialIcons name="arrow-back" size={28} color={colors.textPrimary} />
+            </Pressable>
+            <Text style={[styles.title, { marginBottom: 0 }]}>Service Visit</Text>
+          </View>
           <Text style={styles.subtitle}>Order #{assignment?.code}</Text>
 
           <Text style={styles.sectionTitle}>1. Diagnosis</Text>

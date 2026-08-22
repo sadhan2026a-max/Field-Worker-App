@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { safeRouter } from '@/shared/utils/navigation';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
@@ -22,8 +23,14 @@ export function DeliverProductsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <Stack.Screen options={{ headerShown: false }} />
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Deliver Products</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs }}>
+          <Pressable onPress={() => router.back()} style={{ marginRight: spacing.sm, marginLeft: -8, padding: spacing.xs }}>
+            <MaterialIcons name="arrow-back" size={28} color={colors.textPrimary} />
+          </Pressable>
+          <Text style={[styles.title, { marginBottom: 0 }]}>Deliver Products</Text>
+        </View>
         <Text style={styles.subtitle}>Confirm items to handover for order #{assignment?.code}</Text>
 
         {assignment?.items && assignment.items.length > 0 ? (
@@ -66,15 +73,21 @@ export function DeliverProductsScreen() {
 const useStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: 100 },
-  title: { ...typography.h2,
-    color: colors.textPrimary, marginBottom: spacing.sm },
-  subtitle: { ...typography.body,
-    color: colors.textSecondary, marginBottom: spacing.xl },
+  title: {
+    ...typography.h2,
+    color: colors.textPrimary, marginBottom: spacing.sm
+  },
+  subtitle: {
+    ...typography.body,
+    color: colors.textSecondary, marginBottom: spacing.xl
+  },
   card: { padding: spacing.md, backgroundColor: colors.surface, borderRadius: 8, borderWidth: 1, borderColor: colors.border },
   emptyCard: { padding: spacing.md, backgroundColor: colors.background, borderRadius: 8, borderWidth: 1, borderColor: colors.border, borderStyle: 'dashed' },
   itemText: { ...typography.bodyMedium },
-  emptyText: { ...typography.body,
-    color: colors.textSecondary, fontStyle: 'italic', textAlign: 'center' },
+  emptyText: {
+    ...typography.body,
+    color: colors.textSecondary, fontStyle: 'italic', textAlign: 'center'
+  },
   itemsList: { gap: spacing.sm },
   itemCard: {
     flexDirection: 'row',
@@ -87,12 +100,18 @@ const useStyles = (colors: any) => StyleSheet.create({
     borderColor: colors.border,
   },
   itemInfo: { flex: 1, paddingRight: spacing.md },
-  itemDescription: { ...typography.bodyMedium,
-    color: colors.textPrimary, marginBottom: 2 },
-  itemMeta: { ...typography.caption,
-    color: colors.textSecondary },
-  itemPrice: { ...typography.bodyMedium,
-    color: colors.textPrimary, fontFamily: typography.h2.fontFamily },
+  itemDescription: {
+    ...typography.bodyMedium,
+    color: colors.textPrimary, marginBottom: 2
+  },
+  itemMeta: {
+    ...typography.caption,
+    color: colors.textSecondary
+  },
+  itemPrice: {
+    ...typography.bodyMedium,
+    color: colors.textPrimary, fontFamily: typography.h2.fontFamily
+  },
   summaryCard: {
     marginTop: spacing.xl,
     padding: spacing.lg,
@@ -102,8 +121,12 @@ const useStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  summaryLabel: { ...typography.bodyMedium,
-    color: colors.primary, fontWeight: 'bold' },
-  summaryValue: { ...typography.h2,
-    color: colors.primary },
+  summaryLabel: {
+    ...typography.bodyMedium,
+    color: colors.primary, fontWeight: 'bold'
+  },
+  summaryValue: {
+    ...typography.h2,
+    color: colors.primary
+  },
 });
