@@ -6,8 +6,9 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Skeleton } from '@/shared/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { spacing, typography, palette, FontFamily, FontSize, useTheme } from '@/core/theme';
-import { useAssignments } from '@/hooks/useAssignments';
+import { useAssignments, useWorkspaceSummary } from '@/hooks/useAssignments';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { selectDriver } from '@/features/auth/redux/authSlice';
 import { fetchAssignments } from '@/features/assignment/redux/assignmentSlice';
@@ -48,6 +49,7 @@ export function AssignmentsScreen() {
   const driver = useAppSelector(selectDriver);
   const dispatch = useAppDispatch();
   const { data: assignments, isLoading, refetch } = useAssignments();
+  const { data: summary, refetch: refetchSummary } = useWorkspaceSummary();
   const currentLocation = useCurrentLocation();
   const params = useLocalSearchParams<{ tab?: 'all' | 'pending' | 'completed' }>();
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'completed'>(params.tab || 'all');
@@ -66,6 +68,7 @@ export function AssignmentsScreen() {
 
   const onRefresh = async () => {
     await refetch();
+    await refetchSummary();
     if (activeTab === 'completed') {
       await dispatch(fetchAssignments('completed'));
     }
@@ -98,6 +101,8 @@ export function AssignmentsScreen() {
   const completedAssignments = allAssignments.filter(
     (a) => a.status === 'completed'
   );
+
+  const displayCompletedCount = Math.max(summary?.completedCount ?? 0, completedAssignments.length);
 
   const displayedAssignments =
     activeTab === 'all'
@@ -140,7 +145,7 @@ export function AssignmentsScreen() {
           onPress={() => setActiveTab('completed')}
         >
           <Text style={[styles.tabLabel, activeTab === 'completed' && styles.activeTabLabel]}>
-            Completed <Text style={styles.tabCount}>{completedAssignments.length}</Text>
+            Completed <Text style={styles.tabCount}>{displayCompletedCount}</Text>
           </Text>
         </Pressable>
       </View>
@@ -176,9 +181,16 @@ export function AssignmentsScreen() {
         <FlatList
           data={displayedAssignments}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[styles.list, displayedAssignments.length === 0 && { flexGrow: 1, justifyContent: 'center' }]}
           onRefresh={onRefresh}
           refreshing={false}
+          ListEmptyComponent={
+            <EmptyState
+              icon={activeTab === 'completed' ? 'done-all' : 'assignment'}
+              title={activeTab === 'completed' ? 'No Recent Completions' : 'No Assignments'}
+              description={activeTab === 'completed' ? 'Your completed orders for today will appear here. Note: Historical orders are only visible in the web dashboard.' : 'You have no assignments in this category right now.'}
+            />
+          }
           renderItem={({ item }) => (
             <Pressable onPress={() => router.push({ pathname: '/assignment/[id]', params: { id: item.id } })}>
               <Card style={styles.card}>
@@ -197,8 +209,12 @@ export function AssignmentsScreen() {
                 <View style={styles.cardContent}>
                   {/* Top Row */}
                   <View style={styles.cardTopRow}>
-                    <Text style={styles.code} numberOfLines={1} ellipsizeMode="tail">{item.code}</Text>
-                    {item.status !== 'pending' && (
+                    {item.code !== 'N/A' ? (
+                      <Text style={styles.code} numberOfLines={1} ellipsizeMode="tail">{item.code}</Text>
+                    ) : (
+                      <Text style={styles.code} numberOfLines={1} ellipsizeMode="tail">Cancelled Order</Text>
+                    )}
+                    {item.status !== 'pending' && item.code !== 'N/A' && (
                       <View style={styles.typeBadge}>
                         <Text style={styles.typeBadgeText}>{formatAssignmentType(item.type)}</Text>
                       </View>
@@ -208,7 +224,9 @@ export function AssignmentsScreen() {
                   </View>
 
                   {/* Customer Info */}
-                  <Text style={styles.customerName}>{item.customer.name}</Text>
+                  {item.customer.name !== 'N/A' && (
+                    <Text style={styles.customerName}>{item.customer.name}</Text>
+                  )}
                   {item.status !== 'completed' && item.status !== 'cancelled' && (
                     <DistanceDisplay
                       style={styles.distance}
@@ -239,11 +257,13 @@ export function AssignmentsScreen() {
                       );
                     })()}
 
-                    <View style={styles.codContainer}>
-                      <Text style={styles.codLabel}>
-                        COD: ₹{(item.codAmount ?? 0).toLocaleString()}
-                      </Text>
-                    </View>
+                    {item.code !== 'N/A' && (
+                      <View style={styles.codContainer}>
+                        <Text style={styles.codLabel}>
+                          COD: ₹{(item.codAmount ?? 0).toLocaleString()}
+                        </Text>
+                      </View>
+                    )}
                   </View>
                 </View>
               </Card>
@@ -352,6 +372,7 @@ const useStyles = (colors: any) => StyleSheet.create({
   cardContent: {
     flex: 1,
     gap: 2,
+    justifyContent: 'center',
   },
   code: {
     ...typography.caption,

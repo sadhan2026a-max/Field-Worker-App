@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, Pressable, Platform, Modal, ScrollView, Image } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Pressable, Platform, Modal, ScrollView, Image, KeyboardAvoidingView, TouchableOpacity, Keyboard } from 'react-native';
 import { MaterialIcons, Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
@@ -27,6 +27,9 @@ export function DynamicField({ template, item, onChange, onNotesChange }: Dynami
   const [showMultiselect, setShowMultiselect] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [showRemarksModal, setShowRemarksModal] = useState(false);
+  const [tempRemarks, setTempRemarks] = useState(item.notes || '');
+  const remarksInputRef = useRef<TextInput>(null);
   const signaturePadRef = useRef<SignaturePadHandle>(null);
 
   const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
@@ -274,26 +277,19 @@ export function DynamicField({ template, item, onChange, onNotesChange }: Dynami
 
   return (
     <View style={[styles.container, isAnswered && styles.containerChecked]}>
-      <View style={styles.headerRow}>
+      <View style={[styles.headerRow, itemType === 'Checkbox' && { marginBottom: 0, alignItems: 'flex-start' }]}>
         <Text style={styles.label}>
           {template.label}{template.isRequired && <Text style={styles.required}> *</Text>}
         </Text>
 
         {itemType === 'Checkbox' && (
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <Pressable
-              style={[styles.smallToggleButton, answeredYes ? styles.toggleButtonActiveYes : null]}
-              onPress={() => onChange(true)}
-            >
-              <Feather name="check" size={18} color={answeredYes ? "#fff" : colors.textSecondary} />
-            </Pressable>
-            <Pressable
-              style={[styles.smallToggleButton, answeredNo ? styles.toggleButtonActiveNo : null]}
-              onPress={() => onChange(false)}
-            >
-              <Feather name="x" size={18} color={answeredNo ? "#fff" : colors.textSecondary} />
-            </Pressable>
-          </View>
+          <Pressable onPress={() => onChange(!answeredYes)} style={{ marginTop: -2, marginLeft: 12 }}>
+            <MaterialIcons 
+              name={answeredYes ? "check-box" : "check-box-outline-blank"} 
+              size={26} 
+              color={answeredYes ? colors.primary : colors.textSecondary} 
+            />
+          </Pressable>
         )}
       </View>
 
@@ -303,9 +299,75 @@ export function DynamicField({ template, item, onChange, onNotesChange }: Dynami
         </View>
       )}
 
+      <Pressable 
+        onPress={() => { setTempRemarks(item.notes || ''); setShowRemarksModal(true); }} 
+        style={{ marginTop: spacing.sm, flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end' }}
+      >
+        <MaterialIcons name="edit" size={16} color={colors.primary} style={{ marginRight: 4 }} />
+        <Text style={{ ...typography.caption, color: colors.primary, fontWeight: 'bold' }}>
+          {item.notes ? 'Edit remarks' : 'Add remarks'}
+        </Text>
+      </Pressable>
+      
+      {item.notes ? (
+        <Text style={{ ...typography.caption, marginTop: 4, color: colors.textSecondary, fontStyle: 'italic', textAlign: 'right' }}>
+          "{item.notes}"
+        </Text>
+      ) : null}
+
       {!validation.isValid && validation.errorMessage && (
         <Text style={styles.errorText}>{validation.errorMessage}</Text>
       )}
+
+      <Modal 
+        visible={showRemarksModal} 
+        transparent 
+        animationType="fade"
+        onShow={() => setTimeout(() => remarksInputRef.current?.focus(), 100)}
+      >
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
+          style={{ flex: 1 }}
+        >
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }}>
+            <ScrollView 
+              style={{ flex: 1 }} 
+              contentContainerStyle={{ flexGrow: 1 }}
+              keyboardShouldPersistTaps="always"
+            >
+              <Pressable style={{ flex: 1 }} onPress={() => setShowRemarksModal(false)} />
+              
+              <View style={[styles.modalContent, { paddingBottom: 40, width: '100%' }]}>
+                <Text style={styles.modalTitle}>Add Remarks</Text>
+                <TextInput
+                  ref={remarksInputRef}
+                  style={[styles.input, { minHeight: 100, textAlignVertical: 'top' }]}
+                  placeholder="Type your remarks here..."
+                  placeholderTextColor={colors.textSecondary}
+                  value={tempRemarks}
+                  onChangeText={setTempRemarks}
+                  multiline
+                />
+                <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg }}>
+                  <TouchableOpacity activeOpacity={0.7} style={[styles.modalDoneButton, { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }]} onPress={() => {
+                    Keyboard.dismiss();
+                    setShowRemarksModal(false);
+                  }}>
+                    <Text style={[styles.modalDoneText, { color: colors.textPrimary }]}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity activeOpacity={0.7} style={[styles.modalDoneButton, { flex: 1 }]} onPress={() => {
+                    Keyboard.dismiss();
+                    onNotesChange(tempRemarks);
+                    setShowRemarksModal(false);
+                  }}>
+                    <Text style={styles.modalDoneText}>Save</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -313,11 +375,12 @@ export function DynamicField({ template, item, onChange, onNotesChange }: Dynami
 const useStyles = (colors: any) => StyleSheet.create({
   container: {
     backgroundColor: colors.surface,
-    padding: spacing.md,
-    borderRadius: 14,
-    borderWidth: 1.5,
+    padding: spacing.sm,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
     borderColor: colors.border,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   containerChecked: {
     borderColor: colors.primary,
@@ -327,7 +390,7 @@ const useStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: 4,
   },
   label: {
     ...typography.bodyMedium,

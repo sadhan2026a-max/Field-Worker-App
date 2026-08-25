@@ -37,13 +37,13 @@ function upsertAssignment(state: AssignmentState, assignment: Assignment) {
   const index = state.items.findIndex((item) => item.id === assignment.id);
   if (index >= 0) {
     const currentStatus = state.items[index].status;
-    
+
     // Prevent downgrading an active status to 'pending' if the backend returned stale offer data
     let newStatus = assignment.status;
     if (newStatus === 'pending' && currentStatus !== 'pending' && currentStatus !== 'cancelled') {
       newStatus = currentStatus;
     }
-    
+
     // Merge (not replace) so fields the source response doesn't carry — e.g. offerId,
     // only present on the initial offers-list load — survive later partial updates.
     state.items[index] = { ...state.items[index], ...assignment, status: newStatus };
@@ -290,10 +290,21 @@ const assignmentSlice = createSlice({
         // cancelled, withdrawn, or assigned to someone else. We must remove it.
         const requestedStatus = action.meta.arg;
         const targetStatus = requestedStatus || 'pending';
-        
+
         const fetchedIds = new Set(action.payload.map((a) => a.id));
         state.items = state.items.filter((item) => {
           if (item.status === targetStatus && !fetchedIds.has(item.id)) {
+            // The backend /assignments endpoint does not reliably return historical
+            // completed offers. Do not drop locally tracked completed orders.
+            if (targetStatus === 'completed') {
+              return true;
+            }
+            // Active orders (e.g. assigned via QR) might bypass the offer system entirely
+            // and won't appear in the bulk offers list. Do not forcefully drop them here.
+            // If they are truly cancelled/reassigned, `fetchAssignmentById` will catch the 403 later.
+            if (targetStatus !== 'pending') {
+              return true;
+            }
             return false;
           }
           return true;
@@ -400,6 +411,14 @@ const assignmentSlice = createSlice({
           reqMap[req.orderType.toLowerCase()] = req;
         });
         state.completionRequirements = reqMap;
+      })
+      .addCase('auth/logout/fulfilled', (state) => {
+        state.items = [];
+        state.workspaceSummary = null;
+        state.listStatus = 'idle';
+        state.summaryStatus = 'idle';
+        state.detailStatus = 'idle';
+        state.error = null;
       });
   },
 });

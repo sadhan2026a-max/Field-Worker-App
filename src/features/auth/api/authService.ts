@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Driver } from '@/domain/entities/Driver';
 import { api } from '@/shared/services/axios';
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export async function login(phone: string, password?: string, pin?: string): Promise<Driver> {
   const payload = pin 
     ? { phone, pin, subjectType: 'Driver' } 
@@ -26,7 +28,7 @@ export async function logout(): Promise<void> {
   } catch (error) {
     console.error('Logout API failed:', error);
   } finally {
-    await AsyncStorage.multiRemove(['riderToken', 'riderRefreshToken', 'riderId']);
+    await AsyncStorage.multiRemove(['riderToken', 'riderRefreshToken', 'riderId', 'persisted_assignments', 'persisted_workspace_summary']);
   }
 }
 

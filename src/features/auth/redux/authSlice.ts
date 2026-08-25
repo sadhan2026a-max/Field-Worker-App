@@ -3,6 +3,7 @@ import { Driver } from '@/domain/entities/Driver';
 import * as authService from '@/features/auth/api/authService';
 import { logger } from '@/core/utils/logger';
 import { NotificationService } from '@/core/services/NotificationService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -56,6 +57,9 @@ export const loginThunk = createAsyncThunk<
 >('auth/login', async ({ phone, password, pin }, { rejectWithValue }) => {
   logger.info('auth', 'Login attempt', { phone });
   try {
+    // Force clear any previous driver's persisted assignments/summary before logging in
+    await AsyncStorage.multiRemove(['persisted_assignments', 'persisted_workspace_summary']);
+
     const driver = await authService.login(phone, password, pin);
     logger.info('auth', 'Login successful', { driverId: driver.id, name: driver.name });
     
@@ -74,18 +78,21 @@ export const loginThunk = createAsyncThunk<
     logger.error('auth', 'Login failed', err);
     let errorMessage = 'Login failed';
     if (err instanceof AxiosError) {
-      if (err.response?.status === 404) {
+      // Single-device policy: someone logged in from another device
+      const errorCode = err.response?.data?.details?.code;
+      if (errorCode === 'session_invalidated' || (err as any)._sessionInvalidated) {
+        errorMessage = 'Your account was logged in on another device. Please login again.';
+      } else if (err.response?.status === 404) {
         errorMessage = 'Account does not exist.';
       } else if (err.response?.status === 401) {
-        errorMessage = 'Incorrect password.';
+        errorMessage = 'Incorrect PIN or password.';
       } else {
         errorMessage = err.response?.data?.message || err.response?.data?.error || 'Login failed';
-        // Map common backend strings just in case
         const lowerMsg = errorMessage.toLowerCase();
         if (lowerMsg.includes('not found') || lowerMsg.includes('exist') || lowerMsg.includes('no user') || lowerMsg.includes('invalid phone')) {
           errorMessage = 'Account does not exist.';
         } else if (lowerMsg.includes('invalid') || lowerMsg.includes('incorrect') || lowerMsg.includes('wrong') || lowerMsg.includes('credentials')) {
-          errorMessage = 'Incorrect password.';
+          errorMessage = 'Incorrect PIN or password.';
         }
       }
     } else if (err instanceof Error) {

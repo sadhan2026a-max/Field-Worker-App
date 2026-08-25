@@ -165,6 +165,16 @@ api.interceptors.response.use(
 
     const isAuthEndpoint = originalRequest?.url?.includes('/auth/login') || originalRequest?.url?.includes('/auth/refresh') || originalRequest?.url?.includes('/auth/logout') || originalRequest?.url?.includes('/device-tokens');
 
+    // Handle single-device policy: another device logged in, force logout immediately
+    const errorCode = (error.response?.data as any)?.details?.code;
+    if (error.response?.status === 401 && errorCode === 'session_invalidated') {
+      await AsyncStorage.multiRemove(['riderToken', 'riderRefreshToken', 'riderId', 'persisted_assignments', 'persisted_workspace_summary']);
+      const { store } = require('@/store');
+      const { logoutThunk } = require('@/features/auth/redux/authSlice');
+      store.dispatch(logoutThunk());
+      return Promise.reject(Object.assign(error, { _sessionInvalidated: true }));
+    }
+
     if (error.response?.status === 401 && originalRequest && !originalRequest._retry && !isAuthEndpoint) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {

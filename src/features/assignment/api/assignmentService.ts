@@ -200,7 +200,15 @@ export async function getAssignments(status?: Assignment['status'] | string): Pr
   let offers: any[] = [];
 
   try {
-    const backendStatus = status ? status.charAt(0).toUpperCase() + status.slice(1) : undefined;
+    let backendStatus: string | undefined;
+    if (status === 'accepted') backendStatus = 'Assigned';
+    else if (status === 'in_progress') backendStatus = 'InProgress';
+    else if (status === 'en_route') backendStatus = 'EnRoute';
+    else if (status === 'completed') backendStatus = 'Completed';
+    else if (status === 'cancelled') backendStatus = 'Cancelled';
+    else if (status === 'pending') backendStatus = 'Offered'; // Or 'Pending' depending on backend
+    else if (status) backendStatus = status.charAt(0).toUpperCase() + status.slice(1);
+
     let url = backendStatus ? `/api/v1/driver/assignments?status=${backendStatus}` : '/api/v1/driver/assignments';
 
     const response = await api.get(url);

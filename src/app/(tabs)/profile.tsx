@@ -88,14 +88,19 @@ export default function ProfileScreen() {
         {driver ? (
           <>
             <View style={styles.profileHeader}>
-              <Avatar name={driver.name} size={84} />
+              <Avatar name={driver.name} size={64} />
               <View style={styles.profileInfo}>
-                <Text style={styles.driverName}>{driver.name}</Text>
-                <Text style={styles.driverPhone}>{driver.phone}</Text>
-                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(driver.status) + '20' }]}>
-                  <View style={[styles.statusDot, { backgroundColor: getStatusColor(driver.status) }]} />
-                  <Text style={[styles.statusText, { color: getStatusColor(driver.status) }]}>{driver.status}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                  <Text style={[styles.driverName, { marginBottom: 0, flexShrink: 1 }]} numberOfLines={1}>
+                    {driver.name}
+                  </Text>
+                  <View style={{ flex: 1 }} />
+                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(driver.status) + '20', marginLeft: 0 }]}>
+                    <View style={[styles.statusDot, { backgroundColor: getStatusColor(driver.status) }]} />
+                    <Text style={[styles.statusText, { color: getStatusColor(driver.status) }]}>{driver.status}</Text>
+                  </View>
                 </View>
+                <Text style={styles.driverPhone}>{driver.phone}</Text>
               </View>
             </View>
             <Card style={[styles.sectionCard, { backgroundColor: colors.surface }]}>
@@ -293,6 +298,7 @@ const useStyles = (colors: any) => StyleSheet.create({
     flexGrow: 1,
   },
   profileHeader: {
+    position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.lg,
@@ -308,24 +314,24 @@ const useStyles = (colors: any) => StyleSheet.create({
   profileInfo: {
     marginLeft: spacing.lg,
     flex: 1,
+    justifyContent: 'center',
   },
   driverName: {
     ...typography.h3,
     color: colors.textPrimary,
-    marginBottom: 2,
+    marginBottom: 4,
   },
   driverPhone: {
     ...typography.bodyMedium,
     color: colors.textSecondary,
-    marginBottom: spacing.sm,
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
     borderRadius: 12,
+    marginLeft: spacing.sm,
   },
   statusDot: {
     width: 6,

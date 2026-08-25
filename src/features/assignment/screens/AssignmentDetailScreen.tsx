@@ -164,7 +164,7 @@ export function AssignmentDetailScreen() {
     );
   }
 
-  const isAssignedToOther = assignment.assignedDriverId != null && assignment.assignedDriverId !== driver?.id;
+  const isAssignedToOther = assignment.status !== 'cancelled' && assignment.assignedDriverId != null && assignment.assignedDriverId !== driver?.id;
 
   const comingSoon = () => Toast.show({ type: 'warning', text1: 'Coming soon' });
 
@@ -410,8 +410,8 @@ export function AssignmentDetailScreen() {
       >
         <View style={styles.codeHeader}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-            <Text style={styles.codeText}>{assignment.code}</Text>
-            {assignment.status !== 'pending' && (
+            {assignment.code !== 'N/A' && <Text style={styles.codeText}>{assignment.code}</Text>}
+            {assignment.status !== 'pending' && assignment.code !== 'N/A' && (
               <View style={styles.typeBadge}>
                 <Text style={styles.typeBadgeText}>
                   {assignment.type.split('_').map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
@@ -431,59 +431,65 @@ export function AssignmentDetailScreen() {
           </View>
         )}
 
-        {/* Customer Profile Card */}
-        <View style={styles.customerCard}>
-          <View style={styles.customerHeader}>
-            <Avatar name={assignment.customer.name} size={52} />
-            <View style={styles.customerInfo}>
-              <Text style={styles.customerName}>{assignment.customer.name}</Text>
-              <Text style={styles.customerPhone}>{assignment.customer.phone}</Text>
+        {assignment.status !== 'cancelled' && (
+          <>
+            {/* Customer Profile Card */}
+            <View style={styles.customerCard}>
+              <View style={styles.customerHeader}>
+                <Avatar name={assignment.customer.name} size={52} />
+                <View style={styles.customerInfo}>
+                  <Text style={styles.customerName}>{assignment.customer.name}</Text>
+                  {assignment.customer.phone && assignment.customer.phone !== 'N/A' && (
+                    <Text style={styles.customerPhone}>{assignment.customer.phone}</Text>
+                  )}
+                </View>
+              </View>
+
+              <View style={styles.divider} />
+
+              {/* Call & WhatsApp buttons — only show for active orders (not pending, completed, or cancelled) */}
+              {assignment.status !== 'pending' && assignment.status !== 'completed' && (
+                <View style={styles.customerActions}>
+                  <TouchableOpacity style={[styles.actionBtn, styles.actionBtnCall]} onPress={() => Linking.openURL(`tel:${assignment.customer.phone}`)}>
+                    <MaterialIcons name="call" size={18} color="#FFFFFF" />
+                    <Text style={styles.actionBtnText}>Call Customer</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.actionBtn, styles.actionBtnWa]} onPress={() => Linking.openURL(`whatsapp://send?phone=${assignment.customer.phone.replace(/\D/g, '')}`)}>
+                    <FontAwesome name="whatsapp" size={18} color="#FFFFFF" />
+                    <Text style={styles.actionBtnText}>WhatsApp</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
-          </View>
 
-          <View style={styles.divider} />
-
-          {/* Call & WhatsApp buttons — only show for active orders (not pending, completed, or cancelled) */}
-          {assignment.status !== 'pending' && assignment.status !== 'completed' && assignment.status !== 'cancelled' && (
-            <View style={styles.customerActions}>
-              <TouchableOpacity style={[styles.actionBtn, styles.actionBtnCall]} onPress={() => Linking.openURL(`tel:${assignment.customer.phone}`)}>
-                <MaterialIcons name="call" size={18} color="#FFFFFF" />
-                <Text style={styles.actionBtnText}>Call Customer</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.actionBtn, styles.actionBtnWa]} onPress={() => Linking.openURL(`whatsapp://send?phone=${assignment.customer.phone.replace(/\D/g, '')}`)}>
-                <FontAwesome name="whatsapp" size={18} color="#FFFFFF" />
-                <Text style={styles.actionBtnText}>WhatsApp</Text>
-              </TouchableOpacity>
+            {/* Delivery Address Card */}
+            <View style={styles.addressCard}>
+              <View style={styles.pinContainer}>
+                <MaterialIcons name="place" size={24} color={colors.textPrimary} />
+              </View>
+              <View style={styles.addressContent}>
+                <Text style={styles.addressTitle}>
+                  {assignment.customer.address.split(',')[0]?.trim()}
+                </Text>
+                <Text style={styles.addressText}>
+                  {assignment.customer.address.split(',').slice(1).join(',').trim()}
+                </Text>
+                {assignment.status !== 'completed' && (
+                  <DistanceDisplay
+                    style={styles.distanceText}
+                    currentLocation={currentLocation}
+                    targetLocation={assignment.customer.location}
+                    targetAddress={assignment.customer.address}
+                    backendDistanceKm={assignment.distanceKm}
+                  />
+                )}
+              </View>
             </View>
-          )}
-        </View>
-
-        {/* Delivery Address Card */}
-        <View style={styles.addressCard}>
-          <View style={styles.pinContainer}>
-            <MaterialIcons name="place" size={24} color={colors.textPrimary} />
-          </View>
-          <View style={styles.addressContent}>
-            <Text style={styles.addressTitle}>
-              {assignment.customer.address.split(',')[0]?.trim()}
-            </Text>
-            <Text style={styles.addressText}>
-              {assignment.customer.address.split(',').slice(1).join(',').trim()}
-            </Text>
-            {assignment.status !== 'completed' && assignment.status !== 'cancelled' && (
-              <DistanceDisplay
-                style={styles.distanceText}
-                currentLocation={currentLocation}
-                targetLocation={assignment.customer.location}
-                targetAddress={assignment.customer.address}
-                backendDistanceKm={assignment.distanceKm}
-              />
-            )}
-          </View>
-        </View>
+          </>
+        )}
 
         {/* Order Details Card */}
-        {(['delivery', 'pickup', 'return'].includes(assignment.type) || assignment.itemCount > 0) && (
+        {assignment.status !== 'cancelled' && (['delivery', 'pickup', 'return'].includes(assignment.type) || assignment.itemCount > 0) && (
           <View style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>Order Details</Text>
             <Text style={styles.orderSummary}>
@@ -496,7 +502,7 @@ export function AssignmentDetailScreen() {
         )}
 
         {/* Instructions Card */}
-        {(['delivery', 'pickup', 'return'].includes(assignment.type) || assignment.deliveryInstructions) && (
+        {assignment.status !== 'cancelled' && (['delivery', 'pickup', 'return'].includes(assignment.type) || assignment.deliveryInstructions) && (
           <View style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>
               {['sales_visit', 'service_visit', 'inspection', 'installation'].includes(assignment.type)
