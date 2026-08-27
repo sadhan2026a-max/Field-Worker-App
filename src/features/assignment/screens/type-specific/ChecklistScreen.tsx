@@ -43,6 +43,7 @@ export function ChecklistScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
 
   const fetchTemplates = async () => {
     if (!assignment?.type) return;
@@ -133,6 +134,7 @@ export function ChecklistScreen() {
   };
 
   const handleContinue = async () => {
+    setHasAttemptedSubmit(true);
     // Validate all items before continuing
     let allValid = true;
     for (const t of templates) {
@@ -145,7 +147,7 @@ export function ChecklistScreen() {
     }
 
     if (!allValid) {
-      Alert.alert('Validation Error', 'Please complete all required fields correctly before submitting.');
+      Toast.show({ type: 'error', text1: 'Please complete all required fields correctly.' });
       return;
     }
 
@@ -190,7 +192,7 @@ export function ChecklistScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs }}>
           <Pressable onPress={() => router.back()} style={{ marginRight: spacing.sm, marginLeft: -8, padding: spacing.xs }}>
-            <MaterialIcons name="arrow-back" size={28} color={colors.textPrimary} />
+            <MaterialIcons name="arrow-back" size={25} color={colors.textPrimary} />
           </Pressable>
           <Text style={[styles.title, { marginBottom: 0 }]}>Checklist</Text>
         </View>
@@ -210,6 +212,7 @@ export function ChecklistScreen() {
                 item={items[template.id]}
                 onChange={(val) => updateItemValue(template.id, val)}
                 onNotesChange={(val) => updateNotes(template.id, val)}
+                showErrors={hasAttemptedSubmit}
               />
             ))
         )}
@@ -238,19 +241,24 @@ const useStyles = (colors: any) => StyleSheet.create({
     padding: spacing.xl,
   },
   content: {
-    padding: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
     paddingBottom: 100
   },
   title: {
-    ...typography.h2,
+    ...typography.h3,
+    fontSize: 16,
+    fontWeight: '700',
     color: colors.textPrimary,
     marginBottom: spacing.xs
   },
   subtitle: {
     ...typography.body,
-    color: colors.textSecondary,
-    marginBottom: spacing.lg
+    color: colors.primary,
+    fontWeight: 'bold',
+    marginBottom: spacing.md
   },
+
   loadingText: {
     ...typography.body,
     color: colors.textSecondary,

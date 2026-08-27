@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, SafeAreaView, Pressable } from 'react-native';
 import { router } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import Toast from 'react-native-toast-message';
@@ -55,6 +55,9 @@ export function PinSetupScreen() {
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.content}>
+          <Pressable style={styles.backButton} onPress={() => router.back()}>
+            <MaterialIcons name="arrow-back" size={24} color={colors.textPrimary} />
+          </Pressable>
           <View style={styles.headerContainer}>
             <MaterialIcons name="lock-outline" size={48} color={colors.primary} />
             <Text style={styles.headerTitle}>Set Your PIN</Text>
@@ -157,6 +160,7 @@ const useStyles = (colors: any) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1 },
   content: { flex: 1, paddingHorizontal: spacing.xl, paddingTop: 60 },
+  backButton: { position: 'absolute', top: 32, left: spacing.md, width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', zIndex: 10 },
   headerContainer: { alignItems: 'center', marginBottom: 40 },
   headerTitle: { fontSize: 28, fontFamily: FontFamily.bold, color: colors.textPrimary, marginTop: 16, marginBottom: 8 },
   headerSubtitle: { fontSize: 15, fontFamily: FontFamily.regular, color: colors.textSecondary, textAlign: 'center' },

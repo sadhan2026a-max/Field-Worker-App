@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { spacing, typography, FontSize, colors, useTheme } from '@/core/theme';
 
 interface StatTileProps {
@@ -7,16 +7,24 @@ interface StatTileProps {
   label: string;
   color?: string;
   icon?: React.ReactNode;
+  style?: ViewStyle | ViewStyle[];
 }
 
-export function StatTile({ value, label, color = colors.textPrimary, icon }: StatTileProps) {
-  const { colors } = useTheme();
-  const styles = React.useMemo(() => useStyles(colors), [colors]);
+export function StatTile({ value, label, color, icon, style }: StatTileProps) {
+  const { colors: themeColors, isDark } = useTheme();
+  const styles = React.useMemo(() => useStyles(themeColors), [themeColors]);
+  
+  const actualColor = color || themeColors.primary;
+  const bgOpacity = isDark ? '15' : '10';
+  const backgroundColor = actualColor + bgOpacity;
+
   return (
-    <View style={styles.tile}>
-      {icon ? <View style={styles.iconContainer}>{icon}</View> : null}
-      <Text style={[styles.value, { color }]}>{value}</Text>
-      <Text style={styles.label}>{label}</Text>
+    <View style={[styles.tile, { backgroundColor, borderColor: actualColor + '20' }, style]}>
+      <View style={styles.valueRow}>
+        {icon}
+        <Text style={[styles.value, { color: actualColor }]} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
+      </View>
+      <Text style={styles.label} numberOfLines={1}>{label}</Text>
     </View>
   );
 }
@@ -24,21 +32,29 @@ export function StatTile({ value, label, color = colors.textPrimary, icon }: Sta
 const useStyles = (colors: any) => StyleSheet.create({
   tile: {
     flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderRadius: 12,
+    borderWidth: 1,
     alignItems: 'center',
-    gap: spacing.xs,
+    justifyContent: 'center',
   },
-  iconContainer: {
-    marginBottom: 4,
-    opacity: 0.85,
+  valueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
   },
   value: {
     ...typography.h2,
-    color: colors.textPrimary,
-    fontSize: FontSize.large,
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   label: {
     ...typography.caption,
+    fontSize: 10,
     color: colors.textSecondary,
     textAlign: 'center',
+    marginTop: 4,
   },
 });

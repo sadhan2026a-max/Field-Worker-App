@@ -16,9 +16,9 @@ export function validateChecklistItem(
   // If required and empty/unchecked
   if (isRequired) {
     if (itemType === 'Checkbox') {
-      // For boolean fields (Yes/No), any explicit answer (true/false) is valid
-      const hasAnswer = value !== null && value !== undefined && String(value).trim() !== '';
-      if (!hasAnswer) {
+      // For required checkboxes, they must be checked
+      const isChecked = String(value) === 'true';
+      if (!isChecked) {
         return { isValid: false, errorMessage: 'This field is required' };
       }
     } else {

@@ -37,7 +37,7 @@ export function DistanceDisplay({
 
       if (!currentLocation || (currentLocation.latitude === 0 && currentLocation.longitude === 0)) {
         if (isMounted) {
-          setDebugMsg('No GPS');
+          setDebugMsg('Calculating...');
           setIsCalculating(false);
         }
         return;

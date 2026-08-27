@@ -13,9 +13,10 @@ interface DynamicFieldProps {
   item: ChecklistItem;
   onChange: (value: any) => void;
   onNotesChange: (notes: string) => void;
+  showErrors?: boolean;
 }
 
-export function DynamicField({ template, item, onChange, onNotesChange }: DynamicFieldProps) {
+export function DynamicField({ template, item, onChange, onNotesChange, showErrors = false }: DynamicFieldProps) {
   const { colors } = useTheme();
   const styles = React.useMemo(() => useStyles(colors), [colors]);
 
@@ -88,18 +89,19 @@ export function DynamicField({ template, item, onChange, onNotesChange }: Dynami
       case 'Text':
         return (
           <TextInput
-            style={[styles.input, !validation.isValid && validation.errorMessage ? styles.inputError : null]}
+            style={[styles.input, !validation.isValid && validation.errorMessage && showErrors ? styles.inputError : null, { textAlignVertical: 'top', minHeight: 40 }]}
             placeholder={`Enter ${template.label}`}
             placeholderTextColor={colors.textSecondary}
             value={item.value?.toString() || ''}
             onChangeText={onChange}
+            multiline={true}
           />
         );
 
       case 'Number':
         return (
           <TextInput
-            style={[styles.input, !validation.isValid && validation.errorMessage ? styles.inputError : null]}
+            style={[styles.input, !validation.isValid && validation.errorMessage && showErrors ? styles.inputError : null]}
             placeholder={`Enter ${template.label}`}
             placeholderTextColor={colors.textSecondary}
             value={item.value?.toString() || ''}
@@ -111,16 +113,32 @@ export function DynamicField({ template, item, onChange, onNotesChange }: Dynami
       case 'Radio':
         return (
           <View style={styles.radioGroup}>
-            {template.options?.map((opt) => (
-              <Pressable key={opt} style={styles.radioRow} onPress={() => onChange(opt)}>
-                <MaterialIcons
-                  name={item.value === opt ? "radio-button-checked" : "radio-button-unchecked"}
-                  size={24}
-                  color={item.value === opt ? colors.primary : colors.textSecondary}
-                />
-                <Text style={styles.radioText}>{opt}</Text>
-              </Pressable>
-            ))}
+            {template.options?.map((opt, index) => {
+              const isLast = index === template.options!.length - 1;
+              return (
+                <View key={opt} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Pressable style={[styles.radioRow, { flex: 1 }]} onPress={() => onChange(opt)}>
+                    <MaterialIcons
+                      name={item.value === opt ? "radio-button-checked" : "radio-button-unchecked"}
+                      size={24}
+                      color={item.value === opt ? colors.primary : colors.textSecondary}
+                    />
+                    <Text style={styles.radioText}>{opt}</Text>
+                  </Pressable>
+                  {isLast && (
+                    <Pressable
+                      onPress={() => { setTempRemarks(item.notes || ''); setShowRemarksModal(true); }}
+                      style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}
+                    >
+                      <MaterialIcons name="edit" size={16} color={colors.primary} style={{ marginRight: 4 }} />
+                      <Text style={{ ...typography.caption, color: colors.primary, fontWeight: 'bold' }}>
+                        {item.notes ? 'Edit remarks' : 'Add remarks'}
+                      </Text>
+                    </Pressable>
+                  )}
+                </View>
+              );
+            })}
           </View>
         );
 
@@ -284,10 +302,10 @@ export function DynamicField({ template, item, onChange, onNotesChange }: Dynami
 
         {itemType === 'Checkbox' && (
           <Pressable onPress={() => onChange(!answeredYes)} style={{ marginTop: -2, marginLeft: 12 }}>
-            <MaterialIcons 
-              name={answeredYes ? "check-box" : "check-box-outline-blank"} 
-              size={26} 
-              color={answeredYes ? colors.primary : colors.textSecondary} 
+            <MaterialIcons
+              name={answeredYes ? "check-box" : "check-box-outline-blank"}
+              size={26}
+              color={answeredYes ? colors.primary : colors.textSecondary}
             />
           </Pressable>
         )}
@@ -299,44 +317,46 @@ export function DynamicField({ template, item, onChange, onNotesChange }: Dynami
         </View>
       )}
 
-      <Pressable 
-        onPress={() => { setTempRemarks(item.notes || ''); setShowRemarksModal(true); }} 
-        style={{ marginTop: spacing.sm, flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end' }}
-      >
-        <MaterialIcons name="edit" size={16} color={colors.primary} style={{ marginRight: 4 }} />
-        <Text style={{ ...typography.caption, color: colors.primary, fontWeight: 'bold' }}>
-          {item.notes ? 'Edit remarks' : 'Add remarks'}
-        </Text>
-      </Pressable>
-      
+      {itemType !== 'Radio' && (
+        <Pressable
+          onPress={() => { setTempRemarks(item.notes || ''); setShowRemarksModal(true); }}
+          style={{ marginTop: 4, flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end' }}
+        >
+          <MaterialIcons name="edit" size={16} color={colors.primary} style={{ marginRight: 4 }} />
+          <Text style={{ ...typography.caption, color: colors.primary, fontWeight: 'bold' }}>
+            {item.notes ? 'Edit remarks' : 'Add remarks'}
+          </Text>
+        </Pressable>
+      )}
+
       {item.notes ? (
         <Text style={{ ...typography.caption, marginTop: 4, color: colors.textSecondary, fontStyle: 'italic', textAlign: 'right' }}>
           "{item.notes}"
         </Text>
       ) : null}
 
-      {!validation.isValid && validation.errorMessage && (
+      {!validation.isValid && validation.errorMessage && showErrors && (
         <Text style={styles.errorText}>{validation.errorMessage}</Text>
       )}
 
-      <Modal 
-        visible={showRemarksModal} 
-        transparent 
+      <Modal
+        visible={showRemarksModal}
+        transparent
         animationType="fade"
         onShow={() => setTimeout(() => remarksInputRef.current?.focus(), 100)}
       >
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={{ flex: 1 }}
         >
           <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }}>
-            <ScrollView 
-              style={{ flex: 1 }} 
+            <ScrollView
+              style={{ flex: 1 }}
               contentContainerStyle={{ flexGrow: 1 }}
               keyboardShouldPersistTaps="always"
             >
               <Pressable style={{ flex: 1 }} onPress={() => setShowRemarksModal(false)} />
-              
+
               <View style={[styles.modalContent, { paddingBottom: 40, width: '100%' }]}>
                 <Text style={styles.modalTitle}>Add Remarks</Text>
                 <TextInput
@@ -425,7 +445,8 @@ const useStyles = (colors: any) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 6,
-    padding: spacing.md,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     ...typography.body,
     color: colors.textPrimary,
   },
@@ -461,7 +482,8 @@ const useStyles = (colors: any) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 6,
-    padding: spacing.md,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
   },
   dropdownText: { ...typography.body, color: colors.textPrimary, flex: 1 },
   modalOverlay: {

@@ -80,7 +80,7 @@ export default function WalletScreen() {
         >
           <MaterialIcons
             name="account-balance-wallet"
-            size={18}
+            size={16}
             color={activeTab === 'cash' ? colors.primary : colors.textSecondary}
           />
           <Text style={[styles.tabText, activeTab === 'cash' && styles.activeTabText]}>
@@ -93,7 +93,7 @@ export default function WalletScreen() {
         >
           <MaterialIcons
             name="account-balance"
-            size={18}
+            size={16}
             color={activeTab === 'payout' ? colors.primary : colors.textSecondary}
           />
           <Text style={[styles.tabText, activeTab === 'payout' && styles.activeTabText]}>
@@ -105,8 +105,10 @@ export default function WalletScreen() {
       <View style={styles.contentContainer}>
         {error ? (
           <View style={styles.centerContainer}>
-            <MaterialIcons name="error-outline" size={48} color={palette.red} />
-            <Text style={styles.errorText}>{error}</Text>
+            <MaterialIcons name="cloud-off" size={64} color={palette.grey300 || colors.textSecondary} />
+            <Text style={styles.errorText}>
+              Unable to load your earnings data. Please check your connection and try again.
+            </Text>
             <TouchableOpacity style={styles.retryButton} onPress={() => loadData(true)}>
               <Text style={styles.retryText}>Retry</Text>
             </TouchableOpacity>
@@ -176,31 +178,35 @@ const useStyles = (colors: any) => StyleSheet.create({
   },
   tabContainer: {
     flexDirection: 'row',
-    padding: spacing.sm,
+    alignSelf: 'center',
     backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderRadius: 12,
+    padding: 4,
+    marginVertical: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   tab: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.sm,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
     borderRadius: 8,
-    marginHorizontal: spacing.xs,
   },
   activeTab: {
-    backgroundColor: palette.blueLight,
+    backgroundColor: colors.primary + '15',
   },
   tabText: {
     ...typography.bodyMedium,
-    fontFamily: FontFamily.semiBold,
+    fontFamily: FontFamily.medium,
     color: colors.textSecondary,
-    marginLeft: spacing.xs,
+    marginLeft: 6,
+    fontSize: 13,
   },
   activeTabText: {
     color: colors.primary,
+    fontFamily: FontFamily.bold,
   },
   contentContainer: {
     flex: 1,

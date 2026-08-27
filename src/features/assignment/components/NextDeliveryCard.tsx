@@ -196,7 +196,6 @@ export function NextDeliveryCard({ assignment, onStart }: NextDeliveryCardProps)
               disabled={actionType === 'accept' && acceptOffer.isPending}
               style={({ pressed }) => [
                 styles.declineButton,
-                (actionType === 'accept' && acceptOffer.isPending) && { opacity: 0.5 },
                 pressed && { opacity: 0.85 }
               ]}
             >
