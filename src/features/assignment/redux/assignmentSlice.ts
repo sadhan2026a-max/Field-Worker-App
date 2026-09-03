@@ -4,6 +4,7 @@ import { DriverWorkspaceSummary } from '@/domain/entities/Driver';
 import * as assignmentService from '@/services/assignmentService';
 import { logger } from '@/core/utils/logger';
 import { OrderCompletionRequirementDto } from '@/features/assignment/types/Assignment';
+import * as notificationService from '@/features/notification/api/notificationService';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -19,6 +20,7 @@ interface AssignmentState {
   error: string | null;
   completionRequirements: Record<string, OrderCompletionRequirementDto> | null;
   isHydrated: boolean;
+  cancelledAlert: { visible: boolean; orderCode: string | null };
 }
 
 const initialState: AssignmentState = {
@@ -31,12 +33,14 @@ const initialState: AssignmentState = {
   error: null,
   completionRequirements: null,
   isHydrated: false,
+  cancelledAlert: { visible: false, orderCode: null },
 };
 
 function upsertAssignment(state: AssignmentState, assignment: Assignment) {
   const index = state.items.findIndex((item) => item.id === assignment.id);
   if (index >= 0) {
-    const currentStatus = state.items[index].status;
+    const currentItem = state.items[index];
+    const currentStatus = currentItem.status;
 
     // Prevent downgrading an active status to 'pending' if the backend returned stale offer data
     let newStatus = assignment.status;
@@ -44,9 +48,14 @@ function upsertAssignment(state: AssignmentState, assignment: Assignment) {
       newStatus = currentStatus;
     }
 
-    // Merge (not replace) so fields the source response doesn't carry — e.g. offerId,
-    // only present on the initial offers-list load — survive later partial updates.
-    state.items[index] = { ...state.items[index], ...assignment, status: newStatus };
+    // If incoming assignment is a dummy 'N/A' from a 403 response, but we have real data locally,
+    // ONLY update the status to cancelled, do NOT overwrite details with 'N/A'.
+    if (assignment.code === 'N/A' && currentItem.code !== 'N/A') {
+      state.items[index] = { ...currentItem, status: 'cancelled' };
+    } else {
+      // Normal merge (not replace)
+      state.items[index] = { ...currentItem, ...assignment, status: newStatus };
+    }
   } else {
     state.items.push(assignment);
   }
@@ -61,7 +70,130 @@ export const fetchWorkspaceSummary = createAsyncThunk<DriverWorkspaceSummary, st
 
 export const fetchAssignments = createAsyncThunk<Assignment[], string | undefined>(
   'assignment/fetchAssignments',
-  async (status) => assignmentService.getAssignments(status),
+  async (status, { getState }) => {
+    const apiAssignments = await assignmentService.getAssignments(status);
+    
+    // Attempt to merge with lifetime local history if driver is logged in
+    const state = getState() as any;
+    const driverId = state.auth.driver?.id;
+    
+    if (driverId) {
+      // Save only terminal-state (completed/cancelled) orders to device lifetime storage
+      // NEVER save pending/active orders to lifetime — they can change status at any time
+      await assignmentService.saveLifetimeHistory(driverId, apiAssignments);
+      
+      // Load lifetime history (only completed/cancelled are stored here)
+      const lifetime = await assignmentService.getLifetimeHistory(driverId);
+      
+      // Build a set of IDs that the API returned with ACTIVE/PENDING status
+      // These must NOT be overridden by stale lifetime data
+      const activeApiIds = new Set(
+        apiAssignments
+          .filter(a => ['pending', 'accepted', 'en_route', 'arrived', 'in_progress'].includes(a.status))
+          .map(a => a.id)
+      );
+      // Also build a set of all API-returned IDs
+      const allApiIds = new Set(apiAssignments.map(a => a.id));
+
+      // Merge: start with lifetime (completed/cancelled history)
+      const map = new Map<string, Assignment>();
+      lifetime.forEach(a => {
+        // Only add lifetime entry if it's NOT currently active in the live API
+        if (!activeApiIds.has(a.id)) {
+          map.set(a.id, a);
+        }
+      });
+      // API data always wins — it's the freshest truth
+      apiAssignments.forEach(a => map.set(a.id, a));
+      
+      let merged = Array.from(map.values());
+      // Apply status filter locally if requested
+      if (status) {
+        merged = merged.filter(a => a.status === status);
+      }
+      return merged;
+    }
+
+    return apiAssignments;
+  },
+);
+
+export const syncHistoryFromNotificationsThunk = createAsyncThunk<void, { onlyToday?: boolean } | void>(
+  'assignment/syncHistoryFromNotifications',
+  async (args, { getState, dispatch }) => {
+    const onlyToday = (args as any)?.onlyToday ?? false;
+    try {
+      const state = getState() as any;
+      const driverId = state.auth.driver?.id;
+      if (!driverId) return;
+
+      // Fetch all notifications directly
+      const notifications = await notificationService.getNotifications();
+      
+      // Filter notifications to today only if onlyToday flag is set
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      const filteredNotifications = onlyToday
+        ? notifications.filter(n => new Date(n.createdAt) >= todayStart)
+        : notifications;
+
+      // Extract unique related order IDs
+      const uniqueOrderIds = new Set<string>();
+      filteredNotifications.forEach(n => {
+        const orderId = n.relatedOrderId || (n as any).orderId || (n as any).assignmentId;
+        if (orderId && typeof orderId === 'string') {
+          uniqueOrderIds.add(orderId);
+        }
+      });
+
+      if (uniqueOrderIds.size === 0) return;
+
+      // Read current local lifetime history to avoid fetching what we already have
+      const existingHistory = await assignmentService.getLifetimeHistory(driverId);
+      const existingIds = new Set(existingHistory.map(a => a.id));
+
+      // For today sync: always re-fetch today's orders to get latest status (pending/active)
+      // For full sync: skip already-saved ones
+      const idsToFetch = onlyToday
+        ? Array.from(uniqueOrderIds) // Always re-fetch today's
+        : Array.from(uniqueOrderIds).filter(id => !existingIds.has(id));
+
+      if (idsToFetch.length === 0) return;
+
+      logger.info('assignment', `Syncing ${idsToFetch.length} ${onlyToday ? "today's" : 'missing'} orders from notification history`);
+
+      // Fetch orders directly by ID
+      const fetchedAssignments: Assignment[] = [];
+      const results = await Promise.allSettled(
+        idsToFetch.map(id => assignmentService.getAssignmentById(id))
+      );
+
+      results.forEach(result => {
+        if (result.status === 'fulfilled' && result.value) {
+          fetchedAssignments.push(result.value);
+        }
+      });
+
+      if (fetchedAssignments.length > 0) {
+        // Save completed/cancelled to local lifetime history
+        await assignmentService.saveLifetimeHistory(driverId, fetchedAssignments);
+        // Refresh the main list UI
+        dispatch(fetchAssignments());
+      }
+    } catch (e) {
+      logger.error('assignment', 'Failed to sync history from notifications', e);
+    }
+  }
+);
+
+// Auto-sync only today's orders — called on login and app boot
+export const autoSyncTodayOrdersThunk = createAsyncThunk<void, string>(
+  'assignment/autoSyncTodayOrders',
+  async (driverId, { dispatch }) => {
+    logger.info('assignment', 'Auto-syncing today\'s orders for driver', { driverId });
+    dispatch(syncHistoryFromNotificationsThunk({ onlyToday: true }));
+  }
 );
 
 export const fetchAssignmentById = createAsyncThunk<Assignment | undefined, string>(
@@ -202,6 +334,16 @@ const assignmentSlice = createSlice({
     setHydrated: (state) => {
       state.isHydrated = true;
     },
+    clearAssignments: (state) => {
+      state.items = [];
+      state.workspaceSummary = null;
+    },
+    showCancelledAlert: (state, action: PayloadAction<string>) => {
+      state.cancelledAlert = { visible: true, orderCode: action.payload };
+    },
+    hideCancelledAlert: (state) => {
+      state.cancelledAlert = { visible: false, orderCode: null };
+    }
   },
   extraReducers: (builder) => {
     builder
@@ -411,20 +553,12 @@ const assignmentSlice = createSlice({
           reqMap[req.orderType.toLowerCase()] = req;
         });
         state.completionRequirements = reqMap;
-      })
-      .addCase('auth/logout/fulfilled', (state) => {
-        state.items = [];
-        state.workspaceSummary = null;
-        state.listStatus = 'idle';
-        state.summaryStatus = 'idle';
-        state.detailStatus = 'idle';
-        state.error = null;
       });
   },
 });
 
 export const assignmentReducer = assignmentSlice.reducer;
-export const { addAssignment, clearError, restoreAssignments, restoreWorkspaceSummary, setHydrated } = assignmentSlice.actions;
+export const { addAssignment, clearError, restoreAssignments, restoreWorkspaceSummary, setHydrated, clearAssignments, showCancelledAlert, hideCancelledAlert } = assignmentSlice.actions;
 
 // ─── Selectors ────────────────────────────────────────────────────────────────
 
@@ -433,6 +567,7 @@ type StateWithAssignment = { assignment: AssignmentState };
 export const selectAssignments = (state: StateWithAssignment) => state.assignment.items;
 export const selectCompletionRequirements = (state: StateWithAssignment) => state.assignment.completionRequirements;
 export const selectWorkspaceSummary = (state: StateWithAssignment) => state.assignment.workspaceSummary;
+export const selectCancelledAlert = (state: StateWithAssignment) => state.assignment.cancelledAlert;
 export const selectListStatus = (state: StateWithAssignment) => state.assignment.listStatus;
 export const selectSummaryStatus = (state: StateWithAssignment) => state.assignment.summaryStatus;
 export const selectDetailStatus = (state: StateWithAssignment) => state.assignment.detailStatus;

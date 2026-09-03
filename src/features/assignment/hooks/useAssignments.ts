@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { router } from 'expo-router';
 import { Assignment, PaymentMode } from '@/domain/entities/Assignment';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -27,6 +28,7 @@ import {
   releaseAssignment as releaseAssignmentThunk,
   restoreAssignments,
   restoreWorkspaceSummary,
+  showCancelledAlert,
 } from '@/features/assignment/redux/assignmentSlice';
 import { markRelatedNotificationsRead, markRelatedNotificationsAsReadThunk } from '@/features/notification/redux/notificationSlice';
 
@@ -73,16 +75,63 @@ export function useAssignments(status?: Assignment['status'] | string) {
   const listStatus = useAppSelector(selectListStatus);
 
   useEffect(() => {
-    dispatch(fetchAssignmentsThunk(status));
+    const loadData = async () => {
+      // STEP 1: Restore from local cache first so screen doesn't show blank
+      try {
+        const cached = await AsyncStorage.getItem('persisted_assignments');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            dispatch(restoreAssignments(parsed));
+
+            // STEP 2: For each cached active order, refresh it directly by ID
+            // This is the SAME API that notification uses (fetchAssignmentById)
+            // It works even when the bulk assignments API returns nothing
+            const activeStatuses = ['accepted', 'en_route', 'arrived', 'in_progress'];
+            const activeOrders = parsed.filter((a: any) => activeStatuses.includes(a.status));
+            for (const order of activeOrders) {
+              if (order.id) {
+                dispatch(fetchAssignmentById(order.id));
+              }
+            }
+          }
+        }
+      } catch (e) {
+        // ignore cache errors, continue with API
+      }
+
+      // STEP 3: Fetch from API (pending offers + other statuses)
+      dispatch(fetchAssignmentsThunk(status));
+      if (!status) {
+        dispatch(fetchAssignmentsThunk('in_progress'));
+        dispatch(fetchAssignmentsThunk('en_route'));
+        dispatch(fetchAssignmentsThunk('accepted'));
+        dispatch(fetchAssignmentsThunk('completed'));
+        dispatch(fetchAssignmentsThunk('cancelled'));
+      }
+    };
+
+    loadData();
   }, [dispatch, status]);
 
   const refetch = async () => {
+    // On manual refresh, re-fetch each active order by ID (guaranteed to work)
+    const currentItems = items;
+    const activeStatuses = ['accepted', 'en_route', 'arrived', 'in_progress'];
+    const activeOrders = currentItems.filter((a) => activeStatuses.includes(a.status));
+    for (const order of activeOrders) {
+      if (order.id) {
+        dispatch(fetchAssignmentById(order.id));
+      }
+    }
+
     await dispatch(fetchAssignmentsThunk(status)).unwrap();
     if (!status) {
-      // Fetch active statuses explicitly to recover them if they were dropped from local state
       dispatch(fetchAssignmentsThunk('in_progress'));
       dispatch(fetchAssignmentsThunk('en_route'));
       dispatch(fetchAssignmentsThunk('accepted'));
+      dispatch(fetchAssignmentsThunk('completed'));
+      dispatch(fetchAssignmentsThunk('cancelled'));
     }
   };
 
@@ -100,6 +149,33 @@ export function useAssignment(id: string) {
       dispatch(fetchAssignmentById(id));
     }
   }, [dispatch, id]);
+
+  // Poll every 15 seconds to detect cancellation mid-process on ANY screen
+  useEffect(() => {
+    if (!id) return;
+    const interval = setInterval(() => {
+      dispatch(fetchAssignmentById(id));
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [dispatch, id]);
+
+  // Global cancellation guard — works on ALL screens (Proof, Checklist, Service, Delivery, etc.)
+  // Only show the custom modal if the order TRANSITIONS to 'cancelled' while being viewed.
+  const prevStatusRef = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    const prevStatus = prevStatusRef.current;
+
+    // Only dispatch if prevStatus was already set (not initial mount) AND wasn't cancelled, but IS cancelled now.
+    if (prevStatus && prevStatus !== 'cancelled' && assignment?.status === 'cancelled') {
+      dispatch(showCancelledAlert(assignment.code || ''));
+    }
+
+    // Update the ref to the current status once loaded
+    if (assignment?.status) {
+      prevStatusRef.current = assignment.status;
+    }
+  }, [assignment?.status, assignment?.code, dispatch]);
 
   const refetch = async () => {
     if (id) {

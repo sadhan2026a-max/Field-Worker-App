@@ -222,16 +222,23 @@ export function WorkspaceScreen() {
 
   const pendingCount = allAssignments?.filter(a => displayStatuses.includes(a.status)).length ?? 0;
 
-  const localCompletedCount = allAssignments?.filter(a => a.status === 'completed').length ?? 0;
-  const completedCount = Math.max(summary?.completedCount ?? 0, localCompletedCount);
+  const isToday = (dateString?: string) => {
+    if (!dateString) return false;
+    const date = new Date(dateString);
+    const today = new Date();
+    return date.getDate() === today.getDate() &&
+           date.getMonth() === today.getMonth() &&
+           date.getFullYear() === today.getFullYear();
+  };
 
-  const localCodCollection = allAssignments?.reduce((total, a) => {
-    if (a.status === 'completed' && a.paymentMode === 'cash') {
+  const completedCount = allAssignments?.filter(a => a.status === 'completed' && isToday(a.createdAt)).length ?? 0;
+
+  const codCollection = allAssignments?.reduce((total, a) => {
+    if (a.status === 'completed' && a.paymentMode === 'cash' && isToday(a.createdAt)) {
       return total + (a.receivedAmount ?? a.codAmount ?? 0);
     }
     return total;
   }, 0) ?? 0;
-  const codCollection = Math.max(summary?.codCollection ?? 0, localCodCollection);
 
   return (
     <View style={styles.container}>

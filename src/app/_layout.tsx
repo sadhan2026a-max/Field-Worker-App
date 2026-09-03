@@ -28,6 +28,7 @@ import { Text, View, ScrollView, StyleSheet, Animated, Easing } from 'react-nati
 import { useRef } from 'react';
 import { colors, typography, FontSize, ThemeProvider, useTheme } from '@/core/theme';
 import { TabletWrapper } from '@/shared/components/ui/TabletWrapper';
+import { CancellationModal } from '@/shared/components/ui/CancellationModal';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -115,30 +116,61 @@ function AppBootstrap({ children }: { children: React.ReactNode }) {
       .finally(() => {
         // Mark as hydrated so persistence middleware can start saving
         dispatch(setHydrated());
-        // 2. NOW fetch dynamic completion requirements (safe to do now)
-        dispatch(fetchOrderCompletionRequirements());
       });
 
     // Set up push notification listeners
-    const notificationListener = NotificationService.addNotificationReceivedListener((notification) => {
+    const notificationListener = NotificationService.addNotificationReceivedListener(async (notification) => {
       logger.info('notification', 'Foreground notification received', {
         title: notification.request.content.title,
         body: notification.request.content.body
       });
 
-      // Auto-refresh data immediately when push arrives
-      dispatch(fetchAssignments());
-      dispatch(fetchNotifications());
-
       const currentDriver = store.getState().auth.driver;
-      if (currentDriver?.id) {
-        dispatch(fetchWorkspaceSummary(currentDriver.id));
-      }
+      if (!currentDriver?.id) return;
 
       const data = notification.request.content.data;
+      const notifType = String(data?.type || '').toLowerCase();
+      const titleStr = String(notification.request.content.title || '');
+      const bodyStr = String(notification.request.content.body || '');
       const orderId = data?.relatedOrderId || data?.orderId || data?.assignmentId || data?.id;
-      if (orderId) {
-        dispatch(fetchAssignmentById(String(orderId)));
+
+      const isCancellation = notifType.includes('cancel') ||
+        titleStr.toLowerCase().includes('cancel') ||
+        bodyStr.toLowerCase().includes('cancel');
+
+      dispatch(fetchNotifications());
+
+      if (isCancellation) {
+        // ── CANCEL: show popup immediately from notification text ──────────
+        const orderCodeMatch = bodyStr.match(/ORD-[\w-]+/i);
+        const orderCode = orderCodeMatch ? orderCodeMatch[0] : (orderId || '');
+        dispatch(showCancelledAlert(orderCode));
+
+        // Refresh order state in background
+        if (orderId) dispatch(fetchAssignmentById(String(orderId)));
+        // Delay fetchAssignments so it doesn't race with fetchAssignmentById
+        setTimeout(() => {
+          dispatch(fetchAssignments());
+          dispatch(fetchWorkspaceSummary(currentDriver.id));
+        }, 3000);
+
+      } else if (orderId) {
+        // ── NEW ORDER: add to Redux state immediately via ID ───────────────
+        // Do NOT call fetchAssignments first — it would race and delete this
+        // new pending order (backend still returns [] for this driver)
+        await dispatch(fetchAssignmentById(String(orderId)));
+
+        // After the new order is safely in Redux state, refresh full list
+        // with a delay so the upsert above is not overwritten
+        setTimeout(() => {
+          dispatch(fetchAssignments());
+          dispatch(fetchWorkspaceSummary(currentDriver.id));
+        }, 2000);
+
+      } else {
+        // Other notifications: just refresh everything
+        dispatch(fetchAssignments());
+        dispatch(fetchWorkspaceSummary(currentDriver.id));
       }
     });
 
@@ -164,6 +196,13 @@ function AppBootstrap({ children }: { children: React.ReactNode }) {
     };
   }, [dispatch]);
 
+  // Fetch dynamic completion requirements only when the user is fully logged in
+  useEffect(() => {
+    if (driver?.id) {
+      dispatch(fetchOrderCompletionRequirements());
+    }
+  }, [driver?.id, dispatch]);
+
   // Global authentication state router hook
   useEffect(() => {
     if (isLoading) return;
@@ -177,7 +216,12 @@ function AppBootstrap({ children }: { children: React.ReactNode }) {
     }
   }, [driver, isLoading]);
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <CancellationModal />
+    </>
+  );
 }
 
 const toastConfig = {

@@ -3,8 +3,9 @@ import { MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { safeRouter } from '@/shared/utils/navigation';
+import { router } from 'expo-router';
 import { useRef, useState, useEffect } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View, KeyboardAvoidingView, Platform } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -15,7 +16,7 @@ import { SignaturePad, SignaturePadHandle } from '@/components/ui/SignaturePad';
 import { radius, spacing, typography, colors, useTheme } from '@/core/theme';
 
 import { useAssignment, useSaveDeliveryProof, useCompleteAssignment } from '@/hooks/useAssignments';
-import { useAppSelector } from '@/store/hooks';
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { selectCompletionRequirements } from '@/features/assignment/redux/assignmentSlice';
 
 export function ProofScreen() {
@@ -34,6 +35,7 @@ export function ProofScreen() {
   const [signatureData, setSignatureData] = useState(assignment?.signatureUri || '');
   const [notes, setNotes] = useState(assignment?.deliveryNotes || '');
 
+  const dispatch = useAppDispatch();
   useEffect(() => {
     if (assignment) {
       if (assignment.proofPhotoUris && photoUris.length === 0) setPhotoUris(assignment.proofPhotoUris);
@@ -44,6 +46,23 @@ export function ProofScreen() {
       if (assignment.deliveryNotes && !notes) setNotes(assignment.deliveryNotes);
     }
   }, [assignment]);
+
+  // Sync local state back to Redux so it persists if the user navigates back and forth
+  useEffect(() => {
+    if (!assignment) return;
+    const timeout = setTimeout(() => {
+      dispatch({
+        type: 'assignment/addAssignment',
+        payload: {
+          ...assignment,
+          proofPhotoUris: photoUris,
+          signatureUri: signatureData,
+          deliveryNotes: notes,
+        }
+      });
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [photoUris, signatureData, notes]);
 
   if (isLoading || !assignment) {
     return <ScreenLoader />;

@@ -28,7 +28,7 @@ export async function logout(): Promise<void> {
   } catch (error) {
     console.error('Logout API failed:', error);
   } finally {
-    await AsyncStorage.multiRemove(['riderToken', 'riderRefreshToken', 'riderId', 'persisted_assignments', 'persisted_workspace_summary']);
+    await AsyncStorage.multiRemove(['riderToken', 'riderRefreshToken']);
   }
 }
 

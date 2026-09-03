@@ -1,6 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, router } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, TouchableOpacity, Alert } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';

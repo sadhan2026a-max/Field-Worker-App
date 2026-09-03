@@ -22,7 +22,7 @@ export function ReturnDetailScreen() {
   const completionRequirements = useAppSelector(selectCompletionRequirements);
   const reqs = assignment ? completionRequirements?.[assignment.type.toLowerCase()] : null;
   const requiresReturnReason = reqs ? reqs.requiresReturnReason : true; // Fallback
-  
+
   const [reasons, setReasons] = useState<ReturnReasonOption[]>([]);
   const [selectedReasonId, setSelectedReasonId] = useState<string>(assignment?.returnDetail?.returnReasonOptionId || '');
   const [conditionNotes, setConditionNotes] = useState<string>(assignment?.returnDetail?.conditionNotes || '');
@@ -76,9 +76,20 @@ export function ReturnDetailScreen() {
         </View>
         <Text style={styles.subtitle}>Order #{assignment?.code}</Text>
 
+        {assignment?.returnDetail?.originalInvoiceNumber ? (
+          <View style={styles.invoiceContainer}>
+            <MaterialIcons name="receipt" size={20} color={colors.primary} />
+            <Text style={styles.invoiceText}>
+              Original Invoice: <Text style={{ fontFamily: 'Inter-Bold', fontWeight: 'bold' }}>{assignment.returnDetail.originalInvoiceNumber}</Text>
+            </Text>
+          </View>
+        ) : null}
+
         {requiresReturnReason ? (
           <>
-            <Text style={styles.label}>Select Return Reason *</Text>
+            <Text style={styles.label}>
+              Select Return Reason <Text style={{ color: colors.danger }}>*</Text>
+            </Text>
             <View style={styles.reasonsContainer}>
               {reasons.map((reason) => (
                 <Button
@@ -109,10 +120,10 @@ export function ReturnDetailScreen() {
       </ScrollView>
 
       <ScreenFooter>
-        <Button 
-          label="Continue to Proof" 
-          onPress={handleContinue} 
-          disabled={requiresReturnReason && !selectedReasonId} 
+        <Button
+          label="Continue to Proof"
+          onPress={handleContinue}
+          disabled={requiresReturnReason && !selectedReasonId}
         />
       </ScreenFooter>
     </SafeAreaView>
@@ -122,12 +133,18 @@ export function ReturnDetailScreen() {
 const useStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg },
-  title: { ...typography.h2,
-    color: colors.textPrimary, marginBottom: spacing.xs },
-  subtitle: { ...typography.body,
-    color: colors.textSecondary, marginBottom: spacing.xl },
-  label: { ...typography.h3,
-    color: colors.textPrimary, marginBottom: spacing.sm, marginTop: spacing.md },
+  title: {
+    ...typography.h2,
+    color: colors.textPrimary, marginBottom: spacing.xs
+  },
+  subtitle: {
+    ...typography.body,
+    color: colors.textSecondary, marginBottom: spacing.xl
+  },
+  label: {
+    ...typography.h3,
+    color: colors.textPrimary, marginBottom: spacing.sm, marginTop: spacing.md
+  },
   reasonsContainer: { gap: spacing.sm, marginBottom: spacing.lg },
   reasonButton: { alignSelf: 'flex-start' },
   textArea: {
@@ -139,5 +156,20 @@ const useStyles = (colors: any) => StyleSheet.create({
     ...typography.body,
     color: colors.textPrimary,
     minHeight: 100,
+  },
+  invoiceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary + '15',
+    padding: spacing.md,
+    borderRadius: 8,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.primary + '30',
+  },
+  invoiceText: {
+    ...typography.body,
+    color: colors.primary,
+    marginLeft: spacing.sm,
   }
 });

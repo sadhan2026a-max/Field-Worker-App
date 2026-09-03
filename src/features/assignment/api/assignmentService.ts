@@ -20,6 +20,36 @@ import { DriverWorkspaceSummary } from '@/domain/entities/Driver';
 import { logger } from '@/core/utils/logger';
 import { api } from '@/shared/services/axios';
 import * as FileSystem from 'expo-file-system';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+export const getLocalHistoryKey = (driverId: string) => `lifetime_history_${driverId}`;
+
+export async function getLifetimeHistory(driverId: string): Promise<Assignment[]> {
+  try {
+    const data = await AsyncStorage.getItem(getLocalHistoryKey(driverId));
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveLifetimeHistory(driverId: string, assignments: Assignment[]) {
+  try {
+    // Only save terminal states to lifetime history
+    const toSave = assignments.filter(a => a.status === 'completed' || a.status === 'cancelled');
+    if (toSave.length === 0) return;
+
+    const existing = await getLifetimeHistory(driverId);
+    
+    const map = new Map<string, Assignment>();
+    existing.forEach(a => map.set(a.id, a));
+    toSave.forEach(a => map.set(a.id, a));
+
+    await AsyncStorage.setItem(getLocalHistoryKey(driverId), JSON.stringify(Array.from(map.values())));
+  } catch (e) {
+    logger.warn('assignment', 'Failed to save lifetime history', e);
+  }
+}
 
 const ORDER_TYPE_MAP: Record<string, AssignmentType> = {
   Delivery: 'delivery',
@@ -115,7 +145,11 @@ function mapOrderDtoToAssignment(order: OrderDto, offerId?: string): Assignment 
       unitPrice: item.unitPrice,
     })),
     returnDetail: order.returnDetail
-      ? { returnReasonOptionId: order.returnDetail.returnReasonOptionId, conditionNotes: order.returnDetail.conditionNotes }
+      ? {
+        returnReasonOptionId: order.returnDetail.returnReasonOptionId,
+        conditionNotes: order.returnDetail.conditionNotes,
+        originalInvoiceNumber: order.returnDetail.originalInvoiceNumber
+      }
       : undefined,
     serviceDetail: order.serviceVisitDetail
       ? {
@@ -209,16 +243,19 @@ export async function getAssignments(status?: Assignment['status'] | string): Pr
     else if (status === 'pending') backendStatus = 'Offered'; // Or 'Pending' depending on backend
     else if (status) backendStatus = status.charAt(0).toUpperCase() + status.slice(1);
 
-    let url = backendStatus ? `/api/v1/driver/assignments?status=${backendStatus}` : '/api/v1/driver/assignments';
+    // Always fetch all driver assignments and filter locally to avoid URL query parameter mismatch
+    let url = '/api/v1/driver/assignments';
 
     const response = await api.get(url);
-    offers = Array.isArray(response.data) ? response.data : (response.data?.items || []);
-    logger.debug('assignment', `RAW OFFERS FROM API (${backendStatus || 'all'}):`, JSON.stringify(offers.slice(0, 2)));
+    offers = Array.isArray(response.data)
+      ? response.data
+      : (response.data?.items || response.data?.assignments || response.data?.data || []);
+    logger.debug('assignment', `RAW OFFERS FROM API:`, JSON.stringify(offers.slice(0, 2)));
   } catch (e: any) {
     logger.warn('assignment', `Failed to fetch driver assignments. Status code: ${e?.response?.status}`, e);
   }
 
-  const validOffers = Array.isArray(offers) ? offers.filter((i) => i && i.id && (i.orderId || i.orderNumber)) : [];
+  const validOffers = Array.isArray(offers) ? offers.filter((i) => i && (i.id || i.orderId)) : [];
 
   // Dedupe by orderId — the same order can have more than one offer in its history
   // (e.g. re-offered after expiry), and only the underlying order is what we display.
@@ -230,13 +267,9 @@ export async function getAssignments(status?: Assignment['status'] | string): Pr
   // GET /api/v1/orders (bulk list) is admin/dispatcher-only and 403s for a driver, so
   // each order is enriched individually via GET /api/v1/orders/{id} (self-service read),
   // which carries the real customer/type/checklist data the offers endpoint doesn't have.
-  // We only enrich if the offer is already accepted, otherwise the backend will return a 403.
   const enriched = await Promise.allSettled(
     uniqueOffers.map((offer) => {
       const orderId = offer.orderId || offer.id;
-      const os = offer.status?.toLowerCase();
-      // Let's attempt to fetch it to get real-time cancellation status.
-      // If it 403s because the backend truly restricts pending offers, we will handle it below.
       return api.get<OrderDto>(`/api/v1/orders/${orderId}`, { _suppressLog: true } as any);
     })
   );
@@ -256,8 +289,8 @@ export async function getAssignments(status?: Assignment['status'] | string): Pr
       return assignment;
     }
 
-    // Check if it's a 403 (Forbidden). If so, the driver lost access (order reassigned).
-    const isForbidden = result.reason?.response?.status === 403;
+    // Check if it's a 403 (Forbidden) or 404 (Not Found). If so, the driver lost access or order is cancelled.
+    const isForbidden = result.reason?.response?.status === 403 || result.reason?.response?.status === 404;
 
     // Only log warning if it was a real network error, not our deliberate skip or a 403 reassignment
     if (result.reason?.message !== 'Skip fetch for pending offer to avoid 403' && !isForbidden) {
@@ -266,20 +299,23 @@ export async function getAssignments(status?: Assignment['status'] | string): Pr
 
     // Fallback: bare offer data only (no customer/type detail available)
     let mappedStatus: Assignment['status'] = 'pending';
-    const os = offer.status?.toLowerCase();
+    const os = offer.status?.toLowerCase() || '';
+
+    const isCompletedStatus = ['completed', 'delivered', 'finished', 'done', 'closed'].includes(os);
+    const isCancelledStatus = ['cancelled', 'declined', 'expired', 'failed', 'rejected'].includes(os);
+
     if (os === 'accepted' || os === 'assigned') mappedStatus = 'accepted';
-    if (os === 'declined' || os === 'expired' || os === 'cancelled' || os === 'failed') mappedStatus = 'cancelled';
-    if (os === 'completed') mappedStatus = 'completed';
+    if (isCancelledStatus) mappedStatus = 'cancelled';
+    if (isCompletedStatus) mappedStatus = 'completed';
     if (os === 'inprogress' || os === 'in_progress') mappedStatus = 'in_progress';
     if (os === 'enroute' || os === 'en_route') mappedStatus = 'en_route';
     if (os === 'arrived') mappedStatus = 'arrived';
 
-    // If the driver is no longer authorized (403) to view this order:
-    // - For active orders, it means it was reassigned or cancelled -> mark as cancelled.
-    // - For pending offers, 403 is normal (driver hasn't accepted yet) -> keep as pending.
     if (isForbidden) {
       if (os === 'offered' || os === 'pending') {
         mappedStatus = 'pending';
+      } else if (isCompletedStatus) {
+        mappedStatus = 'completed';
       } else {
         mappedStatus = 'cancelled';
       }
@@ -432,7 +468,7 @@ export async function getAssignmentById(id: string): Promise<Assignment | undefi
     return await fetchOrderAsAssignment(id);
   } catch (e: any) {
     logger.warn('assignment', `Failed to fetch order ${id} (may be unaccepted offer), falling back to offers list`, e);
-    const isForbidden = e?.response?.status === 403;
+    const isForbidden = e?.response?.status === 403 || e?.response?.status === 404;
     try {
       const allAssignments = await getAssignments();
       const found = allAssignments.find((a) => a.id === id);

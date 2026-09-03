@@ -26,7 +26,7 @@ const initialState: AuthState = {
 /** Restore driver session from storage on app boot */
 export const initAuth = createAsyncThunk<Driver | null>(
   'auth/init',
-  async () => {
+  async (_, { dispatch }) => {
     logger.info('auth', 'Restoring session from storage…');
     const driver = await authService.getStoredDriver();
     if (driver) {
@@ -40,6 +40,9 @@ export const initAuth = createAsyncThunk<Driver | null>(
       } catch (tokenErr) {
         logger.warn('auth', 'Failed to register push token on boot', tokenErr);
       }
+      // Auto-sync today's orders in background after session restore
+      // Await it so the data is ready BEFORE the app UI fully renders
+      await dispatch(autoSyncTodayOrdersThunk(String(driver.id)));
     } else {
       logger.info('auth', 'No stored session found');
     }
@@ -49,18 +52,25 @@ export const initAuth = createAsyncThunk<Driver | null>(
 
 import { AxiosError } from 'axios';
 
+import { clearAssignments, hideCancelledAlert, autoSyncTodayOrdersThunk } from '@/features/assignment/redux/assignmentSlice';
+
 /** Login with phone + password */
 export const loginThunk = createAsyncThunk<
   Driver,
   { phone: string; password?: string; pin?: string },
   { rejectValue: string }
->('auth/login', async ({ phone, password, pin }, { rejectWithValue }) => {
+>('auth/login', async ({ phone, password, pin }, { rejectWithValue, dispatch }) => {
   logger.info('auth', 'Login attempt', { phone });
   try {
-    // Force clear any previous driver's persisted assignments/summary before logging in
-    await AsyncStorage.multiRemove(['persisted_assignments', 'persisted_workspace_summary']);
-
+    const previousDriverId = await AsyncStorage.getItem('riderId');
     const driver = await authService.login(phone, password, pin);
+    
+    // If a DIFFERENT driver logs in, clear the previous driver's data
+    if (previousDriverId && previousDriverId !== String(driver.id)) {
+      await AsyncStorage.multiRemove(['persisted_assignments', 'persisted_workspace_summary']);
+      dispatch(clearAssignments());
+    }
+
     logger.info('auth', 'Login successful', { driverId: driver.id, name: driver.name });
     
     // Register push token
@@ -72,6 +82,10 @@ export const loginThunk = createAsyncThunk<
     } catch (tokenErr) {
       logger.warn('auth', 'Failed to register push token after login', tokenErr);
     }
+
+    // Auto-sync today's orders in background (works even on fresh install / ID switch)
+    // Await it so the data is ready BEFORE the app UI fully renders the Dashboard
+    await dispatch(autoSyncTodayOrdersThunk(String(driver.id)));
 
     return driver;
   } catch (err: any) {
@@ -105,9 +119,18 @@ export const loginThunk = createAsyncThunk<
 /** Logout and clear storage */
 export const logoutThunk = createAsyncThunk<void>(
   'auth/logout',
-  async () => {
+  async (_, { dispatch }) => {
     logger.info('auth', 'Driver logging out…');
     
+    // Clear persisted assignment data and Redux state on logout
+    try {
+      await AsyncStorage.multiRemove(['persisted_assignments', 'persisted_workspace_summary', 'riderId']);
+    } catch (e) {
+      logger.warn('auth', 'Failed to clear persisted storage on logout', e);
+    }
+    dispatch(clearAssignments());
+    dispatch(hideCancelledAlert());
+
     // Remove push token
     try {
       const token = await NotificationService.registerForPushNotificationsAsync();

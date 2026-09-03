@@ -431,7 +431,6 @@ export function AssignmentDetailScreen() {
           </View>
         )}
 
-        {assignment.status !== 'cancelled' && (
           <>
             {/* Customer Profile Card */}
             <View style={styles.customerCard}>
@@ -448,7 +447,7 @@ export function AssignmentDetailScreen() {
               <View style={styles.divider} />
 
               {/* Call & WhatsApp buttons — only show for active orders (not pending, completed, or cancelled) */}
-              {assignment.status !== 'pending' && assignment.status !== 'completed' && (
+              {assignment.status !== 'pending' && assignment.status !== 'completed' && assignment.status !== 'cancelled' && assignment.customer.phone && assignment.customer.phone !== 'N/A' && (
                 <View style={styles.customerActions}>
                   <TouchableOpacity style={[styles.actionBtn, styles.actionBtnCall]} onPress={() => Linking.openURL(`tel:${assignment.customer.phone}`)}>
                     <MaterialIcons name="call" size={18} color="#FFFFFF" />
@@ -474,7 +473,7 @@ export function AssignmentDetailScreen() {
                 <Text style={styles.addressText}>
                   {assignment.customer.address.split(',').slice(1).join(',').trim()}
                 </Text>
-                {assignment.status !== 'completed' && (
+                {assignment.status !== 'completed' && assignment.status !== 'cancelled' && (
                   <DistanceDisplay
                     style={styles.distanceText}
                     currentLocation={currentLocation}
@@ -486,10 +485,9 @@ export function AssignmentDetailScreen() {
               </View>
             </View>
           </>
-        )}
 
         {/* Order Details Card */}
-        {assignment.status !== 'cancelled' && (['delivery', 'pickup', 'return'].includes(assignment.type) || assignment.itemCount > 0) && (
+        {(['delivery', 'pickup', 'return'].includes(assignment.type) || assignment.itemCount > 0) && (
           <View style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>Order Details</Text>
             <Text style={styles.orderSummary}>
@@ -502,7 +500,7 @@ export function AssignmentDetailScreen() {
         )}
 
         {/* Instructions Card */}
-        {assignment.status !== 'cancelled' && (['delivery', 'pickup', 'return'].includes(assignment.type) || assignment.deliveryInstructions) && (
+        {(['delivery', 'pickup', 'return'].includes(assignment.type) || assignment.deliveryInstructions) && (
           <View style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>
               {['sales_visit', 'service_visit', 'inspection', 'installation'].includes(assignment.type)

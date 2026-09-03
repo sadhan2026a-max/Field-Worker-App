@@ -63,6 +63,7 @@ export interface ChecklistItem {
 export interface ReturnDetail {
   returnReasonOptionId: string;
   conditionNotes?: string;
+  originalInvoiceNumber?: string;
 }
 
 export interface PartUsed {

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { router, useLocalSearchParams } from 'expo-router';
+import React, { useState, useEffect, useCallback } from 'react';
+import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { FlatList, Pressable, StyleSheet, Text, View, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -11,7 +11,8 @@ import { spacing, typography, palette, FontFamily, FontSize, useTheme } from '@/
 import { useAssignments, useWorkspaceSummary } from '@/hooks/useAssignments';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { selectDriver } from '@/features/auth/redux/authSlice';
-import { fetchAssignments } from '@/features/assignment/redux/assignmentSlice';
+import { fetchAssignments, syncHistoryFromNotificationsThunk } from '@/features/assignment/redux/assignmentSlice';
+import * as assignmentService from '@/features/assignment/api/assignmentService';
 import { useCurrentLocation, calculateDistanceKm } from '@/shared/utils/location';
 import { DistanceDisplay } from '@/features/assignment/components';
 
@@ -51,14 +52,38 @@ export function AssignmentsScreen() {
   const { data: assignments, isLoading, refetch } = useAssignments();
   const { data: summary, refetch: refetchSummary } = useWorkspaceSummary();
   const currentLocation = useCurrentLocation();
-  const params = useLocalSearchParams<{ tab?: 'all' | 'pending' | 'completed' }>();
-  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'completed'>(params.tab || 'all');
+  const params = useLocalSearchParams<{ tab?: 'all' | 'pending' | 'completed' | 'cancelled' }>();
+  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'completed' | 'cancelled'>(params.tab || 'all');
 
-  useEffect(() => {
-    if (activeTab === 'completed') {
-      dispatch(fetchAssignments('completed'));
+  // Separate local state for history tabs (completed/cancelled) — NOT mixed with Redux active store
+  const [historyAssignments, setHistoryAssignments] = useState<typeof assignments>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    await dispatch(syncHistoryFromNotificationsThunk()).unwrap();
+    await loadHistory();
+    setIsSyncing(false);
+  };
+
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    try {
+      const data = await assignmentService.getAssignments();
+      setHistoryAssignments(data);
+    } catch (e) {
+      setHistoryAssignments([]);
+    } finally {
+      setHistoryLoading(false);
     }
-  }, [activeTab, dispatch]);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadHistory();
+    }, [loadHistory])
+  );
 
   useEffect(() => {
     if (params.tab && params.tab !== activeTab) {
@@ -69,59 +94,97 @@ export function AssignmentsScreen() {
   const onRefresh = async () => {
     await refetch();
     await refetchSummary();
-    if (activeTab === 'completed') {
-      await dispatch(fetchAssignments('completed'));
-    }
+    await loadHistory();
   };
 
-  const allAssignments = [...(assignments ?? [])].sort((a, b) => {
-    const priority: Record<string, number> = {
-      'in_progress': 1,
-      'arrived': 2,
-      'en_route': 3,
-      'accepted': 4,
-      'pending': 5,
-      'completed': 6,
-      'cancelled': 7,
-    };
+  // Filter out dummy/ghost assignments (code === 'N/A') so they don't clutter the UI or affect badge counts
+  const validAssignments = (assignments ?? []).filter((a) => a.code !== 'N/A');
+  const validHistoryAssignments = (historyAssignments ?? []).filter((a) => a.code !== 'N/A');
 
-    const pA = priority[a.status] || 99;
-    const pB = priority[b.status] || 99;
+  // Merge Redux assignments + API historyAssignments for completed/cancelled tabs
+  const reduxCompleted = validAssignments.filter((a) => a.status === 'completed');
+  const reduxCancelled = validAssignments.filter((a) => a.status === 'cancelled');
 
-    if (pA !== pB) return pA - pB;
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-  });
+  const completedMap = new Map<string, typeof assignments[0]>();
+  validHistoryAssignments.forEach((a) => { if (a.status === 'completed') completedMap.set(a.id, a); });
+  reduxCompleted.forEach((a) => completedMap.set(a.id, a));
+  const completedAssignments = Array.from(completedMap.values()).sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+
+  const cancelledMap = new Map<string, typeof assignments[0]>();
+  validHistoryAssignments.forEach((a) => { if (a.status === 'cancelled') cancelledMap.set(a.id, a); });
+  reduxCancelled.forEach((a) => cancelledMap.set(a.id, a));
+  const cancelledAssignments = Array.from(cancelledMap.values()).sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+
+  // Active assignments (pending, accepted, en_route, arrived, in_progress)
   const isOnline = driver?.status === 'Available';
   const activeStatuses = ['accepted', 'en_route', 'arrived', 'in_progress'];
   const pendingStatuses = isOnline ? ['pending', ...activeStatuses] : activeStatuses;
 
-  const pendingAssignments = allAssignments.filter(
-    (a) => pendingStatuses.includes(a.status)
-  );
-  const completedAssignments = allAssignments.filter(
-    (a) => a.status === 'completed'
+  const pendingAssignments = [...validAssignments, ...validHistoryAssignments]
+    .filter((a) => pendingStatuses.includes(a.status))
+    .filter((a, index, self) => self.findIndex(t => t.id === a.id) === index)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  // All assignments tab (combines active + completed + cancelled, deduped by ID)
+  const allMap = new Map<string, typeof assignments[0]>();
+  validAssignments.forEach((a) => allMap.set(a.id, a));
+  validHistoryAssignments.forEach((a) => allMap.set(a.id, a));
+  const allAssignments = Array.from(allMap.values()).sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 
   const displayCompletedCount = Math.max(summary?.completedCount ?? 0, completedAssignments.length);
+  const displayCancelledCount = cancelledAssignments.length;
 
   const displayedAssignments =
     activeTab === 'all'
       ? allAssignments
       : activeTab === 'pending'
         ? pendingAssignments
-        : completedAssignments;
+        : activeTab === 'completed'
+          ? completedAssignments
+          : cancelledAssignments;
 
   // driver status already extracted above
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Title Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
         <Text style={styles.title}>My Assignments</Text>
+        <Pressable
+          onPress={handleSync}
+          disabled={isSyncing}
+          style={({ pressed }) => [
+            {
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: isSyncing ? colors.border : colors.primary,
+              paddingHorizontal: 14,
+              paddingVertical: 8,
+              borderRadius: 20,
+              gap: 6
+            },
+            pressed && { opacity: 0.8 }
+          ]}
+        >
+          <MaterialIcons name="sync" size={16} color={isSyncing ? colors.textSecondary : '#FFFFFF'} />
+          <Text style={{
+            color: isSyncing ? colors.textSecondary : '#FFFFFF',
+            fontFamily: FontFamily.bold,
+            fontSize: 12
+          }}>
+            {isSyncing ? 'Restoring...' : 'All Orders'}
+          </Text>
+        </Pressable>
       </View>
 
       {/* Tabs list */}
-      <View style={styles.tabBar}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, maxHeight: 45, minHeight: 45 }} contentContainerStyle={styles.tabBar}>
         <Pressable
           style={[styles.tab, activeTab === 'all' && styles.activeTab]}
           onPress={() => setActiveTab('all')}
@@ -148,10 +211,25 @@ export function AssignmentsScreen() {
             Completed <Text style={styles.tabCount}>{displayCompletedCount}</Text>
           </Text>
         </Pressable>
-      </View>
+
+        <Pressable
+          style={[
+            styles.tab, 
+            activeTab === 'cancelled' && [styles.activeTab, { backgroundColor: colors.danger }]
+          ]}
+          onPress={() => setActiveTab('cancelled')}
+        >
+          <Text style={[
+            styles.tabLabel, 
+            activeTab === 'cancelled' && [styles.activeTabLabel, { color: '#FFFFFF' }]
+          ]}>
+            Cancelled <Text style={styles.tabCount}>{displayCancelledCount}</Text>
+          </Text>
+        </Pressable>
+      </ScrollView>
 
       {/* Assignments List */}
-      {isLoading ? (
+      {(isLoading || historyLoading) ? (
         <ScrollView contentContainerStyle={styles.list}>
           {[1, 2, 3, 4].map((i) => (
             <Card key={i} style={styles.card}>
@@ -186,9 +264,13 @@ export function AssignmentsScreen() {
           refreshing={false}
           ListEmptyComponent={
             <EmptyState
-              icon={activeTab === 'completed' ? 'done-all' : 'assignment'}
-              title={activeTab === 'completed' ? 'No Recent Completions' : 'No Assignments'}
-              description={activeTab === 'completed' ? 'Your completed orders for today will appear here. Note: Historical orders are only visible in the web dashboard.' : 'You have no assignments in this category right now.'}
+              icon={activeTab === 'completed' ? 'done-all' : activeTab === 'cancelled' ? 'cancel' : 'assignment'}
+              title={activeTab === 'completed' ? 'No Recent Completions' : activeTab === 'cancelled' ? 'No Cancelled Orders' : 'No Assignments'}
+              description={activeTab === 'completed'
+                ? 'Your completed orders for today will appear here. Note: Historical orders are only visible in the web dashboard.'
+                : activeTab === 'cancelled'
+                  ? 'There are no cancelled orders for today.'
+                  : 'You have no assignments in this category right now.'}
             />
           }
           renderItem={({ item }) => (
@@ -323,6 +405,7 @@ const useStyles = (colors: any) => StyleSheet.create({
   },
   tabBar: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.md,
