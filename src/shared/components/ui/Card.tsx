@@ -14,10 +14,14 @@ export function Card({ style, children, ...rest }: ViewProps) {
 
 const useStyles = (colors: any) => StyleSheet.create({
   card: {
-    backgroundColor: colors.surface,
-    borderRadius: Borders.radius2,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
     padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
+    shadowColor: '#8a8a8a', // Lighter shadow color for a softer look on Android
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4, // Higher elevation spreads the shadow out, making it smooth instead of a hard line
   },
 });

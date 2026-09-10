@@ -14,6 +14,7 @@ import { selectDriver, selectTenant, toggleAvailability, fetchTenantThunk } from
 import { spacing, FontFamily, typography, useTheme } from '@/core/theme';
 import { useAssignments, useWorkspaceSummary } from '@/hooks/useAssignments';
 import { fetchNotifications, selectUnreadCount } from '@/features/notification/redux/notificationSlice';
+import { syncHistoryFromNotificationsThunk } from '@/features/assignment/redux/assignmentSlice';
 import { useIsFocused, useFocusEffect } from '@react-navigation/native';
 import { useEffect } from 'react';
 import { Assignment } from '@/features/assignment/types/Assignment';
@@ -27,7 +28,7 @@ const getQuickActions = (colors: any): {
   onPress: () => void;
 }[] => [
     { icon: 'qr-code-scanner', label: 'Scan QR', subtitle: 'Instant Order Check', tint: colors.primary, tintLight: colors.primary + '15', onPress: () => safeRouter.push('/scan-qr') },
-    { icon: 'assignment', label: 'My Assignments', subtitle: 'View All Tasks', tint: colors.primaryDark || colors.primary, tintLight: (colors.primaryDark || colors.primary) + '15', onPress: () => safeRouter.push('/(tabs)/assignments') },
+    { icon: 'assignment', label: 'My Assignments', subtitle: 'View All Tasks', tint: colors.primaryDark || colors.primary, tintLight: (colors.primaryDark || colors.primary) + '15', onPress: () => safeRouter.push('/all-assignments') },
     { icon: 'campaign', label: 'Broadcast Jobs', subtitle: 'Open Marketplace', tint: colors.warning, tintLight: colors.warning + '15', onPress: () => safeRouter.push('/(tabs)/assignments?tab=pending') },
     { icon: 'notifications', label: 'Notifications', subtitle: 'System Alerts', tint: colors.danger, tintLight: colors.danger + '15', onPress: () => safeRouter.push('/notifications') },
   ];
@@ -140,6 +141,7 @@ export function WorkspaceScreen() {
   useEffect(() => {
     dispatch(fetchNotifications());
     dispatch(fetchTenantThunk());
+    dispatch(syncHistoryFromNotificationsThunk({ onlyToday: true }));
   }, [dispatch]);
 
 
@@ -204,7 +206,8 @@ export function WorkspaceScreen() {
       await Promise.all([
         refetchSummary(),
         refetchAssignments(),
-        dispatch(fetchNotifications())
+        dispatch(fetchNotifications()),
+        dispatch(syncHistoryFromNotificationsThunk({ onlyToday: true }))
       ]);
     } catch (error) {
       console.error('Failed to refresh dashboard', error);

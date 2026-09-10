@@ -4,7 +4,7 @@ import { store } from '@/store';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { NotificationService } from '@/core/services/NotificationService';
 import * as Notifications from 'expo-notifications';
-import { fetchAssignments, fetchWorkspaceSummary, fetchOrderCompletionRequirements, restoreAssignments, restoreWorkspaceSummary, setHydrated, fetchAssignmentById } from '@/features/assignment/redux/assignmentSlice';
+import { fetchAssignments, fetchWorkspaceSummary, fetchOrderCompletionRequirements, restoreAssignments, restoreWorkspaceSummary, setHydrated, fetchAssignmentById, showCancelledAlert } from '@/features/assignment/redux/assignmentSlice';
 import { fetchNotifications } from '@/features/notification/redux/notificationSlice';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -143,7 +143,7 @@ function AppBootstrap({ children }: { children: React.ReactNode }) {
       if (isCancellation) {
         // ── CANCEL: show popup immediately from notification text ──────────
         const orderCodeMatch = bodyStr.match(/ORD-[\w-]+/i);
-        const orderCode = orderCodeMatch ? orderCodeMatch[0] : (orderId || '');
+        const orderCode = orderCodeMatch ? orderCodeMatch[0] : (orderId ? String(orderId) : '');
         dispatch(showCancelledAlert(orderCode));
 
         // Refresh order state in background
