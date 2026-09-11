@@ -134,12 +134,10 @@ export function AllAssignmentsScreen() {
   );
 
   // Active assignments (pending, accepted, en_route, arrived, in_progress)
-  const isOnline = driver?.status === 'Available';
-  const activeStatuses = ['accepted', 'en_route', 'arrived', 'in_progress'];
-  const pendingStatuses = isOnline ? ['pending', ...activeStatuses] : activeStatuses;
+  const activeStatuses = ['pending', 'accepted', 'en_route', 'arrived', 'in_progress'];
 
   const pendingAssignments = [...validAssignments, ...validHistoryAssignments]
-    .filter((a) => pendingStatuses.includes(a.status))
+    .filter((a) => activeStatuses.includes(a.status))
     .filter((a, index, self) => self.findIndex(t => t.id === a.id) === index)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 

@@ -4,9 +4,9 @@ import { store } from '@/store';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { NotificationService } from '@/core/services/NotificationService';
 import * as Notifications from 'expo-notifications';
-import { fetchAssignments, fetchWorkspaceSummary, fetchOrderCompletionRequirements, restoreAssignments, restoreWorkspaceSummary, setHydrated, fetchAssignmentById, showCancelledAlert } from '@/features/assignment/redux/assignmentSlice';
+import { fetchAssignments, fetchWorkspaceSummary, fetchOrderCompletionRequirements, restoreAssignments, restoreWorkspaceSummary, setHydrated, fetchAssignmentById, showCancelledAlert, addAssignment } from '@/features/assignment/redux/assignmentSlice';
 import { fetchNotifications } from '@/features/notification/redux/notificationSlice';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState, Component } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -24,7 +24,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as SplashScreen from 'expo-splash-screen';
-import { Text, View, ScrollView, StyleSheet, Animated, Easing } from 'react-native';
+import { Text, View, ScrollView, StyleSheet, Animated, Easing, AppState, AppStateStatus } from 'react-native';
 import { useRef } from 'react';
 import { colors, typography, FontSize, ThemeProvider, useTheme } from '@/core/theme';
 import { TabletWrapper } from '@/shared/components/ui/TabletWrapper';
@@ -155,18 +155,54 @@ function AppBootstrap({ children }: { children: React.ReactNode }) {
         }, 3000);
 
       } else if (orderId) {
-        // ── NEW ORDER: add to Redux state immediately via ID ───────────────
-        // Do NOT call fetchAssignments first — it would race and delete this
-        // new pending order (backend still returns [] for this driver)
+        // ── NEW ORDER: show card on home screen INSTANTLY ────────────────────
+        // 1. Extract order code & type from notification text
+        const orderCodeMatch = bodyStr.match(/ORD-[\w-]+/i);
+        const extractedCode = orderCodeMatch ? orderCodeMatch[0] : String(orderId);
+
+        // Detect order type from notification title/body text
+        const bodyLower = bodyStr.toLowerCase();
+        const titleLower = titleStr.toLowerCase();
+        const detectedType = (
+          bodyLower.includes('pickup') || titleLower.includes('pickup') ? 'pickup' :
+            bodyLower.includes('return') || titleLower.includes('return') ? 'return' :
+              bodyLower.includes('installation') || titleLower.includes('installation') ? 'installation' :
+                bodyLower.includes('inspection') || titleLower.includes('inspection') ? 'inspection' :
+                  bodyLower.includes('service') || titleLower.includes('service') ? 'service_visit' :
+                    'delivery'
+        );
+
+        // 2. Dispatch a placeholder assignment IMMEDIATELY so the card
+        //    appears on the home screen without waiting for the API.
+        //    The NextDeliveryCard already handles placeholder values:
+        //    name='Customer', address='order details available after acceptance'
+        dispatch(addAssignment({
+          id: String(orderId),
+          offerId: String(orderId),
+          code: extractedCode,
+          type: detectedType as any,
+          status: 'pending',
+          customer: {
+            name: 'Customer',
+            phone: 'N/A',
+            address: 'order details available after acceptance',
+            location: { latitude: 0, longitude: 0 },
+          },
+          distanceKm: 0,
+          etaMinutes: 0,
+          itemCount: 0,
+          totalAmount: 0,
+          codAmount: 0,
+          createdAt: new Date().toISOString(),
+          items: [],
+        }));
+
+        // 3. Fetch real details in background — upsertAssignment will update
+        //    the placeholder with actual customer name, address, offerId etc.
         await dispatch(fetchAssignmentById(String(orderId)));
 
-        // After the new order is safely in Redux state, refresh full list
-        // with a delay so the upsert above is not overwritten
-        setTimeout(() => {
-          dispatch(fetchAssignments());
-          dispatch(fetchWorkspaceSummary(currentDriver.id));
-        }, 2000);
-
+        // 4. Refresh summary
+        dispatch(fetchWorkspaceSummary(currentDriver.id));
       } else {
         // Other notifications: just refresh everything
         dispatch(fetchAssignments());
@@ -196,6 +232,29 @@ function AppBootstrap({ children }: { children: React.ReactNode }) {
     };
   }, [dispatch]);
 
+  // ── AppState: refresh when app comes back to foreground ──────────────────────
+  // When the app is in the background, the foreground notification listener
+  // does NOT fire. So if a new order / cancellation arrives while minimised,
+  // the user sees stale data until they pull-to-refresh.
+  // Listening to AppState fixes this: the moment they open the app we
+  // re-fetch everything — same as a manual pull-to-refresh but automatic.
+  useEffect(() => {
+    const handleAppStateChange = (nextState: AppStateStatus) => {
+      if (nextState === 'active') {
+        const currentDriver = store.getState().auth.driver;
+        if (!currentDriver?.id) return;
+
+        logger.info('appstate', 'App came to foreground — refreshing assignments');
+        dispatch(fetchAssignments());
+        dispatch(fetchWorkspaceSummary(currentDriver.id));
+        dispatch(fetchNotifications());
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription.remove();
+  }, [dispatch]);
+
   // Fetch dynamic completion requirements only when the user is fully logged in
   useEffect(() => {
     if (driver?.id) {
@@ -203,18 +262,22 @@ function AppBootstrap({ children }: { children: React.ReactNode }) {
     }
   }, [driver?.id, dispatch]);
 
+  const segments = useSegments();
+
   // Global authentication state router hook
   useEffect(() => {
     if (isLoading) return;
 
-    if (!driver) {
-      logger.info('bootstrap', '≡ƒöä No driver session ΓÇö routing to login screen');
+    const inAuthGroup = segments[0] === 'auth';
+
+    if (!driver && !inAuthGroup) {
+      logger.info('bootstrap', '🔄 No driver session — routing to login screen');
       router.replace('/auth/login');
-    } else {
-      logger.info('bootstrap', '≡ƒöä Driver session active ΓÇö routing to workspace');
+    } else if (driver && inAuthGroup) {
+      logger.info('bootstrap', '🔄 Driver session active — routing to workspace');
       router.replace('/(tabs)');
     }
-  }, [driver, isLoading]);
+  }, [driver, isLoading, segments]);
 
   return (
     <>
@@ -316,6 +379,7 @@ function RootNavigator() {
           screenOptions={{
             headerShown: false,
             headerShadowVisible: false,
+            animation: 'none',
             contentStyle: { backgroundColor: colors.background },
             headerStyle: {
               backgroundColor: colors.background,
@@ -329,10 +393,10 @@ function RootNavigator() {
             headerTintColor: colors.textPrimary,
           }}
         >
-          <Stack.Screen name="index" />
-          <Stack.Screen name="auth" />
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="assignment/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="index" options={{ animation: 'none' }} />
+          <Stack.Screen name="auth" options={{ animation: 'none' }} />
+          <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
+          <Stack.Screen name="assignment/[id]" options={{ headerShown: false, animation: 'default' }} />
         </Stack>
       </TabletWrapper>
       <Toast position="bottom" bottomOffset={100} config={toastConfig} />

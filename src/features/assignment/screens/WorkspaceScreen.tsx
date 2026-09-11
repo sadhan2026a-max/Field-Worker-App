@@ -10,7 +10,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/shared/components/ui/Skeleton';
 import { DashboardHeader, NextDeliveryCard, QuickActionButton, StatCard } from '@/features/assignment/components';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { selectDriver, selectTenant, toggleAvailability, fetchTenantThunk } from '@/features/auth/redux/authSlice';
+import { selectDriver, selectIsLoading, selectTenant, toggleAvailability, fetchTenantThunk } from '@/features/auth/redux/authSlice';
 import { spacing, FontFamily, typography, useTheme } from '@/core/theme';
 import { useAssignments, useWorkspaceSummary } from '@/hooks/useAssignments';
 import { fetchNotifications, selectUnreadCount } from '@/features/notification/redux/notificationSlice';
@@ -131,6 +131,7 @@ export function WorkspaceScreen() {
   const { colors } = useTheme();
   const styles = useStyles(colors);
   const driver = useAppSelector(selectDriver);
+  const isAuthLoading = useAppSelector(selectIsLoading); // true while logoutThunk is in-flight
   const dispatch = useAppDispatch();
   const { data: summary, isLoading: isSummaryLoading, refetch: refetchSummary } = useWorkspaceSummary();
   const { data: allAssignments, isLoading: isAssignmentsLoading, refetch: refetchAssignments } = useAssignments();
@@ -154,45 +155,56 @@ export function WorkspaceScreen() {
   const previousActiveIds = React.useRef<string[]>([]);
 
   useEffect(() => {
-    if (allAssignments) {
-      const currentPendingIds = allAssignments
-        .filter(a => a.status === 'pending')
-        .map(a => a.id);
-
-      if (previousPendingIds.current.length > 0) {
-        const allCurrentIds = new Set(allAssignments.map(a => a.id));
-        const missedIds = previousPendingIds.current.filter(id => !allCurrentIds.has(id));
-
-        if (missedIds.length > 0) {
-          Toast.show({
-            type: 'error',
-            text1: 'Sorry! You missed this order',
-          });
-        }
-      }
-
-      previousPendingIds.current = currentPendingIds;
-
-      const currentActiveIds = allAssignments
-        .filter(a => ['accepted', 'en_route', 'in_progress'].includes(a.status))
-        .map(a => a.id);
-
-      if (previousActiveIds.current.length > 0) {
-        const allCurrentIds = new Set(allAssignments.map(a => a.id));
-        const cancelledIds = previousActiveIds.current.filter(id => !allCurrentIds.has(id));
-
-        if (cancelledIds.length > 0) {
-          Toast.show({
-            type: 'error',
-            text1: 'Order Cancelled',
-            text2: 'An active order was removed or cancelled.',
-          });
-        }
-      }
-
-      previousActiveIds.current = currentActiveIds;
+    // Skip if:
+    //  • driver is null  → already logged out
+    //  • isAuthLoading   → logoutThunk.pending fired (driver still set, but
+    //                      clearAssignments() has already emptied the list)
+    // Without the isAuthLoading guard, clearAssignments() empties allAssignments
+    // BEFORE driver becomes null, so the !driver check alone fires too late.
+    if (!driver || isAuthLoading || !allAssignments) {
+      // Reset refs so stale IDs don't fire toasts on the next login
+      previousPendingIds.current = [];
+      previousActiveIds.current = [];
+      return;
     }
-  }, [allAssignments]);
+
+    const currentPendingIds = allAssignments
+      .filter(a => a.status === 'pending')
+      .map(a => a.id);
+
+    if (previousPendingIds.current.length > 0) {
+      const allCurrentIds = new Set(allAssignments.map(a => a.id));
+      const missedIds = previousPendingIds.current.filter(id => !allCurrentIds.has(id));
+
+      if (missedIds.length > 0) {
+        Toast.show({
+          type: 'error',
+          text1: 'Sorry! You missed this order',
+        });
+      }
+    }
+
+    previousPendingIds.current = currentPendingIds;
+
+    const currentActiveIds = allAssignments
+      .filter(a => ['accepted', 'en_route', 'in_progress'].includes(a.status))
+      .map(a => a.id);
+
+    if (previousActiveIds.current.length > 0) {
+      const allCurrentIds = new Set(allAssignments.map(a => a.id));
+      const cancelledIds = previousActiveIds.current.filter(id => !allCurrentIds.has(id));
+
+      if (cancelledIds.length > 0) {
+        Toast.show({
+          type: 'error',
+          text1: 'Order Cancelled',
+          text2: 'An active order was removed or cancelled.',
+        });
+      }
+    }
+
+    previousActiveIds.current = currentActiveIds;
+  }, [driver, isAuthLoading, allAssignments]);
 
   useEffect(() => {
     if (!isSummaryLoading && !isAssignmentsLoading) {
@@ -219,11 +231,26 @@ export function WorkspaceScreen() {
   const isAvailable = driver?.status === 'Available';
 
   const activeStatuses = ['accepted', 'en_route', 'arrived', 'in_progress'];
-  const displayStatuses = isAvailable ? ['pending', ...activeStatuses] : activeStatuses;
+  const nonTerminalStatuses = ['in_progress', 'arrived', 'en_route', 'accepted', 'pending'];
 
-  const nextDelivery = allAssignments?.find(a => displayStatuses.includes(a.status));
+  const activeOrders = (allAssignments || [])
+    .filter((a) => nonTerminalStatuses.includes(a.status))
+    .sort((a, b) => {
+      const priority: Record<string, number> = {
+        in_progress: 5,
+        arrived: 4,
+        en_route: 3,
+        accepted: 2,
+        pending: 1,
+      };
+      const pDiff = (priority[b.status] || 0) - (priority[a.status] || 0);
+      if (pDiff !== 0) return pDiff;
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+    });
 
-  const pendingCount = allAssignments?.filter(a => displayStatuses.includes(a.status)).length ?? 0;
+  const nextDelivery = activeOrders[0];
+
+  const pendingCount = activeOrders.length;
 
   const isToday = (dateString?: string) => {
     if (!dateString) return false;

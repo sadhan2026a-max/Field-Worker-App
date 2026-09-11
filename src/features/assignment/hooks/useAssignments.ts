@@ -84,11 +84,9 @@ export function useAssignments(status?: Assignment['status'] | string) {
           if (Array.isArray(parsed) && parsed.length > 0) {
             dispatch(restoreAssignments(parsed));
 
-            // STEP 2: For each cached active order, refresh it directly by ID
-            // This is the SAME API that notification uses (fetchAssignmentById)
-            // It works even when the bulk assignments API returns nothing
-            const activeStatuses = ['accepted', 'en_route', 'arrived', 'in_progress'];
-            const activeOrders = parsed.filter((a: any) => activeStatuses.includes(a.status));
+            // STEP 2: For each cached active or pending order, refresh it directly by ID
+            const nonTerminalStatuses = ['pending', 'accepted', 'en_route', 'arrived', 'in_progress'];
+            const activeOrders = parsed.filter((a: any) => nonTerminalStatuses.includes(a.status));
             for (const order of activeOrders) {
               if (order.id) {
                 dispatch(fetchAssignmentById(order.id));
@@ -100,38 +98,31 @@ export function useAssignments(status?: Assignment['status'] | string) {
         // ignore cache errors, continue with API
       }
 
-      // STEP 3: Fetch from API (pending offers + other statuses)
+      // STEP 3: Fetch from API
       dispatch(fetchAssignmentsThunk(status));
-      if (!status) {
-        dispatch(fetchAssignmentsThunk('in_progress'));
-        dispatch(fetchAssignmentsThunk('en_route'));
-        dispatch(fetchAssignmentsThunk('accepted'));
-        dispatch(fetchAssignmentsThunk('completed'));
-        dispatch(fetchAssignmentsThunk('cancelled'));
-      }
     };
 
     loadData();
   }, [dispatch, status]);
 
   const refetch = async () => {
-    // On manual refresh, re-fetch each active order by ID (guaranteed to work)
+    // On manual refresh, re-fetch each active and pending order by ID (guaranteed to work)
     const currentItems = items;
-    const activeStatuses = ['accepted', 'en_route', 'arrived', 'in_progress'];
-    const activeOrders = currentItems.filter((a) => activeStatuses.includes(a.status));
-    for (const order of activeOrders) {
-      if (order.id) {
-        dispatch(fetchAssignmentById(order.id));
-      }
-    }
+    const nonTerminalStatuses = ['pending', 'accepted', 'en_route', 'arrived', 'in_progress'];
+    const activeOrders = currentItems.filter((a) => nonTerminalStatuses.includes(a.status));
 
-    await dispatch(fetchAssignmentsThunk(status)).unwrap();
-    if (!status) {
-      dispatch(fetchAssignmentsThunk('in_progress'));
-      dispatch(fetchAssignmentsThunk('en_route'));
-      dispatch(fetchAssignmentsThunk('accepted'));
-      dispatch(fetchAssignmentsThunk('completed'));
-      dispatch(fetchAssignmentsThunk('cancelled'));
+    // Refresh active/pending orders by ID in parallel
+    await Promise.all(
+      activeOrders
+        .filter((order) => !!order.id)
+        .map((order) => dispatch(fetchAssignmentById(order.id)))
+    );
+
+    // Then refresh bulk assignments
+    try {
+      await dispatch(fetchAssignmentsThunk(status)).unwrap();
+    } catch (e) {
+      // ignore bulk fetch error, individual items are already refreshed
     }
   };
 

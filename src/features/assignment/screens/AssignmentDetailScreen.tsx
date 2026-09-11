@@ -62,6 +62,7 @@ export function AssignmentDetailScreen() {
 
   const [refreshing, setRefreshing] = useState(false);
   const [actionType, setActionType] = useState<'accept' | 'decline' | null>(null);
+  const [isDeclineModalVisible, setDeclineModalVisible] = useState(false);
 
   const releaseAssignment = useReleaseAssignment();
 
@@ -263,25 +264,21 @@ export function AssignmentDetailScreen() {
   };
 
   const onDecline = () => {
-    Alert.alert('Decline Offer', 'Are you sure you want to decline this assignment?', [
-      { text: 'Back', style: 'cancel' },
-      {
-        text: 'Decline',
-        style: 'destructive',
-        onPress: async () => {
-          setActionType('decline');
-          try {
-            await declineOffer.mutateAsync(assignment.offerId ?? assignment.id);
-            Toast.show({ type: 'success', text1: 'Offer Declined' });
-            router.back();
-          } catch (error: any) {
-            Toast.show({ type: 'error', text1: error?.message || 'Failed to decline offer' });
-          } finally {
-            setActionType(null);
-          }
-        }
-      }
-    ]);
+    setDeclineModalVisible(true);
+  };
+
+  const handleConfirmDecline = async () => {
+    setActionType('decline');
+    try {
+      await declineOffer.mutateAsync(assignment.offerId ?? assignment.id);
+      setDeclineModalVisible(false);
+      Toast.show({ type: 'success', text1: 'Offer Declined' });
+      router.back();
+    } catch (error: any) {
+      Toast.show({ type: 'error', text1: error?.message || 'Failed to decline offer' });
+    } finally {
+      setActionType(null);
+    }
   };
 
   const onReleaseOrder = async () => {
@@ -702,6 +699,67 @@ export function AssignmentDetailScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Decline Offer Modal */}
+      {assignment && (
+        <Modal
+          visible={isDeclineModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {
+            if (actionType !== 'decline') setDeclineModalVisible(false);
+          }}
+        >
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => {
+              if (actionType !== 'decline') setDeclineModalVisible(false);
+            }}
+          >
+            <Pressable
+              style={[
+                styles.modalContainer,
+                { padding: 24, backgroundColor: colors.surface, borderRadius: 16 },
+              ]}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <Text style={[styles.modalTitle, { marginBottom: 10, fontWeight: 'bold', fontSize: 18 }]}>
+                Decline Offer
+              </Text>
+
+              <Text
+                style={{
+                  ...typography.bodyMedium,
+                  fontSize: 15,
+                  color: colors.textSecondary,
+                  marginBottom: 24,
+                  lineHeight: 22,
+                }}
+              >
+                Are you sure you want to decline this assignment?
+              </Text>
+
+              <View style={{ flexDirection: 'row', width: '100%', gap: 14, marginTop: 8 }}>
+                <Button
+                  label="Cancel"
+                  variant="outline"
+                  onPress={() => setDeclineModalVisible(false)}
+                  disabled={actionType === 'decline'}
+                  style={{ flex: 1, borderWidth: 1.5, borderColor: colors.border, borderRadius: 8, height: 38 }}
+                  textStyle={{ color: colors.textPrimary, fontWeight: 'bold', fontSize: 13.5 }}
+                />
+                <Button
+                  label="Decline"
+                  onPress={handleConfirmDecline}
+                  loading={actionType === 'decline' && declineOffer.isPending}
+                  style={{ flex: 1, backgroundColor: colors.danger, borderColor: colors.danger, borderRadius: 8, height: 38 }}
+                  textStyle={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 13.5 }}
+                />
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      )}
 
     </SafeAreaView>
   );

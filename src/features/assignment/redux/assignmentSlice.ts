@@ -37,6 +37,11 @@ const initialState: AssignmentState = {
 };
 
 function upsertAssignment(state: AssignmentState, assignment: Assignment) {
+  // If incoming assignment is a dummy object from a 403 response, ignore it completely
+  if (assignment.code === 'N/A') {
+    return;
+  }
+
   const index = state.items.findIndex((item) => item.id === assignment.id);
   if (index >= 0) {
     const currentItem = state.items[index];
@@ -48,14 +53,8 @@ function upsertAssignment(state: AssignmentState, assignment: Assignment) {
       newStatus = currentStatus;
     }
 
-    // If incoming assignment is a dummy 'N/A' from a 403 response, but we have real data locally,
-    // ONLY update the status to cancelled, do NOT overwrite details with 'N/A'.
-    if (assignment.code === 'N/A' && currentItem.code !== 'N/A') {
-      state.items[index] = { ...currentItem, status: 'cancelled' };
-    } else {
-      // Normal merge (not replace)
-      state.items[index] = { ...currentItem, ...assignment, status: newStatus };
-    }
+    // Normal merge (not replace)
+    state.items[index] = { ...currentItem, ...assignment, status: newStatus };
   } else {
     state.items.push(assignment);
   }
@@ -178,8 +177,21 @@ export const syncHistoryFromNotificationsThunk = createAsyncThunk<void, { onlyTo
       if (fetchedAssignments.length > 0) {
         // Save completed/cancelled to local lifetime history
         await assignmentService.saveLifetimeHistory(driverId, fetchedAssignments);
-        // Refresh the main list UI
-        dispatch(fetchAssignments());
+
+        // ── CRITICAL FIX ─────────────────────────────────────────────────────
+        // Upsert every fetched order (including pending/active ones) directly
+        // into Redux state via fetchAssignmentById — the same individual-order
+        // API that the foreground notification handler uses. This is safe even
+        // for pending offers and does NOT race with the bulk list endpoint.
+        // Without this, pending orders fetched by ID were silently discarded
+        // (saveLifetimeHistory only persists terminal states), so logging out
+        // and back in would show an empty "Active Orders" card.
+        const activeOrNonTerminal = fetchedAssignments.filter(a =>
+          ['pending', 'accepted', 'en_route', 'arrived', 'in_progress'].includes(a.status)
+        );
+        for (const order of activeOrNonTerminal) {
+          await dispatch(fetchAssignmentById(order.id));
+        }
       }
     } catch (e) {
       logger.error('assignment', 'Failed to sync history from notifications', e);
@@ -423,35 +435,10 @@ const assignmentSlice = createSlice({
         state.listStatus = 'loading';
       })
       .addCase(fetchAssignments.fulfilled, (state, action) => {
-        // Merge (not replace): the offers endpoint this is sourced from only returns
-        // pending offers, so a full replace would drop items that already moved past
-        // "Offered" (e.g. right after acceptOffer) until they show up again elsewhere.
-
-        // However, if we fetched the default pending offers (status is undefined or 'pending'),
-        // any offer that is locally 'pending' but missing from the payload has been
-        // cancelled, withdrawn, or assigned to someone else. We must remove it.
-        const requestedStatus = action.meta.arg;
-        const targetStatus = requestedStatus || 'pending';
-
-        const fetchedIds = new Set(action.payload.map((a) => a.id));
-        state.items = state.items.filter((item) => {
-          if (item.status === targetStatus && !fetchedIds.has(item.id)) {
-            // The backend /assignments endpoint does not reliably return historical
-            // completed offers. Do not drop locally tracked completed orders.
-            if (targetStatus === 'completed') {
-              return true;
-            }
-            // Active orders (e.g. assigned via QR) might bypass the offer system entirely
-            // and won't appear in the bulk offers list. Do not forcefully drop them here.
-            // If they are truly cancelled/reassigned, `fetchAssignmentById` will catch the 403 later.
-            if (targetStatus !== 'pending') {
-              return true;
-            }
-            return false;
-          }
-          return true;
-        });
-
+        // Upsert all assignments returned by API.
+        // DO NOT filter out or delete existing pending/active items!
+        // The bulk API endpoint does not reliably return all active/pending orders,
+        // and deleting locally tracked orders causes active cards to disappear on refresh.
         for (const item of action.payload) {
           upsertAssignment(state, item);
         }

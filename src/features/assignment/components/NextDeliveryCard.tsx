@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
-import { StyleSheet, Text, View, Platform, Alert, Pressable, Linking, ActivityIndicator } from 'react-native';
+import { StyleSheet, Text, View, Platform, Alert, Pressable, Linking, ActivityIndicator, Modal } from 'react-native';
 import { router } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -75,6 +75,7 @@ export function NextDeliveryCard({ assignment, onStart }: NextDeliveryCardProps)
   const acceptOffer = useAcceptOffer();
   const declineOffer = useDeclineOffer();
   const [actionType, setActionType] = useState<'accept' | 'decline' | null>(null);
+  const [showDeclineModal, setShowDeclineModal] = useState(false);
 
   const onAccept = async () => {
     setActionType('accept');
@@ -89,24 +90,20 @@ export function NextDeliveryCard({ assignment, onStart }: NextDeliveryCardProps)
   };
 
   const onDecline = () => {
-    Alert.alert('Decline Offer', 'Are you sure you want to decline this assignment?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Decline',
-        style: 'destructive',
-        onPress: async () => {
-          setActionType('decline');
-          try {
-            await declineOffer.mutateAsync(assignment.offerId ?? assignment.id);
-            Toast.show({ type: 'success', text1: 'Offer Declined' });
-          } catch (error: any) {
-            Toast.show({ type: 'info', text1: error?.message || 'Failed to decline offer' });
-          } finally {
-            setActionType(null);
-          }
-        },
-      },
-    ]);
+    setShowDeclineModal(true);
+  };
+
+  const handleConfirmDecline = async () => {
+    setActionType('decline');
+    try {
+      await declineOffer.mutateAsync(assignment.offerId ?? assignment.id);
+      setShowDeclineModal(false);
+      Toast.show({ type: 'success', text1: 'Offer Declined' });
+    } catch (error: any) {
+      Toast.show({ type: 'info', text1: error?.message || 'Failed to decline offer' });
+    } finally {
+      setActionType(null);
+    }
   };
 
   const handlePhoneCall = () => {
@@ -120,8 +117,9 @@ export function NextDeliveryCard({ assignment, onStart }: NextDeliveryCardProps)
   };
 
   return (
-    <Pressable
-      style={styles.cardContainer}
+    <>
+      <Pressable
+        style={styles.cardContainer}
       onPress={() => {
         if (assignment.status !== 'pending') {
           router.push({ pathname: '/assignment/[id]', params: { id: assignment.id } });
@@ -238,6 +236,60 @@ export function NextDeliveryCard({ assignment, onStart }: NextDeliveryCardProps)
         )}
       </View>
     </Pressable>
+
+      <Modal
+        visible={showDeclineModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (actionType !== 'decline') setShowDeclineModal(false);
+        }}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => {
+            if (actionType !== 'decline') setShowDeclineModal(false);
+          }}
+        >
+          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.modalTitle}>Decline Offer</Text>
+
+            <Text style={styles.modalMessage}>
+              Are you sure you want to decline this assignment?
+            </Text>
+
+            <View style={styles.modalBtnRow}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.modalCancelBtn,
+                  pressed && styles.modalCancelBtnPressed,
+                ]}
+                onPress={() => setShowDeclineModal(false)}
+                disabled={actionType === 'decline'}
+              >
+                <Text style={styles.modalCancelBtnText}>Cancel</Text>
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.modalConfirmBtn,
+                  pressed && { opacity: 0.85 },
+                  actionType === 'decline' && { opacity: 0.7 },
+                ]}
+                onPress={handleConfirmDecline}
+                disabled={actionType === 'decline'}
+              >
+                {actionType === 'decline' && declineOffer.isPending ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalConfirmBtnText}>Decline</Text>
+                )}
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
   );
 }
 
@@ -410,6 +462,81 @@ const useStyles = (colors: any) => StyleSheet.create({
     fontFamily: FontFamily.bold,
     color: '#FFFFFF',
     letterSpacing: 0.2,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  modalCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 24,
+    width: '88%',
+    maxWidth: 340,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontFamily: FontFamily.bold,
+    color: colors.textPrimary,
+    marginBottom: 10,
+  },
+  modalMessage: {
+    fontSize: 15,
+    fontFamily: FontFamily.regular,
+    color: colors.textSecondary,
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  modalBtnRow: {
+    flexDirection: 'row',
+    width: '100%',
+    gap: 14,
+    marginTop: 8,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    height: 38,
+    borderRadius: 8,
+    backgroundColor: colors.background,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCancelBtnPressed: {
+    opacity: 0.75,
+    backgroundColor: colors.border + '30',
+  },
+  modalCancelBtnText: {
+    fontSize: 13.5,
+    fontFamily: FontFamily.bold,
+    color: colors.textPrimary,
+  },
+  modalConfirmBtn: {
+    flex: 1,
+    height: 38,
+    borderRadius: 8,
+    backgroundColor: colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: colors.danger,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  modalConfirmBtnText: {
+    fontSize: 14,
+    fontFamily: FontFamily.bold,
+    color: '#FFFFFF',
   },
 });
 

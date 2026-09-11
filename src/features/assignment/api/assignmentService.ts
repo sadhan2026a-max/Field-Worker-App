@@ -468,33 +468,13 @@ export async function getAssignmentById(id: string): Promise<Assignment | undefi
     return await fetchOrderAsAssignment(id);
   } catch (e: any) {
     logger.warn('assignment', `Failed to fetch order ${id} (may be unaccepted offer), falling back to offers list`, e);
-    const isForbidden = e?.response?.status === 403 || e?.response?.status === 404;
     try {
       const allAssignments = await getAssignments();
-      const found = allAssignments.find((a) => a.id === id);
+      const found = allAssignments.find((a) => a.id === id || a.offerId === id);
       if (found) return found;
 
-      if (isForbidden) {
-        return {
-          id,
-          code: 'N/A',
-          type: 'other',
-          status: 'cancelled',
-          assignedDriverId: 'another-driver',
-          customer: {
-            name: 'N/A',
-            phone: 'N/A',
-            address: 'Order reassigned to another driver',
-            location: { latitude: 0, longitude: 0 },
-          },
-          distanceKm: 0,
-          etaMinutes: 0,
-          itemCount: 0,
-          totalAmount: 0,
-          codAmount: 0,
-          createdAt: new Date().toISOString(),
-        };
-      }
+      // Do NOT fabricate a cancelled assignment on 403/404.
+      // Unaccepted offers or auth restrictions must not mark orders as cancelled.
       return undefined;
     } catch (fallbackError) {
       logger.warn('assignment', `Fallback to getAssignments failed`, fallbackError);
