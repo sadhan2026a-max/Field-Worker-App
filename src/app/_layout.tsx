@@ -32,9 +32,9 @@ import { CancellationModal } from '@/shared/components/ui/CancellationModal';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
-logger.info('layout', '≡ƒôª _layout.tsx module loaded');
+logger.info('layout', '📦 _layout.tsx module loaded');
 
-// ΓöÇΓöÇΓöÇ Error Boundary ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ─── Error Boundary ───────────────────────────────────────────────────────────
 
 interface ErrorBoundaryState { hasError: boolean; error: Error | null }
 
@@ -42,7 +42,7 @@ class RootErrorBoundary extends Component<{ children: React.ReactNode }, ErrorBo
   state: ErrorBoundaryState = { hasError: false, error: null };
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    logger.error('ErrorBoundary', '≡ƒÆÑ Uncaught render error', error);
+    logger.error('ErrorBoundary', '💥 Uncaught render error', error);
     return { hasError: true, error };
   }
 
@@ -54,7 +54,7 @@ class RootErrorBoundary extends Component<{ children: React.ReactNode }, ErrorBo
     if (this.state.hasError) {
       return (
         <View style={errStyles.container}>
-          <Text style={errStyles.title}>≡ƒö┤ Render Error</Text>
+          <Text style={errStyles.title}>🔴 Render Error</Text>
           <ScrollView style={errStyles.scroll}>
             <Text style={errStyles.message}>{this.state.error?.message}</Text>
             <Text style={errStyles.stack}>{this.state.error?.stack}</Text>
@@ -74,7 +74,7 @@ const errStyles = StyleSheet.create({
   stack: { color: '#888', fontSize: 11, lineHeight: 18 },
 });
 
-// ΓöÇΓöÇΓöÇ Bootstrap component ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ─── Bootstrap component ──────────────────────────────────────────────────────
 
 /** Dispatches initAuth once on mount to restore driver session from storage, and listens to session changes to route dynamically. */
 function AppBootstrap({ children }: { children: React.ReactNode }) {
@@ -269,13 +269,18 @@ function AppBootstrap({ children }: { children: React.ReactNode }) {
     if (isLoading) return;
 
     const inAuthGroup = segments[0] === 'auth';
+    const isRoot = !segments.length || !segments[0];
 
     if (!driver && !inAuthGroup) {
       logger.info('bootstrap', '🔄 No driver session — routing to login screen');
       router.replace('/auth/login');
-    } else if (driver && inAuthGroup) {
+    } else if (driver && (inAuthGroup || isRoot)) {
       logger.info('bootstrap', '🔄 Driver session active — routing to workspace');
-      router.replace('/(tabs)');
+      if (!driver.hasPin) {
+        router.replace('/pin-setup');
+      } else {
+        router.replace('/(tabs)');
+      }
     }
   }, [driver, isLoading, segments]);
 
@@ -405,7 +410,7 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
-  logger.debug('layout', '≡ƒöä RootLayout render');
+  logger.debug('layout', '🔄 RootLayout render');
 
   const [fontsLoaded, fontError] = useFonts({
     ...MaterialIcons.font,
@@ -421,36 +426,36 @@ export default function RootLayout() {
   // Log font load result whenever it changes
   useEffect(() => {
     if (fontError) {
-      logger.warn('fonts', 'ΓÜá∩╕Å  Font load error ΓÇö falling back to system fonts', {
+      logger.warn('fonts', '⚠️  Font load error — falling back to system fonts', {
         message: fontError.message,
       });
-      logger.warn('fonts', 'ΓÜá∩╕Å  Fix: check font imports');
+      logger.warn('fonts', '⚠️  Fix: check font imports');
     } else if (fontsLoaded) {
-      logger.info('fonts', 'Γ£à All Roboto fonts loaded successfully (Roboto family active)');
+      logger.info('fonts', '✅ All Roboto fonts loaded successfully (Roboto family active)');
     } else {
-      logger.debug('fonts', 'ΓÅ│ Fonts still loading...');
+      logger.debug('fonts', '⏳ Fonts still loading...');
     }
   }, [fontsLoaded, fontError]);
 
   useEffect(() => {
-    // Proceed even if fonts failed ΓÇö fall back to system fonts
+    // Proceed even if fonts failed — fall back to system fonts
     if (fontsLoaded || fontError) {
-      logger.info('layout', `≡ƒÄ» App ready ΓÇö fontsLoaded=${fontsLoaded} fontError=${!!fontError}`);
+      logger.info('layout', `🎯 App ready — fontsLoaded=${fontsLoaded} fontError=${!!fontError}`);
       setAppIsReady(true);
     }
   }, [fontsLoaded, fontError]);
 
   useEffect(() => {
     if (appIsReady) {
-      logger.info('layout', '≡ƒîà Hiding splash screen');
+      logger.info('layout', '🌅 Hiding splash screen');
       SplashScreen.hideAsync().catch(err => {
-        logger.warn('layout', 'ΓÜá∩╕Å  Failed to hide splash screen', err);
+        logger.warn('layout', '⚠️  Failed to hide splash screen', err);
       });
     }
   }, [appIsReady]);
 
   if (!appIsReady) {
-    logger.debug('layout', 'ΓÅ╕  appIsReady=false ΓÇö returning null (splash visible)');
+    logger.debug('layout', '⏸️  appIsReady=false — returning null (splash visible)');
     return null;
   }
 

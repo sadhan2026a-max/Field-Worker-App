@@ -41,10 +41,6 @@ export function QuickActionButton({ icon, label, subtitle, tint, tintLight, onPr
             <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text>
           ) : null}
         </View>
-
-        <View style={styles.chevronCircle}>
-          <MaterialIcons name="arrow-forward" size={14} color={tint} />
-        </View>
       </Pressable>
     </View>
   );
@@ -95,14 +91,6 @@ const useStyles = (colors: any, tint: string, tintLight: string) => StyleSheet.c
     fontFamily: FontFamily.medium,
     color: colors.textSecondary,
     marginTop: 1,
-  },
-  chevronCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: tint + '12',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   badgeContainer: {
     position: 'absolute',

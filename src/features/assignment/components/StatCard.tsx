@@ -1,6 +1,6 @@
 import React from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
-import { StyleSheet, Text, View, Platform, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, View, Platform, Pressable } from 'react-native';
 import { spacing, FontFamily, useTheme } from '@/core/theme';
 
 interface StatCardProps {
@@ -23,43 +23,60 @@ export function StatCard({ icon, value, label, tint = '#16A34A', tintLight = '#E
   const isDashboard = variant === 'dashboard';
 
   if (isDashboard) {
-    const content = (
-      <View style={[styles.dashboardCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <View style={styles.dashboardContent}>
-          <View style={styles.dashboardHeader}>
-            {icon && (
-              <View style={[styles.dashboardIconChip, { backgroundColor: tint + '15' }]}>
-                <MaterialIcons name={icon} size={14} color={tint} />
-              </View>
-            )}
-            {trend && (
-              <View style={[styles.trendBadge, { backgroundColor: tint + '15' }]}>
-                <Text style={[styles.trendText, { color: tint }]}>{trend}</Text>
-              </View>
-            )}
-          </View>
-          <Text style={[styles.dashboardValue, { color: colors.textPrimary }]} numberOfLines={1} adjustsFontSizeToFit>
-            {value}
-          </Text>
-          <Text style={[styles.dashboardLabel, { color: colors.textSecondary }]} numberOfLines={1}>
-            {label}
-          </Text>
+    const cardContent = (
+      <View style={styles.dashboardContent}>
+        <View style={styles.dashboardHeader}>
+          {icon && (
+            <View style={[styles.dashboardIconChip, { backgroundColor: tint + '15' }]}>
+              <MaterialIcons name={icon} size={14} color={tint} />
+            </View>
+          )}
+          {trend && (
+            <View style={[styles.trendBadge, { backgroundColor: tint + '15' }]}>
+              <Text style={[styles.trendText, { color: tint }]}>{trend}</Text>
+            </View>
+          )}
         </View>
+        <Text style={[styles.dashboardValue, { color: colors.textPrimary }]} numberOfLines={1}>
+          {value}
+        </Text>
+        <Text style={[styles.dashboardLabel, { color: colors.textSecondary }]} numberOfLines={1}>
+          {label}
+        </Text>
       </View>
     );
 
     if (onPress) {
       return (
-        <TouchableOpacity style={{ flex: 1 }} onPress={onPress} activeOpacity={0.78}>
-          {content}
-        </TouchableOpacity>
+        <View style={styles.wrapper}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.dashboardCard,
+              {
+                backgroundColor: pressed ? (tint + '14') : colors.surface,
+                borderColor: pressed ? (tint + '40') : colors.border,
+                opacity: Platform.OS === 'ios' && pressed ? 0.88 : 1,
+              },
+            ]}
+            android_ripple={{ color: tint + '20', borderless: false }}
+            onPress={onPress}
+          >
+            {cardContent}
+          </Pressable>
+        </View>
       );
     }
-    return content;
+    return (
+      <View style={styles.wrapper}>
+        <View style={[styles.dashboardCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          {cardContent}
+        </View>
+      </View>
+    );
   }
 
-  const defaultContent = (
-    <View style={styles.card}>
+  const cardInner = (
+    <>
       {isWide ? (
         <View style={styles.headerWide}>
           {icon && (
@@ -82,57 +99,55 @@ export function StatCard({ icon, value, label, tint = '#16A34A', tintLight = '#E
         valueColor && { color: valueColor }
       ]}>{value}</Text>
       {!isWide ? <Text style={styles.label}>{label}</Text> : null}
-    </View>
+    </>
   );
 
   if (onPress) {
     return (
-      <TouchableOpacity style={{ flex: 1 }} onPress={onPress} activeOpacity={0.78}>
-        {defaultContent}
-      </TouchableOpacity>
+      <View style={styles.wrapper}>
+        <Pressable
+          style={({ pressed }) => [
+            styles.card,
+            {
+              backgroundColor: pressed ? (tint + '14') : colors.surface,
+              borderColor: pressed ? (tint + '40') : colors.border,
+              opacity: Platform.OS === 'ios' && pressed ? 0.88 : 1,
+            },
+          ]}
+          android_ripple={{ color: tint + '20', borderless: false }}
+          onPress={onPress}
+        >
+          {cardInner}
+        </Pressable>
+      </View>
     );
   }
-  return defaultContent;
+  return (
+    <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      {cardInner}
+    </View>
+  );
 }
 
 const useStyles = (colors: any, tint: string, tintLight: string) => StyleSheet.create({
+  wrapper: {
+    flex: 1,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
   card: {
     flex: 1,
-    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 12,
     alignItems: 'flex-start',
     borderWidth: 1,
-    borderColor: colors.border,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.04,
-        shadowRadius: 6,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
+    overflow: 'hidden',
   },
   dashboardCard: {
     flex: 1,
     borderRadius: 14,
     borderWidth: 1,
     overflow: 'hidden',
-    position: 'relative',
-    ...Platform.select({
-      ios: {
-        shadowColor: tint,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
   },
   topAccentBar: {
     height: 3.5,

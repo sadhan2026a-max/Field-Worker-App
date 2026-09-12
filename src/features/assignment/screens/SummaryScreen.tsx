@@ -6,12 +6,33 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ScreenLoader } from '@/components/ui/ScreenLoader';
 import { ScreenFooter } from '@/components/ui/ScreenFooter';
-import { radius, spacing, typography, colors, useTheme } from '@/core/theme';
+import { radius, spacing, typography, colors, useTheme, FontFamily, FontSize } from '@/core/theme';
 
 import { useAssignment, useCompleteAssignment, useVerifyOrderOtp } from '@/hooks/useAssignments';
 import { safeRouter } from '@/shared/utils/navigation';
 import React, { useState } from 'react';
 import { TextInput } from 'react-native';
+
+function getAssignmentTypeIcon(type: string): keyof typeof MaterialIcons.glyphMap {
+  switch (type) {
+    case 'delivery':
+      return 'local-shipping';
+    case 'pickup':
+      return 'archive';
+    case 'return':
+      return 'assignment-return';
+    case 'installation':
+      return 'build';
+    case 'inspection':
+      return 'fact-check';
+    case 'sales_visit':
+      return 'handshake';
+    case 'service_visit':
+      return 'engineering';
+    default:
+      return 'local-shipping';
+  }
+}
 
 export function SummaryScreen() {
   const { colors } = useTheme();
@@ -99,7 +120,9 @@ export function SummaryScreen() {
 
         <Card style={styles.card}>
           <View style={styles.recapRow}>
-            <MaterialIcons name="local-shipping" size={24} color={colors.primary} />
+            <View style={styles.iconContainer}>
+              <MaterialIcons name={getAssignmentTypeIcon(assignment.type)} size={24} color={colors.primary} />
+            </View>
             <View style={styles.recapTextContainer}>
               <Text style={styles.recapLabel}>Assignment Type</Text>
               <Text style={styles.recapValue}>{assignment.type.toUpperCase()}</Text>
@@ -114,7 +137,9 @@ export function SummaryScreen() {
                 onPress={() => safeRouter.push({ pathname: '/assignment/[id]/service', params: { id: assignment.id } })}
                 activeOpacity={0.7}
               >
-                <MaterialIcons name="build" size={24} color={colors.primary} />
+                <View style={styles.iconContainer}>
+                  <MaterialIcons name="engineering" size={24} color={colors.primary} />
+                </View>
                 <View style={styles.recapTextContainer}>
                   <Text style={styles.recapLabel}>Service Details</Text>
                   <Text style={styles.recapValue}>
@@ -147,7 +172,9 @@ export function SummaryScreen() {
                     </View>
                   )}
                 </View>
-                <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
+                <View style={styles.chevronContainer}>
+                  <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
+                </View>
               </TouchableOpacity>
             </>
           )}
@@ -160,7 +187,9 @@ export function SummaryScreen() {
                 onPress={() => safeRouter.push({ pathname: '/assignment/[id]/proof', params: { id: assignment.id } })}
                 activeOpacity={0.7}
               >
-                <MaterialIcons name="camera-alt" size={24} color={colors.primary} />
+                <View style={styles.iconContainer}>
+                  <MaterialIcons name="camera-alt" size={24} color={colors.primary} />
+                </View>
                 <View style={styles.recapTextContainer}>
                   <Text style={styles.recapLabel}>Proof of Delivery</Text>
                   <Text style={styles.recapValue}>Captured</Text>
@@ -183,7 +212,9 @@ export function SummaryScreen() {
                     </View>
                   ) : null}
                 </View>
-                <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
+                <View style={styles.chevronContainer}>
+                  <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
+                </View>
               </TouchableOpacity>
             </>
           )}
@@ -196,7 +227,9 @@ export function SummaryScreen() {
                 onPress={() => safeRouter.push({ pathname: '/assignment/[id]/payment', params: { id: assignment.id } })}
                 activeOpacity={0.7}
               >
-                <MaterialIcons name="payments" size={24} color={colors.primary} />
+                <View style={styles.iconContainer}>
+                  <MaterialIcons name="payments" size={24} color={colors.primary} />
+                </View>
                 <View style={styles.recapTextContainer}>
                   <Text style={styles.recapLabel}>Payment Collection</Text>
                   <Text style={styles.recapValue}>
@@ -215,7 +248,9 @@ export function SummaryScreen() {
                     </View>
                   )}
                 </View>
-                <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
+                <View style={styles.chevronContainer}>
+                  <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
+                </View>
               </TouchableOpacity>
             </>
           )}
@@ -228,7 +263,9 @@ export function SummaryScreen() {
                 onPress={() => safeRouter.push({ pathname: '/assignment/[id]/checklist', params: { id: assignment.id } })}
                 activeOpacity={0.7}
               >
-                <MaterialIcons name="checklist" size={24} color={colors.primary} />
+                <View style={styles.iconContainer}>
+                  <MaterialIcons name="checklist" size={24} color={colors.primary} />
+                </View>
                 <View style={styles.recapTextContainer}>
                   <Text style={styles.recapLabel}>Checklist</Text>
                   <Text style={styles.recapValue}>
@@ -250,7 +287,9 @@ export function SummaryScreen() {
                     </View>
                   ))}
                 </View>
-                <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
+                <View style={styles.chevronContainer}>
+                  <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
+                </View>
               </TouchableOpacity>
             </>
           )}
@@ -259,7 +298,9 @@ export function SummaryScreen() {
         {assignment.requiresDeliveryOtp && !assignment.deliveryOtpVerifiedAt && (
           <Card style={styles.card}>
             <View style={styles.otpContainer}>
-              <MaterialIcons name="security" size={24} color={colors.primary} />
+              <View style={styles.iconContainer}>
+                <MaterialIcons name="security" size={24} color={colors.primary} />
+              </View>
               <View style={styles.otpTextContainer}>
                 <Text style={styles.recapLabel}>OTP Verification Required</Text>
                 <TextInput
@@ -307,17 +348,31 @@ const useStyles = (colors: any) => StyleSheet.create({
   },
   recapRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     padding: spacing.lg,
     gap: spacing.md,
+  },
+  iconContainer: {
+    width: 28,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chevronContainer: {
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   recapTextContainer: {
     flex: 1,
   },
   recapLabel: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    marginBottom: 2,
+    fontSize: FontSize.regular + 4,
+    fontFamily: FontFamily.semiBold,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: 4,
   },
   recapValue: {
     ...typography.body,
@@ -336,7 +391,7 @@ const useStyles = (colors: any) => StyleSheet.create({
   },
   otpContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     padding: spacing.lg,
     gap: spacing.md,
     backgroundColor: colors.warning + '15',

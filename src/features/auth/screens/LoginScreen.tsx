@@ -35,31 +35,33 @@ interface CustomInputProps extends TextInputProps {
   rightElement?: ReactNode;
   rightLabel?: ReactNode;
   error?: string;
-  submitCount?: number;
-  disableShake?: boolean;
+  shakeTrigger?: number;
 }
 
-function CustomInput({ label, leftIcon, rightElement, rightLabel, error, submitCount, disableShake, style, ...rest }: CustomInputProps) {
+function CustomInput({ label, leftIcon, rightElement, rightLabel, error, shakeTrigger, style, ...rest }: CustomInputProps) {
   const { colors } = useTheme();
   const styles = React.useMemo(() => useStyles(colors), [colors]);
   const [isFocused, setIsFocused] = useState(false);
   
   const shakeAnim = useRef(new Animated.Value(0)).current;
 
+  // Shake ONLY when shakeTrigger changes (explicit button hit), NEVER while typing!
   useEffect(() => {
-    if (error && !disableShake) {
+    if (shakeTrigger && shakeTrigger > 0) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       
       shakeAnim.setValue(0);
       Animated.sequence([
-        Animated.timing(shakeAnim, { toValue: -15, duration: 50, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: 15, duration: 50, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: -15, duration: 50, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: 15, duration: 50, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true })
+        Animated.timing(shakeAnim, { toValue: -12, duration: 45, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 12, duration: 45, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: -10, duration: 45, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 10, duration: 45, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: -5, duration: 40, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 5, duration: 40, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 0, duration: 40, useNativeDriver: true })
       ]).start();
     }
-  }, [error, submitCount, disableShake]);
+  }, [shakeTrigger]);
 
   return (
     <View style={styles.inputWrapper}>
@@ -72,7 +74,7 @@ function CustomInput({ label, leftIcon, rightElement, rightLabel, error, submitC
           styles.inputFieldContainer,
           isFocused && styles.inputFieldFocused,
           error ? styles.inputFieldError : null,
-          !disableShake ? { transform: [{ translateX: shakeAnim }] } : null
+          { transform: [{ translateX: shakeAnim }] }
         ]}
       >
         {leftIcon && <View style={styles.leftIconContainer}>{leftIcon}</View>}
@@ -100,13 +102,18 @@ export function LoginScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  // Separate shake triggers that ONLY increment when the user hits the Log In button
+  const [shakePin, setShakePin] = useState(0);
+  const [shakePassword, setShakePassword] = useState(0);
+
   const [loginMode, setLoginMode] = useState<'pin' | 'password'>('pin');
 
   const {
     control,
     handleSubmit,
     setError,
-    formState: { errors, submitCount },
+    clearErrors,
+    formState: { errors },
   } = useForm<LoginForm>({ defaultValues: { phone: '', pin: '', password: '' } });
 
   if (driver) {
@@ -116,6 +123,17 @@ export function LoginScreen() {
     return <Redirect href="/(tabs)" />;
   }
 
+  // Called ONLY when the user hits the Log In button and client validation fails
+  const onInvalid = (fieldErrors: any) => {
+    // In PIN mode: shake ONLY if user entered an incomplete PIN (1-5 digits).
+    // If PIN is completely empty ('required'), DO NOT shake.
+    if (loginMode === 'pin' && fieldErrors.pin?.type === 'minLength') {
+      setShakePin(prev => prev + 1);
+    }
+    // In Password mode: if password is empty ('required'), DO NOT shake.
+  };
+
+  // Called ONLY when client validation passes and user hits the Log In button
   const onSubmit = async (values: LoginForm) => {
     setIsSubmitting(true);
     try {
@@ -129,12 +147,21 @@ export function LoginScreen() {
       if (errorMsg === 'Account does not exist.') {
         setError('phone', { type: 'manual', message: errorMsg });
       } else if (errorMsg.includes('Incorrect') || errorMsg.includes('credentials') || errorMsg.includes('password')) {
-        setError(loginMode, { 
-          type: 'manual', 
-          message: loginMode === 'pin' ? 'Incorrect PIN.' : 'Incorrect password.' 
-        });
+        if (loginMode === 'pin') {
+          setError('pin', { type: 'manual', message: 'Incorrect PIN.' });
+          setShakePin(prev => prev + 1);
+        } else {
+          setError('password', { type: 'manual', message: 'Incorrect password.' });
+          setShakePassword(prev => prev + 1);
+        }
       } else {
-        setError(loginMode, { type: 'manual', message: errorMsg });
+        if (loginMode === 'pin') {
+          setError('pin', { type: 'manual', message: errorMsg });
+          setShakePin(prev => prev + 1);
+        } else {
+          setError('password', { type: 'manual', message: errorMsg });
+          setShakePassword(prev => prev + 1);
+        }
       }
     } finally {
       setIsSubmitting(false);
@@ -175,8 +202,7 @@ export function LoginScreen() {
                   value={field.value}
                   onChangeText={(text: string) => field.onChange(text.replace(/[^0-9]/g, ''))}
                   error={errors.phone?.message}
-                  submitCount={submitCount}
-                  disableShake={true}
+                  returnKeyType="next"
                   leftIcon={<MaterialIcons name="phone" size={20} color={colors.textSecondary} />}
                 />
               )}
@@ -201,7 +227,9 @@ export function LoginScreen() {
                     value={field.value}
                     onChangeText={(text: string) => field.onChange(text.replace(/[^0-9]/g, ''))}
                     error={errors.pin?.message}
-                    submitCount={submitCount}
+                    shakeTrigger={shakePin}
+                    returnKeyType="go"
+                    onSubmitEditing={handleSubmit(onSubmit, onInvalid)}
                     leftIcon={<MaterialIcons name="lock" size={20} color={colors.textSecondary} />}
                     rightElement={
                       <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
@@ -230,7 +258,9 @@ export function LoginScreen() {
                     value={field.value}
                     onChangeText={field.onChange}
                     error={errors.password?.message}
-                    submitCount={submitCount}
+                    shakeTrigger={shakePassword}
+                    returnKeyType="go"
+                    onSubmitEditing={handleSubmit(onSubmit, onInvalid)}
                     leftIcon={<MaterialIcons name="lock" size={20} color={colors.textSecondary} />}
                     rightLabel={
                       <Pressable onPress={() => router.push('/forgot-password')}>
@@ -251,7 +281,13 @@ export function LoginScreen() {
               />
             )}
 
-            <Pressable onPress={() => setLoginMode(m => m === 'pin' ? 'password' : 'pin')} style={styles.toggleModeBtn}>
+            <Pressable
+              onPress={() => {
+                clearErrors(['pin', 'password']);
+                setLoginMode(m => m === 'pin' ? 'password' : 'pin');
+              }}
+              style={styles.toggleModeBtn}
+            >
               <Text style={styles.toggleModeText}>
                 {loginMode === 'pin' ? 'Login with Password instead' : 'Login with PIN instead'}
               </Text>
@@ -260,7 +296,7 @@ export function LoginScreen() {
             {/* Submit button */}
             <Button
               label="Log In"
-              onPress={handleSubmit(onSubmit)}
+              onPress={handleSubmit(onSubmit, onInvalid)}
               loading={isSubmitting}
               style={styles.submit}
               textStyle={styles.submitText}
