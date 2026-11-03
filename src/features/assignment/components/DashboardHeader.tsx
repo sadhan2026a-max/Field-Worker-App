@@ -1,9 +1,8 @@
 import React from 'react';
 import { Pressable, TouchableOpacity, StyleSheet, Text, View, Platform, ActivityIndicator, Image } from 'react-native';
-import { colors, spacing, FontFamily, palette } from '@/core/theme';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useTheme } from '@/core/theme';
+import { useTheme, FontFamily } from '@/core/theme';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TenantInfo } from '@/features/auth/api/authService';
@@ -18,6 +17,7 @@ function getTimeGreeting(): string {
 function getInitials(name: string): string {
   return name
     .split(' ')
+    .filter(Boolean)
     .map(w => w[0])
     .join('')
     .toUpperCase()
@@ -33,66 +33,113 @@ interface DashboardHeaderProps {
   onToggleAvailability: () => void;
 }
 
-export function DashboardHeader({ driverName, isAvailable, isTogglingAvailability, tenant, unreadCount, onToggleAvailability }: DashboardHeaderProps) {
+export function DashboardHeader({
+  driverName,
+  isAvailable,
+  isTogglingAvailability,
+  tenant,
+  unreadCount,
+  onToggleAvailability,
+}: DashboardHeaderProps) {
   const insets = useSafeAreaInsets();
   const { colors: themeColors } = useTheme();
   const styles = React.useMemo(() => useStyles(themeColors), [themeColors]);
 
+  const gradientColors: [string, string, ...string[]] = isAvailable
+    ? (themeColors.headerGradient as [string, string, ...string[]] || [themeColors.primaryDark || '#047857', themeColors.primary || '#10B981'])
+    : ['#0F172A', '#1E293B', '#334155'];
+
   return (
     <View style={styles.headerWrapper}>
       <LinearGradient
-        colors={isAvailable ? (themeColors.headerGradient as [string, string, ...string[]] || [themeColors.primaryDark, themeColors.primary]) : ['#1E293B', '#334155', '#475569']}
+        colors={gradientColors}
         start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.banner, { paddingTop: insets.top + 8 }]}
+        end={{ x: 1, y: 0.9 }}
+        style={[styles.banner, { paddingTop: insets.top + 6 }]}
       >
-        <View style={styles.decorCircle1} />
-        <View style={styles.decorCircle2} />
-        <View style={styles.decorGlow} />
+        {/* Subtle Ambient Decorative Glows */}
+        <View style={styles.decorMeshLight} />
+        <View style={styles.decorMeshRing} />
 
-        <View style={styles.topRow}>
-          <View style={styles.avatarWrapper}>
-            <View style={[styles.avatarGlowRing, isAvailable ? styles.avatarGlowOnline : styles.avatarGlowOffline]}>
-              {tenant?.logoUrl ? (
-                <Image source={{ uri: tenant.logoUrl }} style={styles.tenantLogo} />
-              ) : (
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{getInitials(tenant?.name || driverName)}</Text>
-                </View>
-              )}
+        <View style={styles.contentRow}>
+          {/* Driver Avatar & Identity */}
+          <View style={styles.profileSection}>
+            <View style={styles.avatarContainer}>
+              <View style={[styles.avatarGlow, isAvailable ? styles.avatarGlowOnline : styles.avatarGlowOffline]}>
+                {tenant?.logoUrl ? (
+                  <Image source={{ uri: tenant.logoUrl }} style={styles.avatarImage} />
+                ) : (
+                  <View style={styles.avatarFallback}>
+                    <Text style={styles.avatarText}>{getInitials(tenant?.name || driverName)}</Text>
+                  </View>
+                )}
+              </View>
+              {/* Online / Offline Status Dot */}
+              <View style={[styles.statusDot, !isAvailable && styles.statusDotOffline]} />
             </View>
-            <View style={[styles.statusDot, !isAvailable && styles.statusDotOffline]} />
-          </View>
 
-          <View style={styles.greetingGroup}>
-            <View style={styles.subTitleRow}>
-              <Text style={styles.greeting} numberOfLines={1}>
-                {tenant?.name || getTimeGreeting()}
+            <View style={styles.textDetails}>
+              {tenant?.name ? (
+                <View style={styles.tenantBadge}>
+                  <MaterialIcons name="business" size={10} color="#FFFFFF" style={{ opacity: 0.85 }} />
+                  <Text style={styles.tenantText} numberOfLines={1}>{tenant.name}</Text>
+                </View>
+              ) : (
+                <Text style={styles.greetingText} numberOfLines={1}>
+                  {getTimeGreeting()}
+                </Text>
+              )}
+              <Text style={styles.driverNameText} numberOfLines={1}>
+                {driverName}
               </Text>
             </View>
-
-            <Text style={styles.name} numberOfLines={1}>{driverName}</Text>
           </View>
 
-          <View style={styles.rightActions}>
-            <TouchableOpacity style={styles.customSwitchContainer} onPress={onToggleAvailability} activeOpacity={0.8}>
-              <View style={[styles.switchTrack, isAvailable ? styles.switchTrackOnline : styles.switchTrackOffline]}>
-                <View style={[styles.switchThumb, isAvailable ? styles.switchThumbOnline : styles.switchThumbOffline]}>
-                  {isTogglingAvailability ? (
-                    <ActivityIndicator size="small" color={isAvailable ? themeColors.primary : '#FFFFFF'} style={{ transform: [{ scale: 0.65 }] }} />
-                  ) : (
-                    <MaterialIcons name={isAvailable ? 'power-settings-new' : 'pause'} size={12} color={isAvailable ? themeColors.primary : '#64748B'} />
-                  )}
+          {/* Right Action Controls: Duty Status Pill + Notification Icon */}
+          <View style={styles.actionsSection}>
+            {/* Duty Toggle Pill (Online / Offline) */}
+            <TouchableOpacity
+              style={[
+                styles.dutyPill,
+                isAvailable ? styles.dutyPillOnline : styles.dutyPillOffline,
+              ]}
+              onPress={onToggleAvailability}
+              activeOpacity={0.8}
+              disabled={isTogglingAvailability}
+            >
+              {isTogglingAvailability ? (
+                <ActivityIndicator
+                  size="small"
+                  color={isAvailable ? themeColors.primary : '#FFFFFF'}
+                  style={{ transform: [{ scale: 0.65 }], marginHorizontal: 4 }}
+                />
+              ) : (
+                <View style={styles.dutyPillContent}>
+                  <View
+                    style={[
+                      styles.dutyDot,
+                      isAvailable ? styles.dutyDotOnline : styles.dutyDotOffline,
+                    ]}
+                  />
+                  <Text
+                    style={[
+                      styles.dutyPillText,
+                      isAvailable ? styles.dutyPillTextOnline : styles.dutyPillTextOffline,
+                    ]}
+                  >
+                    {isAvailable ? 'ONLINE' : 'OFFLINE'}
+                  </Text>
                 </View>
-              </View>
+              )}
             </TouchableOpacity>
 
+            {/* Notification Bell Button */}
             <Pressable
-              style={styles.iconButton}
+              style={styles.notifButton}
               onPress={() => router.push('/notifications')}
               android_ripple={{ color: 'rgba(255,255,255,0.2)' }}
             >
-              <MaterialIcons name="notifications-none" size={22} color="#FFFFFF" />
+              <MaterialIcons name="notifications-none" size={20} color="#FFFFFF" />
               {isAvailable && unreadCount > 0 && (
                 <View style={styles.notifBadge}>
                   <Text style={styles.notifBadgeText}>
@@ -112,204 +159,216 @@ const useStyles = (themeColors: any) => StyleSheet.create({
   headerWrapper: {
     marginHorizontal: -12,
     marginTop: -12,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   banner: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    paddingHorizontal: 14,
+    paddingBottom: 14,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
     overflow: 'hidden',
     position: 'relative',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.25,
-        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.18,
+        shadowRadius: 10,
       },
       android: {
-        elevation: 8,
+        elevation: 6,
       },
     }),
   },
-  decorCircle1: {
+  decorMeshLight: {
     position: 'absolute',
-    top: -30,
-    right: -30,
-    width: 130,
-    height: 130,
-    borderRadius: 65,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    top: -24,
+    right: -24,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
-  decorCircle2: {
+  decorMeshRing: {
     position: 'absolute',
-    bottom: -30,
-    left: -20,
+    bottom: -35,
+    left: '25%',
     width: 90,
     height: 90,
     borderRadius: 45,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
   },
-  decorGlow: {
-    position: 'absolute',
-    top: 0,
-    left: '30%',
-    width: 100,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-  },
-  topRow: {
+  contentRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  avatarWrapper: {
-    position: 'relative',
-    marginRight: 10,
+  profileSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
   },
-  avatarGlowRing: {
-    padding: 2.5,
-    borderRadius: 26,
+  avatarContainer: {
+    position: 'relative',
+    marginRight: 9,
+  },
+  avatarGlow: {
+    padding: 2,
+    borderRadius: 14,
   },
   avatarGlowOnline: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
   },
   avatarGlowOffline: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
   },
-  avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+  avatarFallback: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.4)',
+    borderColor: 'rgba(255, 255, 255, 0.4)',
   },
-  tenantLogo: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+  avatarImage: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.6)',
+    borderColor: 'rgba(255, 255, 255, 0.6)',
   },
   avatarText: {
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: FontFamily.bold,
     color: '#FFFFFF',
   },
   statusDot: {
     position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#22C55E',
-    borderWidth: 2,
-    borderColor: themeColors.primaryDark,
+    bottom: 0,
+    right: 0,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#10B981',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
   },
   statusDotOffline: {
-    backgroundColor: '#9CA3AF',
-    borderColor: '#334155',
+    backgroundColor: '#94A3B8',
+    borderColor: '#1E293B',
   },
-  greetingGroup: {
+  textDetails: {
     flex: 1,
-    marginRight: 8,
   },
-  subTitleRow: {
+  tenantBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 2,
+    gap: 3,
+    marginBottom: 1,
   },
-  greeting: {
-    fontSize: 11,
+  tenantText: {
+    fontSize: 10.5,
+    fontFamily: FontFamily.semiBold,
+    color: 'rgba(255, 255, 255, 0.88)',
+    letterSpacing: 0.2,
+  },
+  greetingText: {
+    fontSize: 10.5,
     fontFamily: FontFamily.medium,
-    color: 'rgba(255,255,255,0.82)',
+    color: 'rgba(255, 255, 255, 0.82)',
+    marginBottom: 1,
   },
-  name: {
-    fontSize: 18,
+  driverNameText: {
+    fontSize: 16,
     fontFamily: FontFamily.bold,
     color: '#FFFFFF',
     letterSpacing: -0.2,
   },
-  rightActions: {
+  actionsSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
-  customSwitchContainer: {
+  dutyPill: {
+    height: 28,
+    paddingHorizontal: 9,
+    borderRadius: 14,
+    justifyContent: 'center',
     alignItems: 'center',
-    justifyContent: 'center',
+    borderWidth: 1,
   },
-  switchTrack: {
-    width: 44,
-    height: 24,
-    borderRadius: 12,
-    padding: 2,
-    justifyContent: 'center',
-  },
-  switchTrackOnline: {
+  dutyPillOnline: {
     backgroundColor: '#FFFFFF',
-  },
-  switchTrackOffline: {
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.35)',
-  },
-  switchThumb: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  switchThumbOnline: {
-    transform: [{ translateX: 22 }],
-    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(255, 255, 255, 0.9)',
     ...Platform.select({
-      ios: { shadowColor: themeColors.primary, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3 },
-      android: { elevation: 3 },
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 1.5 }, shadowOpacity: 0.15, shadowRadius: 3 },
+      android: { elevation: 2 },
     }),
   },
-  switchThumbOffline: {
-    transform: [{ translateX: 2 }],
-    backgroundColor: '#E2E8F0',
+  dutyPillOffline: {
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: 'rgba(255, 255, 255, 0.25)',
   },
-  iconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+  dutyPillContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  dutyDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  dutyDotOnline: {
+    backgroundColor: '#10B981',
+  },
+  dutyDotOffline: {
+    backgroundColor: '#94A3B8',
+  },
+  dutyPillText: {
+    fontSize: 10,
+    fontFamily: FontFamily.bold,
+    letterSpacing: 0.4,
+  },
+  dutyPillTextOnline: {
+    color: themeColors.primaryDark || '#059669',
+  },
+  dutyPillTextOffline: {
+    color: 'rgba(255, 255, 255, 0.9)',
+  },
+  notifButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
+    borderColor: 'rgba(255, 255, 255, 0.22)',
   },
   notifBadge: {
     position: 'absolute',
-    top: -4,
-    right: -4,
+    top: -3,
+    right: -3,
     backgroundColor: '#EF4444',
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: themeColors.primaryDark,
-    paddingHorizontal: 4,
+    borderColor: '#FFFFFF',
+    paddingHorizontal: 3,
   },
   notifBadgeText: {
     color: '#FFFFFF',
-    fontSize: 9,
+    fontSize: 8.5,
     fontFamily: FontFamily.bold,
-    lineHeight: 11,
+    lineHeight: 10,
   },
 });

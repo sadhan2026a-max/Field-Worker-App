@@ -118,8 +118,21 @@ function mapOrderDtoToAssignment(order: OrderDto, offerId?: string): Assignment 
     distanceKm: order.deliveryChargeDistanceKm || 0,
     etaMinutes: 0,
     itemCount: order.items?.length || 0,
-    totalAmount: order.totalAmount || 0,
-    codAmount: order.isCod ? order.totalAmount || 0 : 0,
+
+    totalAmount: Number(order.totalAmount ?? (order as any).total_amount ?? (order as any).codAmount ?? (order as any).amount ?? 0),
+    codAmount: Number(
+      (order as any).codAmount ??
+      (order as any).cod_amount ??
+      (order.isCod || (order as any).is_cod ? (order.totalAmount || (order as any).amount || 0) : 0)
+    ),
+    isCod: Boolean(
+      order.isCod ||
+      (order as any).is_cod ||
+      (order as any).codAmount > 0 ||
+      (order as any).cod_amount > 0 ||
+      String((order as any).paymentMode || (order as any).paymentMethod || (order as any).paymentType || '').toLowerCase().includes('cash') ||
+      String((order as any).paymentMode || (order as any).paymentMethod || (order as any).paymentType || '').toLowerCase().includes('cod')
+    ),
     deliveryInstructions: order.instructions || undefined,
     createdAt: order.createdAt,
     completedAt: order.completedAt || undefined,
@@ -173,6 +186,8 @@ function mapOrderDtoToAssignment(order: OrderDto, offerId?: string): Assignment 
       : undefined,
     requiresDeliveryOtp: order.requiresDeliveryOtp,
     deliveryOtpVerifiedAt: order.deliveryOtpVerifiedAt,
+    pickupWarehouseName: order.pickupWarehouseName,
+    externalReferenceId: order.externalReferenceId,
   };
 }
 
@@ -246,7 +261,16 @@ export async function getAssignments(status?: Assignment['status'] | string): Pr
     // Always fetch all driver assignments and filter locally to avoid URL query parameter mismatch
     let url = '/api/v1/driver/assignments';
 
-    const response = await api.get(url);
+    const [assignmentsRes, driverOrdersRes] = await Promise.allSettled([
+      api.get(url),
+      api.get('/api/v1/driver/orders?PageSize=100', { _suppressLog: true } as any),
+    ]);
+
+    const response = assignmentsRes.status === 'fulfilled' ? assignmentsRes.value : { data: [] };
+    const driverOrders: OrderDto[] = driverOrdersRes.status === 'fulfilled' && Array.isArray((driverOrdersRes.value.data as any)?.items || driverOrdersRes.value.data)
+      ? ((driverOrdersRes.value.data as any)?.items || driverOrdersRes.value.data)
+      : [];
+    (offers as any)._driverOrders = driverOrders;
     offers = Array.isArray(response.data)
       ? response.data
       : (response.data?.items || response.data?.assignments || response.data?.data || []);
@@ -278,11 +302,23 @@ export async function getAssignments(status?: Assignment['status'] | string): Pr
     const result = enriched[index];
     const orderId = offer.orderId || offer.id;
 
-    if (result.status === 'fulfilled') {
-      const assignment = mapOrderDtoToAssignment(result.value.data, offer.orderId ? offer.id : undefined);
-      const os = offer.status?.toLowerCase();
+    const driverOrdersList: OrderDto[] = (offers as any)._driverOrders || [];
+    const matchingDriverOrder = driverOrdersList.find(
+      (o) => o.id === orderId || (offer.orderNumber && o.orderNumber === offer.orderNumber)
+    );
+
+    if (result.status === 'fulfilled' || matchingDriverOrder) {
+      const orderData = result.status === 'fulfilled' ? result.value.data : matchingDriverOrder!;
+      const assignment = mapOrderDtoToAssignment(orderData, offer.orderId ? offer.id : undefined);
+
+
+
+
+
+
       // If the backend offer is still pending, enforce the pending status locally
       // unless the actual order has been cancelled by the admin.
+      const os = offer.status?.toLowerCase();
       if ((os === 'offered' || os === 'pending') && assignment.status !== 'cancelled') {
         assignment.status = 'pending';
       }
@@ -340,8 +376,24 @@ export async function getAssignments(status?: Assignment['status'] | string): Pr
       distanceKm: 0,
       etaMinutes: 0,
       itemCount: 1,
-      totalAmount: 0,
-      codAmount: 0,
+      // Offer function total unique line 379
+      totalAmount: Number((offer as any).totalAmount ?? (offer as any).amount ?? 0),
+      codAmount: Number(
+        (offer as any).codAmount ??
+        (offer as any).cod_amount ??
+        (offer as any).order?.codAmount ??
+        ((offer as any).isCod || (offer as any).order?.isCod || String((offer as any).paymentMode || (offer as any).paymentMethod || '').toLowerCase().includes('cash') || String((offer as any).paymentMode || (offer as any).paymentMethod || '').toLowerCase().includes('cod')
+          ? ((offer as any).totalAmount ?? (offer as any).amount ?? (offer as any).order?.totalAmount ?? 0)
+          : 0)
+      ),
+      isCod: Boolean(
+        (offer as any).isCod ||
+        (offer as any).is_cod ||
+        (offer as any).codAmount > 0 ||
+        (offer as any).order?.isCod ||
+        String((offer as any).paymentMode || (offer as any).paymentMethod || (offer as any).order?.paymentMode || '').toLowerCase().includes('cash') ||
+        String((offer as any).paymentMode || (offer as any).paymentMethod || (offer as any).order?.paymentMode || '').toLowerCase().includes('cod')
+      ),
       createdAt: offer.offeredAt,
     };
   });
@@ -415,6 +467,7 @@ export async function acceptOffer(offerId: string): Promise<Assignment> {
     const rawOrderType = response.data?.orderType || response.data?.type || 'Delivery';
     const mappedType = ORDER_TYPE_MAP[rawOrderType] ?? 'other';
 
+    const resData = (response.data as any) || {};
     return {
       id: orderId,
       offerId,
@@ -430,8 +483,9 @@ export async function acceptOffer(offerId: string): Promise<Assignment> {
       distanceKm: 0,
       etaMinutes: 0,
       itemCount: 1,
-      totalAmount: 0,
-      codAmount: 0,
+      totalAmount: Number(resData.totalAmount ?? resData.amount ?? 0),
+      codAmount: Number(resData.codAmount ?? resData.cod_amount ?? 0),
+      isCod: Boolean(resData.isCod || resData.is_cod || (resData.codAmount > 0)),
       createdAt: response.data.offeredAt || new Date().toISOString(),
     };
   }

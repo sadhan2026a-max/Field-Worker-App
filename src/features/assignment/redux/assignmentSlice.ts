@@ -71,19 +71,19 @@ export const fetchAssignments = createAsyncThunk<Assignment[], string | undefine
   'assignment/fetchAssignments',
   async (status, { getState }) => {
     const apiAssignments = await assignmentService.getAssignments(status);
-    
+
     // Attempt to merge with lifetime local history if driver is logged in
     const state = getState() as any;
     const driverId = state.auth.driver?.id;
-    
+
     if (driverId) {
       // Save only terminal-state (completed/cancelled) orders to device lifetime storage
       // NEVER save pending/active orders to lifetime — they can change status at any time
       await assignmentService.saveLifetimeHistory(driverId, apiAssignments);
-      
+
       // Load lifetime history (only completed/cancelled are stored here)
       const lifetime = await assignmentService.getLifetimeHistory(driverId);
-      
+
       // Build a set of IDs that the API returned with ACTIVE/PENDING status
       // These must NOT be overridden by stale lifetime data
       const activeApiIds = new Set(
@@ -104,7 +104,7 @@ export const fetchAssignments = createAsyncThunk<Assignment[], string | undefine
       });
       // API data always wins — it's the freshest truth
       apiAssignments.forEach(a => map.set(a.id, a));
-      
+
       let merged = Array.from(map.values());
       // Apply status filter locally if requested
       if (status) {
@@ -128,7 +128,7 @@ export const syncHistoryFromNotificationsThunk = createAsyncThunk<void, { onlyTo
 
       // Fetch all notifications directly
       const notifications = await notificationService.getNotifications();
-      
+
       // Filter notifications to today only if onlyToday flag is set
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
@@ -259,7 +259,16 @@ export const confirmPayment = createAsyncThunk(
 
 export const completeAssignment = createAsyncThunk<Assignment, string>(
   'assignment/completeAssignment',
-  (id) => assignmentService.completeAssignment(id),
+  async (id, { rejectWithValue }) => {
+    try {
+      return await assignmentService.completeAssignment(id);
+    } catch (error: any) {
+      const data = error.response?.data;
+      const message = data?.message || data?.error || error.message || 'Failed to complete assignment';
+      const missingRequirements = data?.missingRequirements || data?.details?.missingRequirements;
+      return rejectWithValue({ message, missingRequirements, status: error.response?.status });
+    }
+  },
 );
 
 export const updateOrderItems = createAsyncThunk<
@@ -270,11 +279,33 @@ export const updateOrderItems = createAsyncThunk<
 export const verifyOrderOtp = createAsyncThunk<
   Assignment,
   { id: string; otp: string }
->('assignment/verifyOrderOtp', (params) => assignmentService.verifyOrderOtp(params.id, params.otp));
+>('assignment/verifyOrderOtp', async (params, { rejectWithValue }) => {
+  try {
+    return await assignmentService.verifyOrderOtp(params.id, params.otp);
+  } catch (error: any) {
+    const data = error.response?.data;
+    const message = data?.message || data?.error || error.message || 'Failed to verify OTP';
+    const remainingAttempts = data?.remainingAttempts ?? data?.details?.remainingAttempts;
+    return rejectWithValue({ message, remainingAttempts, status: error.response?.status });
+  }
+});
 
 export const acceptOffer = createAsyncThunk<Assignment, string>(
   'assignment/acceptOffer',
-  (offerId) => assignmentService.acceptOffer(offerId),
+  async (offerId, { rejectWithValue }) => {
+    try {
+      return await assignmentService.acceptOffer(offerId);
+    } catch (error: any) {
+      const data = error.response?.data;
+      const status = error.response?.status;
+      const message =
+        status === 409
+          ? 'This offer is no longer available or was already assigned.'
+          : data?.message || data?.error || error.message || 'Failed to accept offer';
+      const code = data?.code || data?.details?.code;
+      return rejectWithValue({ message, status, code });
+    }
+  },
 );
 
 export const declineOffer = createAsyncThunk<string, string>(
@@ -492,7 +523,7 @@ const assignmentSlice = createSlice({
         })
         .addCase(thunk.rejected, (state, action) => {
           state.isMutating = false;
-          state.error = action.error.message ?? 'Failed to update assignment';
+          state.error = (action.payload as any)?.message ?? action.error.message ?? 'Failed to update assignment';
         });
     }
 
@@ -511,8 +542,8 @@ const assignmentSlice = createSlice({
       })
       .addCase(acceptOffer.rejected, (state, action) => {
         state.isMutating = false;
-        state.error = action.error.message ?? 'Failed to accept offer';
-        if (state.error.includes('processed or expired')) {
+        state.error = (action.payload as any)?.message ?? action.error.message ?? 'Failed to accept offer';
+        if (state.error?.includes('processed or expired') || (action.payload as any)?.status === 409 || state.error?.includes('no longer available')) {
           const offerId = action.meta.arg;
           state.items = state.items.filter((i) => i.offerId !== offerId && i.id !== offerId);
         }
@@ -529,7 +560,7 @@ const assignmentSlice = createSlice({
       .addCase(declineOffer.rejected, (state, action) => {
         state.isMutating = false;
         state.error = action.error.message ?? 'Failed to decline offer';
-        if (state.error.includes('processed or expired')) {
+        if (state.error?.includes('processed or expired') || (action.payload as any)?.status === 409 || state.error?.includes('no longer available')) {
           const targetId = action.meta.arg;
           state.items = state.items.filter((i) => i.offerId !== targetId && i.id !== targetId);
         }

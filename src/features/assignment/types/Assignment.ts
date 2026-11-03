@@ -113,6 +113,7 @@ export interface Assignment {
   itemCount: number;
   totalAmount: number;
   codAmount: number;
+  isCod?: boolean;
   deliveryInstructions?: string;
   createdAt: string;
   completedAt?: string;
@@ -132,6 +133,11 @@ export interface Assignment {
   timeline?: { status: string; timestamp: string; notes?: string; }[];
   requiresDeliveryOtp?: boolean;
   deliveryOtpVerifiedAt?: string | null;
+  pickupWarehouseName?: string | null;
+  externalReferenceId?: string | null;
+  landmark?: string;
+  assignedLab?: string;
+  referredBy?: string;
 }
 
 export interface AssignmentOffer {

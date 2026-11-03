@@ -73,7 +73,11 @@ export function ChecklistScreen() {
             options: item.options || [],
           }));
         } else {
-          throw templateErr;
+          if ((templateErr as any)?.response?.status === 403) {
+            data = [];
+          } else {
+            throw templateErr;
+          }
         }
       }
 
@@ -98,7 +102,11 @@ export function ChecklistScreen() {
       });
       setItems(initialItems);
 
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.response?.status === 403) {
+        safeRouter.push(`/assignment/${id}/proof`);
+        return;
+      }
       setError('Failed to load checklist. Please check your connection and try again.');
     } finally {
       setIsLoading(false);
@@ -161,7 +169,11 @@ export function ChecklistScreen() {
       // Navigate to the next logical step based on assignment type
       safeRouter.push(`/assignment/${id}/proof`);
 
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.response?.status === 403) {
+        safeRouter.push(`/assignment/${id}/proof`);
+        return;
+      }
       Alert.alert('Error', 'Failed to save checklist. Please try again.');
     } finally {
       setIsSubmitting(false);

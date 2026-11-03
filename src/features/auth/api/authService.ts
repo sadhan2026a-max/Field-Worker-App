@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Driver } from '@/domain/entities/Driver';
 import { api } from '@/shared/services/axios';
+import { SecureTokenStorage } from '@/core/services/secureStorage';
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -11,35 +12,44 @@ export async function login(phone: string, password?: string, pin?: string): Pro
   const loginRes = await api.post('/api/v1/auth/login', payload);
   
   const { accessToken, refreshToken, subjectId } = loginRes.data;
-  await AsyncStorage.setItem('riderToken', accessToken);
-  await AsyncStorage.setItem('riderRefreshToken', refreshToken);
+  await SecureTokenStorage.setItem('riderToken', accessToken);
+  await SecureTokenStorage.setItem('riderRefreshToken', refreshToken);
   await AsyncStorage.setItem('riderId', subjectId);
   
   const meRes = await api.get<Driver>('/api/v1/drivers/me');
+  await AsyncStorage.setItem('riderProfile', JSON.stringify(meRes.data));
   return meRes.data;
 }
 
 export async function logout(): Promise<void> {
   try {
-    const refreshToken = await AsyncStorage.getItem('riderRefreshToken');
+    const refreshToken = await SecureTokenStorage.getItem('riderRefreshToken');
     if (refreshToken) {
       await api.post('/api/v1/auth/logout', { refreshToken });
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Logout API failed:', error);
   } finally {
-    await AsyncStorage.multiRemove(['riderToken', 'riderRefreshToken']);
+    await SecureTokenStorage.multiRemove(['riderToken', 'riderRefreshToken']);
+    await AsyncStorage.removeItem('riderProfile');
   }
 }
 
 export async function getStoredDriver(): Promise<Driver | null> {
-  const token = await AsyncStorage.getItem('riderToken');
+  const token = await SecureTokenStorage.getItem('riderToken');
   if (!token) return null;
   
   try {
     const meRes = await api.get<Driver>('/api/v1/drivers/me');
-    return meRes.data;
-  } catch (error) {
+    await AsyncStorage.setItem('riderProfile', JSON.stringify(meRes.data));
+  return meRes.data;
+  } catch (error: any) {
+    const status = error.response?.status;
+    if (status === 401 || status === 403) return null;
+    try {
+      const cached = await AsyncStorage.getItem('riderProfile');
+      if (cached) return JSON.parse(cached);
+    } catch (e) {}
     return null;
   }
 }
@@ -55,7 +65,7 @@ export async function updateLocation(lat: number, lng: number): Promise<void> {
     if (!driverId) return;
     
     await api.post(`/api/v1/drivers/${driverId}/location`, { lat, lng });
-  } catch (error) {
+  } catch (error: any) {
     // Fail silently so it doesn't interrupt the user
     console.warn('Failed to update driver location:', error);
   }
@@ -64,18 +74,18 @@ export async function updateLocation(lat: number, lng: number): Promise<void> {
 export async function registerDeviceToken(token: string): Promise<void> {
   try {
     await api.post('/api/v1/drivers/me/device-tokens', { token, platform: 'android' });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to register device token:', error);
   }
 }
 
 export async function removeDeviceToken(token: string): Promise<void> {
   try {
-    const riderToken = await AsyncStorage.getItem('riderToken');
+    const riderToken = await SecureTokenStorage.getItem('riderToken');
     if (!riderToken) return;
     
     await api.delete(`/api/v1/drivers/me/device-tokens?token=${encodeURIComponent(token)}`);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to remove device token:', error);
   }
 }

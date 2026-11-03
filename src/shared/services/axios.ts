@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { logger } from './logger';
+import { SecureTokenStorage } from '@/core/services/secureStorage';
 
 export const api = axios.create({
   baseURL: process.env.EXPO_PUBLIC_BASE_URL || 'http://161.97.89.175:5091',
@@ -11,7 +12,7 @@ export const api = axios.create({
 });
 
 api.interceptors.request.use(async (config) => {
-  const token = await AsyncStorage.getItem('riderToken');
+  const token = await SecureTokenStorage.getItem('riderToken');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -129,7 +130,7 @@ api.interceptors.response.use(
       console.log(logLines.map(line => `${red}${line}${reset}`).join('\n'));
     }
 
-    
+
     const isModifyingRequest = ['post', 'put', 'patch', 'delete'].includes(originalRequest?.method?.toLowerCase() || '');
     const isReplay = (originalRequest as any)?._isReplay;
     const isNetworkError = !error.response; // No response usually means no internet or server down
@@ -141,25 +142,25 @@ api.interceptors.response.use(
       try {
         const { OfflineSyncService } = require('@/core/services/OfflineSyncService');
         const { logger } = require('@/core/utils/logger');
-        
+
         let parsedData = originalRequest.data;
         if (typeof parsedData === 'string') {
-           try { parsedData = JSON.parse(parsedData); } catch(e) {}
+          try { parsedData = JSON.parse(parsedData); } catch (e) { }
         }
 
         logger.info('network', `Network error on ${originalRequest.url}. Queuing for offline sync.`);
-        
+
         await OfflineSyncService.enqueueAction({
           url: originalRequest.url || '',
           method: originalRequest.method || 'post',
           data: parsedData,
           headers: originalRequest.headers,
         });
-        
-        // Return a mock success response so Redux handles it optimistically
-        return Promise.resolve({ data: { success: true, _offlineQueued: true }, status: 202, config: originalRequest, headers: {}, statusText: 'Accepted' });
+
+        // Reject so UI/Redux knows request failed instead of fake-success silent loss
+        return Promise.reject(error);
       } catch (e) {
-         console.error('Failed to queue offline action', e);
+        console.error('Failed to queue offline action', e);
       }
     }
 
@@ -168,7 +169,7 @@ api.interceptors.response.use(
     // Handle single-device policy: another device logged in, force logout immediately
     const errorCode = (error.response?.data as any)?.details?.code;
     if (error.response?.status === 401 && errorCode === 'session_invalidated') {
-      await AsyncStorage.multiRemove(['riderToken', 'riderRefreshToken', 'riderId', 'persisted_assignments', 'persisted_workspace_summary']);
+      await SecureTokenStorage.multiRemove(['riderToken', 'riderRefreshToken', 'riderId']);
       const { store } = require('@/store');
       const { logoutThunk } = require('@/features/auth/redux/authSlice');
       store.dispatch(logoutThunk());
@@ -191,17 +192,17 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const refreshToken = await AsyncStorage.getItem('riderRefreshToken');
+        const refreshToken = await SecureTokenStorage.getItem('riderRefreshToken');
         if (refreshToken) {
           const res = await axios.post(`${api.defaults.baseURL?.toString().replace(/\/$/, '')}/api/v1/auth/refresh`, { refreshToken });
           const newAccessToken = res.data.accessToken;
           const newRefreshToken = res.data.refreshToken;
 
           if (newAccessToken) {
-            await AsyncStorage.setItem('riderToken', newAccessToken);
+            await SecureTokenStorage.setItem('riderToken', newAccessToken);
           }
           if (newRefreshToken) {
-            await AsyncStorage.setItem('riderRefreshToken', newRefreshToken);
+            await SecureTokenStorage.setItem('riderRefreshToken', newRefreshToken);
           }
 
           originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
@@ -212,12 +213,16 @@ api.interceptors.response.use(
           processQueue(new Error('No refresh token'));
           throw new Error('No refresh token');
         }
-      } catch (refreshError) {
+      } catch (refreshError: any) {
         processQueue(refreshError, null);
-        await AsyncStorage.multiRemove(['riderToken', 'riderRefreshToken', 'riderId']);
+        const isNetworkErr = !refreshError?.response || refreshError?.code === 'ECONNABORTED' || refreshError?.message?.includes('Network Error');
+        const isAuthRejection = refreshError?.response?.status === 401 || refreshError?.response?.status === 403;
+        if (!isNetworkErr && isAuthRejection) {
+          await SecureTokenStorage.multiRemove(['riderToken', 'riderRefreshToken', 'riderId']);
         const { store } = require('@/store');
         const { logoutThunk } = require('@/features/auth/redux/authSlice');
-        store.dispatch(logoutThunk());
+          store.dispatch(logoutThunk());
+        }
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

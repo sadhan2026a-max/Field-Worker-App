@@ -42,7 +42,11 @@ export const initAuth = createAsyncThunk<Driver | null>(
       }
       // Auto-sync today's orders in background after session restore
       // Await it so the data is ready BEFORE the app UI fully renders
-      await dispatch(autoSyncTodayOrdersThunk(String(driver.id)));
+      try {
+        await dispatch(autoSyncTodayOrdersThunk(String(driver.id)));
+      } catch (syncErr) {
+        logger.warn('auth', 'Auto-sync failed on boot (likely offline)', syncErr);
+      }
     } else {
       logger.info('auth', 'No stored session found');
     }
@@ -64,7 +68,7 @@ export const loginThunk = createAsyncThunk<
   try {
     const previousDriverId = await AsyncStorage.getItem('riderId');
     const driver = await authService.login(phone, password, pin);
-    
+
     // If a DIFFERENT driver logs in, clear the previous driver's data
     if (previousDriverId && previousDriverId !== String(driver.id)) {
       await AsyncStorage.multiRemove(['persisted_assignments', 'persisted_workspace_summary']);
@@ -72,7 +76,7 @@ export const loginThunk = createAsyncThunk<
     }
 
     logger.info('auth', 'Login successful', { driverId: driver.id, name: driver.name });
-    
+
     // Register push token
     try {
       const token = await NotificationService.registerForPushNotificationsAsync();
@@ -121,7 +125,7 @@ export const logoutThunk = createAsyncThunk<void>(
   'auth/logout',
   async (_, { dispatch }) => {
     logger.info('auth', 'Driver logging out…');
-    
+
     // Clear persisted assignment data and Redux state on logout
     try {
       await AsyncStorage.multiRemove(['persisted_assignments', 'persisted_workspace_summary', 'riderId']);

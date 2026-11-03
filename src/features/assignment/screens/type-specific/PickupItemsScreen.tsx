@@ -51,7 +51,11 @@ export function PickupItemsScreen() {
       }
 
       router.replace(`/assignment/${id}/proof`);
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.response?.status === 403 || e?.status === 403) {
+        router.replace(`/assignment/${id}/proof`);
+        return;
+      }
       ToastAndroid.show('Failed to update items', ToastAndroid.SHORT);
     }
   };
