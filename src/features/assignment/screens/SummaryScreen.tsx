@@ -5,6 +5,7 @@ import Toast from 'react-native-toast-message';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ScreenLoader } from '@/components/ui/ScreenLoader';
+import { AppStatusBar } from '@/shared/components/ui/AppStatusBar';
 import { ScreenFooter } from '@/components/ui/ScreenFooter';
 import { radius, spacing, typography, colors, useTheme, FontFamily, FontSize } from '@/core/theme';
 
@@ -114,6 +115,7 @@ export function SummaryScreen() {
 
   return (
     <View style={styles.container}>
+      <AppStatusBar />
       <Stack.Screen options={{ headerShown: true, title: 'Job Summary' }} />
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.sectionTitle}>Review Job Completion</Text>

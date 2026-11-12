@@ -10,36 +10,29 @@ import { DistanceDisplay } from '@/features/assignment/components';
 import { useCurrentLocation } from '@/shared/utils/location';
 import { useAcceptOffer, useDeclineOffer } from '@/features/assignment/hooks/useAssignments';
 import { externalMapsUrl } from '@/shared/services/maps';
+import { getOverviewTheme, OverviewThemePalette } from './overviewTheme';
 
-function getStatusLabel(status: string): string {
-  const labels: Record<string, string> = {
-    pending: 'Pending Acceptance',
-    accepted: 'Accepted',
-    en_route: 'En Route',
-    arrived: 'At Location',
-    in_progress: 'In Progress',
-  };
-  return labels[status] || status.replace(/_/g, ' ');
-}
-
-function getStatusTheme(status: string): { text: string; bg: string; border: string; dot: string } {
-  switch (status) {
-    case 'pending':
-      return { text: '#D97706', bg: '#FEF3C7', border: '#FDE68A', dot: '#F59E0B' };
-    case 'accepted':
-      return { text: '#7C3AED', bg: '#F3E8FF', border: '#E9D5FF', dot: '#8B5CF6' };
-    case 'en_route':
-      return { text: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE', dot: '#3B82F6' };
-    case 'arrived':
-      return { text: '#059669', bg: '#ECFDF5', border: '#A7F3D0', dot: '#10B981' };
-    case 'in_progress':
-      return { text: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE', dot: '#3B82F6' };
-    default:
-      return { text: '#4B5563', bg: '#F3F4F6', border: '#E5E7EB', dot: '#6B7280' };
+function getTypeDetails(type?: string, isDark: boolean = false): { icon: keyof typeof MaterialIcons.glyphMap; label: string; bg: string; color: string } {
+  if (isDark) {
+    switch (type) {
+      case 'delivery':
+        return { icon: 'local-shipping', label: 'Delivery', bg: 'rgba(59, 130, 246, 0.16)', color: '#60A5FA' };
+      case 'pickup':
+        return { icon: 'archive', label: 'Pickup', bg: 'rgba(245, 158, 11, 0.16)', color: '#FBBF24' };
+      case 'return':
+        return { icon: 'assignment-return', label: 'Return', bg: 'rgba(239, 68, 68, 0.16)', color: '#F87171' };
+      case 'installation':
+        return { icon: 'build', label: 'Installation', bg: 'rgba(16, 185, 129, 0.16)', color: '#34D399' };
+      case 'inspection':
+        return { icon: 'fact-check', label: 'Inspection', bg: 'rgba(168, 85, 247, 0.16)', color: '#C084FC' };
+      case 'service_visit':
+      case 'service':
+        return { icon: 'engineering', label: 'Service', bg: 'rgba(99, 102, 241, 0.16)', color: '#818CF8' };
+      default:
+        return { icon: 'shopping-bag', label: 'Task', bg: 'rgba(148, 163, 184, 0.14)', color: '#CBD5E1' };
+    }
   }
-}
 
-function getTypeDetails(type?: string): { icon: keyof typeof MaterialIcons.glyphMap; label: string; bg: string; color: string } {
   switch (type) {
     case 'delivery':
       return { icon: 'local-shipping', label: 'Delivery', bg: '#EFF6FF', color: '#1D4ED8' };
@@ -65,11 +58,11 @@ interface NextDeliveryCardProps {
 }
 
 export function NextDeliveryCard({ assignment, onStart }: NextDeliveryCardProps) {
-  const { colors } = useTheme();
-  const styles = React.useMemo(() => useStyles(colors), [colors]);
+  const { colors, theme, isDark } = useTheme();
+  const palette = React.useMemo(() => getOverviewTheme(theme, isDark), [theme, isDark]);
+  const styles = React.useMemo(() => useStyles(colors, palette, isDark), [colors, palette, isDark]);
   const currentLocation = useCurrentLocation();
-  const statusTheme = getStatusTheme(assignment.status);
-  const typeDetails = getTypeDetails(assignment.type);
+  const typeDetails = getTypeDetails(assignment.type, isDark);
 
   const acceptOffer = useAcceptOffer();
   const declineOffer = useDeclineOffer();
@@ -186,23 +179,17 @@ export function NextDeliveryCard({ assignment, onStart }: NextDeliveryCardProps)
           }
         }}
       >
-        {/* ─── Header Strip: Order ID & Status ─── */}
+        {/* ─── Header Strip: Type Chip & Order Code together ─── */}
         <View style={styles.headerStrip}>
-          <View style={styles.headerLeft}>
-            <View style={[styles.typeChip, { backgroundColor: typeDetails.bg }]}>
-              <MaterialIcons name={typeDetails.icon} size={11} color={typeDetails.color} />
-              <Text style={[styles.typeChipText, { color: typeDetails.color }]}>
-                {typeDetails.label}
-              </Text>
-            </View>
-            <Text style={styles.orderIdText}>#{orderCode}</Text>
+          <View style={[styles.typeChip, { backgroundColor: typeDetails.bg }]}>
+            <MaterialIcons name={typeDetails.icon} size={11} color={typeDetails.color} />
+            <Text style={[styles.typeChipText, { color: typeDetails.color }]}>
+              {typeDetails.label}
+            </Text>
           </View>
 
-          <View style={[styles.statusChip, { backgroundColor: statusTheme.bg, borderColor: statusTheme.border }]}>
-            <View style={[styles.statusDot, { backgroundColor: statusTheme.dot }]} />
-            <Text style={[styles.statusText, { color: statusTheme.text }]}>
-              {getStatusLabel(assignment.status)}
-            </Text>
+          <View style={styles.orderIdBadge}>
+            <Text style={styles.orderIdText} numberOfLines={1}>{orderCode}</Text>
           </View>
         </View>
 
@@ -216,9 +203,22 @@ export function NextDeliveryCard({ assignment, onStart }: NextDeliveryCardProps)
 
           <View style={styles.destinationDetails}>
             <View style={styles.customerNameRow}>
-              <Text style={styles.customerName} numberOfLines={1}>
-                {assignment.customer?.name || 'Customer'}
-              </Text>
+              <View style={styles.customerNameLeft}>
+                <Text style={styles.customerName} numberOfLines={1}>
+                  {assignment.customer?.name || 'Customer'}
+                </Text>
+
+                <View style={[styles.paymentInfoPill, isCod ? styles.codPaymentPill : styles.prepaidPaymentPill]}>
+                  <MaterialIcons
+                    name={isCod ? 'payments' : 'verified'}
+                    size={10}
+                    color={isCod ? (isDark ? '#FBBF24' : '#B45309') : (isDark ? '#34D399' : '#059669')}
+                  />
+                  <Text style={[styles.paymentInfoText, isCod ? styles.codPaymentText : styles.prepaidPaymentText]}>
+                    {isCod ? `COD ₹${displayAmount}` : 'Prepaid'}
+                  </Text>
+                </View>
+              </View>
 
               {assignment.customer?.location?.latitude !== 0 || assignment.customer?.location?.longitude !== 0 ? (
                 <View style={styles.distanceBadge}>
@@ -250,8 +250,8 @@ export function NextDeliveryCard({ assignment, onStart }: NextDeliveryCardProps)
         </View>
 
         {/* ─── One-Tap Action Tools: Maps, Call, WhatsApp (Available after Acceptance) ─── */}
-        <View style={styles.toolsRow}>
-          {assignment.status !== 'pending' && (
+        {assignment.status !== 'pending' && (
+          <View style={styles.toolsRow}>
             <Pressable
               style={styles.toolButton}
               onPress={handleOpenNavigation}
@@ -260,37 +260,30 @@ export function NextDeliveryCard({ assignment, onStart }: NextDeliveryCardProps)
               <MaterialIcons name="navigation" size={12} color={colors.primary} />
               <Text style={styles.toolButtonText}>Navigate</Text>
             </Pressable>
-          )}
 
-          {assignment.status !== 'pending' && assignment.customer?.phone && assignment.customer.phone !== 'N/A' && (
-            <>
-              <Pressable
-                style={styles.toolButton}
-                onPress={handlePhoneCall}
-                android_ripple={{ color: colors.primary + '18' }}
-              >
-                <MaterialIcons name="phone" size={12} color={colors.primary} />
-                <Text style={styles.toolButtonText}>Call</Text>
-              </Pressable>
+            {assignment.customer?.phone && assignment.customer.phone !== 'N/A' && (
+              <>
+                <Pressable
+                  style={styles.toolButton}
+                  onPress={handlePhoneCall}
+                  android_ripple={{ color: colors.primary + '18' }}
+                >
+                  <MaterialIcons name="phone" size={12} color={colors.primary} />
+                  <Text style={styles.toolButtonText}>Call</Text>
+                </Pressable>
 
-              <Pressable
-                style={styles.toolButton}
-                onPress={handleWhatsApp}
-                android_ripple={{ color: '#16A34A18' }}
-              >
-                <MaterialIcons name="chat" size={12} color="#16A34A" />
-                <Text style={[styles.toolButtonText, { color: '#16A34A' }]}>WhatsApp</Text>
-              </Pressable>
-            </>
-          )}
-
-          {/* Quick Package & Payment Pill */}
-          <View style={styles.paymentInfoPill}>
-            <Text style={[styles.paymentInfoText, isCod && { color: '#B45309' }]}>
-              {isCod ? `COD ₹${displayAmount}` : 'Prepaid'}
-            </Text>
+                <Pressable
+                  style={styles.toolButton}
+                  onPress={handleWhatsApp}
+                  android_ripple={{ color: '#16A34A18' }}
+                >
+                  <MaterialIcons name="chat" size={12} color="#16A34A" />
+                  <Text style={[styles.toolButtonText, { color: '#16A34A' }]}>WhatsApp</Text>
+                </Pressable>
+              </>
+            )}
           </View>
-        </View>
+        )}
 
         {/* ─── Primary Action CTA Section ─── */}
         {assignment.status === 'pending' ? (
@@ -301,7 +294,7 @@ export function NextDeliveryCard({ assignment, onStart }: NextDeliveryCardProps)
               style={({ pressed }) => [styles.declineBtn, pressed && { opacity: 0.85 }]}
             >
               {actionType === 'decline' && declineOffer.isPending ? (
-                <ActivityIndicator color="#EF4444" size="small" style={{ transform: [{ scale: 0.7 }] }} />
+                <ActivityIndicator color="#DC2626" size="small" style={{ transform: [{ scale: 0.7 }] }} />
               ) : (
                 <Text style={styles.declineBtnText}>Decline</Text>
               )}
@@ -313,13 +306,13 @@ export function NextDeliveryCard({ assignment, onStart }: NextDeliveryCardProps)
               style={styles.acceptBtnWrapper}
             >
               <LinearGradient
-                colors={colors.headerGradient as [string, string, ...string[]] || [colors.primary, colors.primaryDark]}
+                colors={isDark ? ['#10B981', '#059669'] : [palette.headerPrimary, palette.headerPrimary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.acceptBtnGradient}
               >
                 <Text style={styles.acceptBtnText}>
-                  {actionType === 'accept' && acceptOffer.isPending ? 'Accepting...' : 'Accept Job'}
+                  {actionType === 'accept' && acceptOffer.isPending ? 'Accepting...' : 'Accept'}
                 </Text>
               </LinearGradient>
             </Pressable>
@@ -327,7 +320,7 @@ export function NextDeliveryCard({ assignment, onStart }: NextDeliveryCardProps)
         ) : (
           <Pressable onPress={onStart} style={styles.primaryCtaWrapper}>
             <LinearGradient
-              colors={colors.headerGradient as [string, string, ...string[]] || [colors.primaryDark || '#047857', colors.primary || '#10B981']}
+              colors={isDark ? ['#10B981', '#059669'] : [palette.headerPrimary, palette.headerPrimary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.primaryCtaGradient}
@@ -392,81 +385,59 @@ export function NextDeliveryCard({ assignment, onStart }: NextDeliveryCardProps)
   );
 }
 
-const useStyles = (colors: any) => StyleSheet.create({
+const useStyles = (colors: any, palette: OverviewThemePalette, isDark: boolean) => StyleSheet.create({
   container: {
-    backgroundColor: colors.surface,
-    borderRadius: 14,
+    backgroundColor: isDark ? '#1E1E24' : '#FFFFFF',
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: colors.border,
-    padding: 11,
+    borderColor: isDark ? '#333338' : '#E2E8F0',
+    padding: 13,
     marginBottom: 12,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 6,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
   },
   headerStrip: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: 8,
+    gap: 7,
+    paddingBottom: 9,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border + '60',
-    marginBottom: 9,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+    borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
+    marginBottom: 10,
   },
   typeChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
-    borderRadius: 4,
-    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   typeChipText: {
-    fontSize: 9.5,
+    fontSize: 10.5,
     fontFamily: FontFamily.bold,
   },
-  orderIdText: {
-    fontSize: 11.5,
-    fontFamily: FontFamily.bold,
-    color: colors.textPrimary,
-  },
-  statusChip: {
+  orderIdBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 5,
-    borderWidth: 0.8,
-    gap: 4,
+    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
   },
-  statusDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-  },
-  statusText: {
-    fontSize: 9.5,
+  orderIdText: {
+    fontSize: 10.5,
     fontFamily: FontFamily.bold,
-    letterSpacing: 0.1,
+    color: isDark ? '#FFFFFF' : '#0F172A',
+    letterSpacing: 0.2,
   },
   routeSection: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
-    marginBottom: 9,
+    gap: 9,
+    marginBottom: 10,
   },
   waypointColumn: {
     alignItems: 'center',
@@ -481,8 +452,8 @@ const useStyles = (colors: any) => StyleSheet.create({
   },
   pinLine: {
     width: 1.5,
-    height: 18,
-    backgroundColor: '#CBD5E1',
+    height: 20,
+    backgroundColor: isDark ? '#334155' : '#CBD5E1',
     marginVertical: 2,
   },
   destinationDetails: {
@@ -494,31 +465,40 @@ const useStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'space-between',
     gap: 6,
   },
+  customerNameLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 1,
+  },
   customerName: {
-    fontSize: 13,
+    fontSize: 13.5,
     fontFamily: FontFamily.bold,
-    color: colors.textPrimary,
-    flex: 1,
+    color: isDark ? '#FFFFFF' : '#0F172A',
+    letterSpacing: -0.1,
+    flexShrink: 1,
   },
   distanceBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2.5,
-    backgroundColor: colors.primary + '12',
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
-    borderRadius: 4,
+    gap: 3,
+    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.14)' : (palette.viewAllBg || '#ECFDF5'),
+    borderWidth: 1,
+    borderColor: isDark ? 'rgba(16, 185, 129, 0.32)' : (palette.viewAllBorder || '#D1FAE5'),
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
   distanceText: {
     fontSize: 10,
-    fontFamily: FontFamily.semiBold,
-    color: colors.primary,
+    fontFamily: FontFamily.bold,
+    color: isDark ? '#34D399' : (palette.viewAllText || '#059669'),
   },
   addressText: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontFamily: FontFamily.medium,
-    color: colors.textSecondary,
-    lineHeight: 14,
+    color: isDark ? '#94A3B8' : '#64748B',
+    lineHeight: 15,
     marginTop: 2,
   },
   landmarkPill: {
@@ -537,92 +517,112 @@ const useStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingTop: 8,
+    paddingTop: 9,
     borderTopWidth: 1,
-    borderTopColor: colors.border + '50',
-    marginBottom: 9,
+    borderTopColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
+    marginBottom: 10,
   },
   toolButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.background,
-    borderWidth: 0.8,
-    borderColor: colors.border,
-    borderRadius: 6,
-    paddingHorizontal: 7,
+    backgroundColor: isDark ? '#27272A' : '#F8FAFC',
+    borderWidth: 1,
+    borderColor: isDark ? '#3F3F46' : '#E2E8F0',
+    borderRadius: 8,
+    paddingHorizontal: 8,
     paddingVertical: 4.5,
-    gap: 3.5,
+    gap: 4,
   },
   toolButtonText: {
-    fontSize: 10,
+    fontSize: 10.5,
     fontFamily: FontFamily.bold,
-    color: colors.primary,
+    color: palette.headerPrimary || colors.primary,
   },
   paymentInfoPill: {
-    marginLeft: 'auto',
-    backgroundColor: colors.background,
-    borderRadius: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3.5,
+    borderRadius: 6,
     paddingHorizontal: 6,
-    paddingVertical: 3,
+    paddingVertical: 2,
+    borderWidth: 1,
+  },
+  prepaidPaymentPill: {
+    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.16)' : '#ECFDF5',
+    borderColor: isDark ? 'rgba(16, 185, 129, 0.35)' : '#D1FAE5',
+  },
+  codPaymentPill: {
+    backgroundColor: isDark ? 'rgba(245, 158, 11, 0.16)' : '#FFFBEB',
+    borderColor: isDark ? 'rgba(245, 158, 11, 0.35)' : '#FDE68A',
   },
   paymentInfoText: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontFamily: FontFamily.bold,
-    color: colors.textPrimary,
+  },
+  prepaidPaymentText: {
+    color: isDark ? '#34D399' : '#059669',
+  },
+  codPaymentText: {
+    color: isDark ? '#FBBF24' : '#B45309',
   },
   dualActionRow: {
     flexDirection: 'row',
     gap: 8,
+  },
+  btnInnerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
   },
   declineBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FEF2F2',
+    backgroundColor: isDark ? 'rgba(239, 68, 68, 0.12)' : '#FEF2F2',
     borderWidth: 1,
-    borderColor: '#FECACA',
-    borderRadius: 9,
-    height: 36,
+    borderColor: isDark ? 'rgba(239, 68, 68, 0.32)' : '#FECACA',
+    borderRadius: 12,
+    height: 38,
   },
   declineBtnText: {
-    fontSize: 12,
+    fontSize: 12.5,
     fontFamily: FontFamily.bold,
-    color: '#EF4444',
+    color: isDark ? '#F87171' : '#DC2626',
   },
   acceptBtnWrapper: {
     flex: 1,
-    borderRadius: 9,
+    borderRadius: 12,
     overflow: 'hidden',
   },
   acceptBtnGradient: {
     flexDirection: 'row',
-    height: 36,
+    height: 38,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 9,
+    borderRadius: 12,
   },
   acceptBtnText: {
-    fontSize: 12,
+    fontSize: 12.5,
     fontFamily: FontFamily.bold,
     color: '#FFFFFF',
     letterSpacing: 0.2,
   },
   primaryCtaWrapper: {
-    borderRadius: 9,
+    borderRadius: 12,
     overflow: 'hidden',
   },
   primaryCtaGradient: {
     flexDirection: 'row',
-    height: 36,
+    height: 38,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 9,
+    borderRadius: 12,
     gap: 6,
     paddingHorizontal: 12,
   },
   primaryCtaText: {
-    fontSize: 12.5,
+    fontSize: 13,
     fontFamily: FontFamily.bold,
     color: '#FFFFFF',
     letterSpacing: 0.2,
@@ -635,11 +635,13 @@ const useStyles = (colors: any) => StyleSheet.create({
     padding: 16,
   },
   modalCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 14,
+    backgroundColor: isDark ? '#1E1E24' : '#FFFFFF',
+    borderRadius: 18,
     padding: 18,
     width: '88%',
     maxWidth: 320,
+    borderWidth: 1,
+    borderColor: isDark ? '#333338' : '#E2E8F0',
     ...Platform.select({
       ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 8 },
       android: { elevation: 6 },
@@ -648,13 +650,13 @@ const useStyles = (colors: any) => StyleSheet.create({
   modalTitle: {
     fontSize: 15,
     fontFamily: FontFamily.bold,
-    color: colors.textPrimary,
+    color: isDark ? '#FFFFFF' : '#0F172A',
     marginBottom: 6,
   },
   modalMessage: {
     fontSize: 12.5,
     fontFamily: FontFamily.regular,
-    color: colors.textSecondary,
+    color: isDark ? '#94A3B8' : '#64748B',
     lineHeight: 18,
     marginBottom: 16,
   },
@@ -665,11 +667,11 @@ const useStyles = (colors: any) => StyleSheet.create({
   },
   modalCancelBtn: {
     flex: 1,
-    height: 35,
-    borderRadius: 8,
-    backgroundColor: colors.background,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: isDark ? '#27272A' : '#F1F5F9',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: isDark ? '#3F3F46' : '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -679,13 +681,13 @@ const useStyles = (colors: any) => StyleSheet.create({
   modalCancelBtnText: {
     fontSize: 12,
     fontFamily: FontFamily.bold,
-    color: colors.textPrimary,
+    color: isDark ? '#FFFFFF' : '#0F172A',
   },
   modalConfirmBtn: {
     flex: 1,
-    height: 35,
-    borderRadius: 8,
-    backgroundColor: '#EF4444',
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#DC2626',
     alignItems: 'center',
     justifyContent: 'center',
   },

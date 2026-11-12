@@ -2,11 +2,12 @@ import { logger } from '@/core/utils/logger';
 import { initAuth, selectDriver, selectIsLoading } from '@/features/auth/redux/authSlice';
 import { store } from '@/store';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { NotificationService } from '@/core/services/NotificationService';
+import { NotificationService, CHANNEL_NEW_ORDER, CHANNEL_CANCELLED } from '@/core/services/NotificationService';
 import * as Notifications from 'expo-notifications';
-import { fetchAssignments, fetchWorkspaceSummary, fetchOrderCompletionRequirements, restoreAssignments, restoreWorkspaceSummary, setHydrated, fetchAssignmentById, showCancelledAlert, addAssignment } from '@/features/assignment/redux/assignmentSlice';
+import { fetchAssignments, fetchWorkspaceSummary, fetchOrderCompletionRequirements, restoreAssignments, restoreWorkspaceSummary, setHydrated, fetchAssignmentById, showCancelledAlert, hideCancelledAlert, markOrderCancelled, syncHistoryFromNotificationsThunk, addAssignment } from '@/features/assignment/redux/assignmentSlice';
 import { fetchNotifications } from '@/features/notification/redux/notificationSlice';
-import { Stack, router, useSegments } from 'expo-router';
+import * as Haptics from 'expo-haptics';
+import { Stack, router, useSegments, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState, Component } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -24,7 +25,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as SplashScreen from 'expo-splash-screen';
-import { Text, View, ScrollView, StyleSheet, Animated, Easing, AppState, AppStateStatus } from 'react-native';
+import { Text, View, ScrollView, StyleSheet, Animated, Easing, AppState, AppStateStatus, Platform, StatusBar as RNStatusBar, Vibration } from 'react-native';
 import { useRef } from 'react';
 import { colors, typography, FontSize, ThemeProvider, useTheme } from '@/core/theme';
 import { TabletWrapper } from '@/shared/components/ui/TabletWrapper';
@@ -84,6 +85,12 @@ function AppBootstrap({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     logger.info('bootstrap', '👋 SidhaHisab Rider starting up — dispatching initAuth');
+
+    // Setup Android notification channels (new_order & order_cancelled sounds)
+    NotificationService.setupAndroidChannels().catch((e) =>
+      logger.warn('bootstrap', 'Failed to setup notification channels', e)
+    );
+
     dispatch(initAuth())
       .then((result) => {
         logger.info('bootstrap', '✅ initAuth completed', result);
@@ -141,14 +148,38 @@ function AppBootstrap({ children }: { children: React.ReactNode }) {
       dispatch(fetchNotifications());
 
       if (isCancellation) {
-        // ── CANCEL: show popup immediately from notification text ──────────
+        // ── CANCEL: mark order as cancelled in Redux IMMEDIATELY ───────────────
         const orderCodeMatch = bodyStr.match(/ORD-[\w-]+/i);
         const orderCode = orderCodeMatch ? orderCodeMatch[0] : (orderId ? String(orderId) : '');
+
+        // 1. Remove/cancel the order from local Redux state right away
+        if (orderId) dispatch(markOrderCancelled(String(orderId)));
+        if (orderCode) dispatch(markOrderCancelled(orderCode));
+        if (orderId) dispatch(fetchAssignmentById(String(orderId)));
+
+        // 2. Show cancellation popup
         dispatch(showCancelledAlert(orderCode));
 
-        // Refresh order state in background
-        if (orderId) dispatch(fetchAssignmentById(String(orderId)));
-        // Delay fetchAssignments so it doesn't race with fetchAssignmentById
+        // 3. Vibrate with a "triple heavy" pattern for cancellation (long-short-long)
+        //    Works even when app is in foreground on Android.
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+        if (Platform.OS === 'android') {
+          Vibration.vibrate([0, 500, 200, 500, 200, 500]);
+        }
+
+        // 4. Schedule a local notification on the cancelled channel so the
+        //    custom sound (order_cancelled) plays regardless of FCM channelId
+        Notifications.scheduleNotificationAsync({
+          content: {
+            title: notification.request.content.title || 'Order Cancelled',
+            body: notification.request.content.body || orderCode,
+            sound: 'order_cancelled',
+            ...(Platform.OS === 'android' && { channelId: CHANNEL_CANCELLED }),
+          },
+          trigger: null,
+        }).catch(() => {});
+
+        // 5. Delay full refresh so it doesn't race with fetchAssignmentById
         setTimeout(() => {
           dispatch(fetchAssignments());
           dispatch(fetchWorkspaceSummary(currentDriver.id));
@@ -156,7 +187,24 @@ function AppBootstrap({ children }: { children: React.ReactNode }) {
 
       } else if (orderId) {
         // ── NEW ORDER: show card on home screen INSTANTLY ────────────────────
-        // 1. Extract order code & type from notification text
+        // 1. Vibrate with a cheerful short double-buzz for new order
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        if (Platform.OS === 'android') {
+          Vibration.vibrate([0, 200, 100, 200]);
+        }
+
+        // 2. Play new order chime sound via local notification
+        Notifications.scheduleNotificationAsync({
+          content: {
+            title: notification.request.content.title || 'New Delivery Order',
+            body: notification.request.content.body || (orderId ? `Order #${orderId}` : 'New order assigned'),
+            sound: 'new_order',
+            ...(Platform.OS === 'android' && { channelId: CHANNEL_NEW_ORDER }),
+          },
+          trigger: null,
+        }).catch(() => {});
+
+        // 3. Extract order code & type from notification text
         const orderCodeMatch = bodyStr.match(/ORD-[\w-]+/i);
         const extractedCode = orderCodeMatch ? orderCodeMatch[0] : String(orderId);
 
@@ -172,7 +220,7 @@ function AppBootstrap({ children }: { children: React.ReactNode }) {
                     'delivery'
         );
 
-        // 2. Dispatch a placeholder assignment IMMEDIATELY so the card
+        // 3. Dispatch a placeholder assignment IMMEDIATELY so the card
         //    appears on the home screen without waiting for the API.
         //    The NextDeliveryCard already handles placeholder values:
         //    name='Customer', address='order details available after acceptance'
@@ -197,11 +245,11 @@ function AppBootstrap({ children }: { children: React.ReactNode }) {
           items: [],
         }));
 
-        // 3. Fetch real details in background — upsertAssignment will update
+        // 4. Fetch real details in background — upsertAssignment will update
         //    the placeholder with actual customer name, address, offerId etc.
         await dispatch(fetchAssignmentById(String(orderId)));
 
-        // 4. Refresh summary
+        // 5. Refresh summary
         dispatch(fetchWorkspaceSummary(currentDriver.id));
       } else {
         // Other notifications: just refresh everything
@@ -248,6 +296,7 @@ function AppBootstrap({ children }: { children: React.ReactNode }) {
         dispatch(fetchAssignments());
         dispatch(fetchWorkspaceSummary(currentDriver.id));
         dispatch(fetchNotifications());
+        dispatch(syncHistoryFromNotificationsThunk({ onlyToday: true }));
       }
     };
 
@@ -375,10 +424,21 @@ const toastConfig = {
 
 function RootNavigator() {
   const { colors, isDark } = useTheme();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    // Edge-to-edge transparent status bar with dark icons for light theme and light icons for dark theme
+    const barStyle = isDark ? 'light-content' : 'dark-content';
+    RNStatusBar.setBarStyle(barStyle, true);
+    if (Platform.OS === 'android') {
+      RNStatusBar.setTranslucent(true);
+      RNStatusBar.setBackgroundColor('transparent', true);
+    }
+  }, [pathname, isDark]);
 
   return (
     <>
-      <StatusBar style={isDark ? "light" : "dark"} />
+      <StatusBar style={isDark ? "light" : "dark"} backgroundColor="transparent" translucent />
       <TabletWrapper>
         <Stack
           screenOptions={{

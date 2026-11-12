@@ -5,6 +5,7 @@ import { useForm, Controller } from 'react-hook-form';
 import Toast from 'react-native-toast-message';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
+import { AppStatusBar } from '@/shared/components/ui/AppStatusBar';
 import { useTheme, spacing, typography, FontFamily } from '@/core/theme';
 import { requestPasswordReset, confirmPasswordReset } from '@/features/auth/api/authService';
 
@@ -57,6 +58,7 @@ export function ForgotPasswordScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <AppStatusBar />
       <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.content}>
           <Pressable style={styles.backButton} onPress={() => router.back()}>

@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { ScreenLoader } from '@/components/ui/ScreenLoader';
+import { AppStatusBar } from '@/shared/components/ui/AppStatusBar';
 import { ScreenFooter } from '@/components/ui/ScreenFooter';
 import { SignaturePad, SignaturePadHandle } from '@/components/ui/SignaturePad';
 import { radius, spacing, typography, colors, useTheme } from '@/core/theme';
@@ -143,6 +144,7 @@ export function ProofScreen() {
 
   return (
     <View style={styles.container}>
+      <AppStatusBar />
       <Stack.Screen options={{ headerShown: true, title: `${assignment.code} · ${assignment.customer.name}` }} />
       <KeyboardAvoidingView 
         style={{ flex: 1 }} 

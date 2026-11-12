@@ -7,6 +7,7 @@ import { safeRouter } from '@/shared/utils/navigation';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { ScreenFooter } from '@/components/ui/ScreenFooter';
+import { AppStatusBar } from '@/shared/components/ui/AppStatusBar';
 import { spacing, typography, colors, useTheme } from '@/core/theme';
 
 import { useAssignment, useCompleteAssignment } from '@/features/assignment/hooks/useAssignments';
@@ -128,6 +129,7 @@ export function SalesDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <AppStatusBar />
       <Stack.Screen options={{ headerShown: false }} />
       <ScrollView ref={scrollViewRef} contentContainerStyle={styles.content}>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs }}>
@@ -136,7 +138,7 @@ export function SalesDetailScreen() {
           </Pressable>
           <Text style={[styles.title, { marginBottom: 0 }]}>Sales Visit</Text>
         </View>
-        <Text style={styles.subtitle}>Order #{assignment?.code}</Text>
+        <Text style={styles.subtitle}>Order {assignment?.code}</Text>
 
         <Text style={styles.label}>Meeting Notes <Text style={styles.asterisk}>*</Text></Text>
         <TextInput

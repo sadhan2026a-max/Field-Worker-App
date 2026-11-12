@@ -62,6 +62,19 @@ const ORDER_TYPE_MAP: Record<string, AssignmentType> = {
   Other: 'other',
 };
 
+export function normalizeOrderType(rawType?: any): AssignmentType | null {
+  if (!rawType || typeof rawType !== 'string') return null;
+  const s = rawType.toLowerCase().trim();
+  if (s.includes('inspect')) return 'inspection';
+  if (s.includes('install')) return 'installation';
+  if (s.includes('pickup')) return 'pickup';
+  if (s.includes('return')) return 'return';
+  if (s.includes('service')) return 'service_visit';
+  if (s.includes('sales')) return 'sales_visit';
+  if (s.includes('deliver')) return 'delivery';
+  return (ORDER_TYPE_MAP as any)[rawType] || null;
+};
+
 const PAYMENT_MODE_MAP: Record<PaymentMode, 'Cash' | 'Upi' | 'Card'> = {
   cash: 'Cash',
   upi: 'Upi',
@@ -104,7 +117,7 @@ function mapOrderDtoToAssignment(order: OrderDto, offerId?: string): Assignment 
     id: order.id,
     offerId,
     code: order.orderNumber,
-    type: ORDER_TYPE_MAP[order.orderType] ?? 'other',
+    type: normalizeOrderType(order.orderType) ?? 'other',
     status: mapOrderStatus(order.status),
     customer: {
       name: extractCustomerName(order),
@@ -288,6 +301,21 @@ export async function getAssignments(status?: Assignment['status'] | string): Pr
     return [underlyingOrderId, o];
   })).values());
 
+  let cachedAssignmentsMap = new Map<string, Assignment>();
+  try {
+    const cachedData = await AsyncStorage.getItem('persisted_assignments');
+    if (cachedData) {
+      const parsed = JSON.parse(cachedData);
+      if (Array.isArray(parsed)) {
+        parsed.forEach((a) => {
+          if (a?.id) cachedAssignmentsMap.set(a.id, a);
+          if (a?.offerId) cachedAssignmentsMap.set(a.offerId, a);
+          if (a?.code) cachedAssignmentsMap.set(a.code, a);
+        });
+      }
+    }
+  } catch {}
+
   // GET /api/v1/orders (bulk list) is admin/dispatcher-only and 403s for a driver, so
   // each order is enriched individually via GET /api/v1/orders/{id} (self-service read),
   // which carries the real customer/type/checklist data the offers endpoint doesn't have.
@@ -357,8 +385,20 @@ export async function getAssignments(status?: Assignment['status'] | string): Pr
       }
     }
 
-    const rawOrderType = offer.orderType || offer.type || 'Delivery';
-    const mappedType = ORDER_TYPE_MAP[rawOrderType] ?? 'other';
+    const cachedItem = cachedAssignmentsMap.get(orderId) || (offer.orderNumber ? cachedAssignmentsMap.get(offer.orderNumber) : undefined);
+    const cachedType = cachedItem?.type;
+    const isSpecificType = (t?: string) => Boolean(t && !['delivery', 'other'].includes(t.toLowerCase()));
+
+    const rawOrderType =
+      normalizeOrderType(offer.orderType) ||
+      normalizeOrderType((offer as any).order_type) ||
+      normalizeOrderType((offer as any).order?.orderType) ||
+      normalizeOrderType((offer as any).order?.type) ||
+      normalizeOrderType(offer.type) ||
+      normalizeOrderType((offer as any).category) ||
+      normalizeOrderType((offer as any).orderTitle || (offer as any).title || (offer as any).notes || (offer as any).message) ||
+      (isSpecificType(cachedType) ? cachedType : 'Delivery');
+    const mappedType = (((rawOrderType ? ORDER_TYPE_MAP[rawOrderType] : undefined)) || normalizeOrderType(rawOrderType)) ?? 'delivery';
 
     return {
       id: orderId,
@@ -413,24 +453,44 @@ export async function acceptOffer(offerId: string): Promise<Assignment> {
   // Before calling accept, verify the offer still exists and hasn't been
   // cancelled by the admin. This guards against the backend bug where a
   // cancelled order can still be "accepted" by the driver.
+  let targetOrderId: string | undefined;
   try {
     const currentAssignments = await getAssignments();
     const offer = currentAssignments.find((a) => a.id === offerId || a.offerId === offerId);
     if (!offer) {
-      // Not in the pending list at all — it was already cancelled/withdrawn
       logger.warn('assignment', `Pre-flight: offer ${offerId} not found in pending list, blocking accept`);
-      throw new Error('This offer has already been processed or expired.');
+      throw new Error('This order has been cancelled by the admin.');
     }
     if (offer.status === 'cancelled') {
       logger.warn('assignment', `Pre-flight: offer ${offerId} is cancelled, blocking accept`);
-      throw new Error('This offer has already been processed or expired.');
+      throw new Error('This order has been cancelled by the admin.');
+    }
+    targetOrderId = offer.id;
+
+    // Verify directly with the backend order endpoint if orderId is known
+    if (targetOrderId) {
+      try {
+        const orderCheck = await api.get<OrderDto>(`/api/v1/orders/${targetOrderId}`, { _suppressLog: true } as any);
+        if (orderCheck.data?.status?.toLowerCase() === 'cancelled') {
+          logger.warn('assignment', `Pre-flight: order ${targetOrderId} is Cancelled on backend, blocking accept`);
+          throw new Error('This order has been cancelled by the admin.');
+        }
+      } catch (checkErr: any) {
+        if (checkErr.message?.includes('cancelled by the admin')) {
+          throw checkErr;
+        }
+        const status = checkErr?.response?.status;
+        if (status === 403 || status === 404) {
+          logger.warn('assignment', `Pre-flight: order check returned ${status}, order is cancelled or reassigned`);
+          throw new Error('This order has been cancelled by the admin.');
+        }
+      }
     }
   } catch (preflightError: any) {
-    if (preflightError.message?.includes('processed or expired')) {
-      throw preflightError; // re-throw our own guard error
+    if (preflightError.message?.includes('cancelled by the admin') || preflightError.message?.includes('processed or expired')) {
+      throw preflightError;
     }
-    // If the pre-flight API call itself fails (network?), proceed cautiously
-    logger.warn('assignment', 'Pre-flight check failed, proceeding with accept', preflightError);
+    logger.warn('assignment', 'Pre-flight check failed, proceeding cautiously', preflightError);
   }
   // ────────────────────────────────────────────────────────────────────────────
 
@@ -465,7 +525,7 @@ export async function acceptOffer(offerId: string): Promise<Assignment> {
     logger.warn('assignment', `Accepted order ${orderId} but failed to enrich it immediately`, e);
 
     const rawOrderType = response.data?.orderType || response.data?.type || 'Delivery';
-    const mappedType = ORDER_TYPE_MAP[rawOrderType] ?? 'other';
+    const mappedType = (ORDER_TYPE_MAP[rawOrderType] || normalizeOrderType(rawOrderType)) ?? 'delivery';
 
     const resData = (response.data as any) || {};
     return {
@@ -527,8 +587,13 @@ export async function getAssignmentById(id: string): Promise<Assignment | undefi
       const found = allAssignments.find((a) => a.id === id || a.offerId === id);
       if (found) return found;
 
-      // Do NOT fabricate a cancelled assignment on 403/404.
-      // Unaccepted offers or auth restrictions must not mark orders as cancelled.
+      const status = e?.response?.status;
+      const errorMsg = String(e?.response?.data?.error || e?.response?.data?.message || e?.message || '');
+      if (status === 403 || status === 404 || errorMsg.includes('not assigned')) {
+        logger.info('assignment', `Order ${id} is no longer assigned to driver, returning cancelled status`);
+        return { id, status: 'cancelled' } as any;
+      }
+
       return undefined;
     } catch (fallbackError) {
       logger.warn('assignment', `Fallback to getAssignments failed`, fallbackError);
@@ -755,6 +820,12 @@ export async function releaseAssignment(id: string, reason?: string): Promise<As
     logger.info('assignment', 'Assignment released', { id });
     return mapOrderDtoToAssignment(response.data);
   } catch (error: any) {
+    const status = error.response?.status;
+    const errorMsg = String(error.response?.data?.error || error.response?.data?.message || error.message || '');
+    if (status === 403 && (errorMsg.includes('not assigned') || errorMsg.includes('calling driver'))) {
+      logger.info('assignment', 'Order already not assigned to calling driver, treating as released', { id });
+      return { id, status: 'cancelled' } as any;
+    }
     if (error.response?.status === 409) {
       throw new Error('You cannot release this order anymore as it has already progressed.');
     }

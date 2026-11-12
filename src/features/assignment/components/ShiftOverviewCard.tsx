@@ -1,8 +1,10 @@
 import React from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { StyleSheet, Text, View, Platform, Pressable, Image } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { FontFamily, useTheme } from '@/core/theme';
 import { safeRouter } from '@/shared/utils/navigation';
+import { getOverviewTheme, OverviewThemePalette } from './overviewTheme';
 
 const WALLET_IMG = require('../../../../assets/wallete.png');
 const CASH_IMG = require('../../../../assets/image.png');
@@ -20,309 +22,291 @@ export function ShiftOverviewCard({
   pendingCount,
   completedCount,
 }: ShiftOverviewCardProps) {
-  const { colors } = useTheme();
-  const styles = React.useMemo(() => useStyles(colors), [colors]);
+  const { colors, theme, isDark } = useTheme();
+  const palette = React.useMemo(() => getOverviewTheme(theme, isDark), [theme, isDark]);
+  const styles = React.useMemo(() => useStyles(colors, palette), [colors, palette]);
 
   return (
-    <View style={styles.cardContainer}>
-      {/* ─── 1. Header Bar: Title & Direct Interactive Wallet Pill ─── */}
+    <View style={styles.container}>
+      {/* ── 1. Header Row: [✓] Today Overview  |  View All > ── */}
       <View style={styles.headerRow}>
         <View style={styles.titleGroup}>
-          <View style={[styles.headerIconChip, { backgroundColor: colors.primary + '18' }]}>
-            <MaterialIcons name="trending-up" size={13} color={colors.primary} />
+          <View style={styles.titleIconChip}>
+            <MaterialIcons name="check" size={14} color="#FFFFFF" />
           </View>
-          <Text style={styles.headerTitle}>Today Overview</Text>
+          <Text style={styles.titleText}>Today Overview</Text>
         </View>
 
         <Pressable
-          style={({ pressed }) => [styles.walletPill, pressed && styles.pillPressed]}
+          style={({ pressed }) => [styles.viewAllPill, pressed && styles.viewAllPressed]}
           onPress={() => safeRouter.push('/wallet')}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Text style={styles.walletPillText}>Wallet & Payout</Text>
-          <MaterialIcons name="arrow-forward" size={11} color={colors.primary} />
+          <Text style={styles.viewAllText}>View All</Text>
+          <MaterialIcons name="chevron-right" size={14} color={palette.viewAllText} />
         </Pressable>
       </View>
 
-      {/* ─── 2. Dual Financial Bento Pods (Compact & Restructured) ─── */}
-      <View style={styles.bentoRow}>
-        {/* Earnings Pod */}
+      {/* ── 2. Dual Financial Cards (Theme-Aware Gradients & Proportions) ── */}
+      <View style={styles.podsRow}>
+        {/* Left: Today's Earnings */}
         <Pressable
-          style={({ pressed }) => [
-            styles.bentoPod,
-            styles.earningsPod,
-            pressed && styles.podPressed,
-          ]}
+          style={({ pressed }) => [styles.podWrapper, pressed && styles.podPressed]}
           onPress={() => safeRouter.push('/wallet')}
         >
-          <View style={styles.podHeader}>
+          <LinearGradient
+            colors={palette.earningsGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.podContent, styles.earningsBorder]}
+          >
             <Text style={styles.podLabel} numberOfLines={1}>Today's Earnings</Text>
-            <Image source={WALLET_IMG} style={styles.podIllustration} resizeMode="contain" />
-          </View>
+            <View style={styles.podDivider} />
 
-          <View style={styles.podValueRow}>
-            <Text style={styles.podAmount} numberOfLines={1}>
-              ₹{totalEarnings.toLocaleString('en-IN')}
-            </Text>
-            <MaterialIcons name="chevron-right" size={13} color={colors.primary} style={{ opacity: 0.65 }} />
-          </View>
+            <View style={styles.podBottomRow}>
+              <Text style={styles.podAmount} numberOfLines={1}>
+                ₹{totalEarnings.toLocaleString('en-IN')}
+              </Text>
+              <Image source={CASH_IMG} style={styles.podIcon} resizeMode="contain" />
+            </View>
+          </LinearGradient>
         </Pressable>
 
-        {/* COD In Hand Pod */}
+        {/* Right: COD in Hand */}
         <Pressable
-          style={({ pressed }) => [
-            styles.bentoPod,
-            styles.codPod,
-            pressed && styles.podPressed,
-          ]}
+          style={({ pressed }) => [styles.podWrapper, pressed && styles.podPressed]}
           onPress={() => safeRouter.push('/wallet?tab=cash')}
         >
-          <View style={styles.podHeader}>
-            <Text style={styles.podLabel} numberOfLines={1}>COD In Hand</Text>
-            <Image source={CASH_IMG} style={styles.podIllustration} resizeMode="contain" />
-          </View>
+          <LinearGradient
+            colors={palette.codGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.podContent, styles.codBorder]}
+          >
+            <Text style={styles.podLabel} numberOfLines={1}>COD in Hand</Text>
+            <View style={styles.podDivider} />
 
-          <View style={styles.podValueRow}>
-            <Text style={[styles.podAmount, { color: '#0369A1' }]} numberOfLines={1}>
-              ₹{codCollection.toLocaleString('en-IN')}
-            </Text>
-            <MaterialIcons name="chevron-right" size={13} color="#0284C7" style={{ opacity: 0.65 }} />
-          </View>
+            <View style={styles.podBottomRow}>
+              <Text style={styles.podAmount} numberOfLines={1}>
+                ₹{codCollection.toLocaleString('en-IN')}
+              </Text>
+              <Image source={WALLET_IMG} style={styles.podIcon} resizeMode="contain" />
+            </View>
+          </LinearGradient>
         </Pressable>
       </View>
 
-      {/* ─── 3. Interactive Operational Task Counters (Pending & Completed) ─── */}
+      {/* ── 3. Bottom Operational Status Pills (Theme-Aware Pastel Pills) ── */}
       <View style={styles.tasksRow}>
-        {/* Pending Task Tile (Warm Amber Theme) */}
+        {/* Pending Pill */}
         <Pressable
-          style={({ pressed }) => [
-            styles.taskTile,
-            styles.pendingTile,
-            pressed && styles.tilePressed,
-          ]}
+          style={({ pressed }) => [styles.taskPill, styles.pendingPill, pressed && styles.pillPressed]}
           onPress={() => safeRouter.push('/(tabs)/assignments?tab=pending')}
         >
-          <View style={styles.taskTileLeft}>
-            <View style={[styles.taskIconChip, { backgroundColor: '#FEF3C7' }]}>
-              <MaterialIcons name="pending-actions" size={13} color="#D97706" />
-            </View>
-            <View style={styles.taskTextGroup}>
-              <Text style={styles.taskCountTextPending}>{pendingCount}</Text>
-              <Text style={styles.taskLabelTextPending}>Pending</Text>
-            </View>
+          <View style={styles.pendingBadge}>
+            <MaterialIcons name="schedule" size={13} color={palette.pendingIcon} />
           </View>
-          <MaterialIcons name="chevron-right" size={14} color="#D97706" />
+          <Text style={styles.pendingText}>
+            <Text style={styles.countBold}>{pendingCount}</Text> Pending
+          </Text>
         </Pressable>
 
-        {/* Completed Task Tile (Fresh Emerald Theme) */}
+        {/* Completed Pill */}
         <Pressable
-          style={({ pressed }) => [
-            styles.taskTile,
-            styles.completedTile,
-            pressed && styles.tilePressed,
-          ]}
+          style={({ pressed }) => [styles.taskPill, styles.completedPill, pressed && styles.pillPressed]}
           onPress={() => safeRouter.push('/(tabs)/assignments?tab=completed')}
         >
-          <View style={styles.taskTileLeft}>
-            <View style={[styles.taskIconChip, { backgroundColor: '#DCFCE7' }]}>
-              <MaterialIcons name="check-circle" size={13} color="#16A34A" />
-            </View>
-            <View style={styles.taskTextGroup}>
-              <Text style={styles.taskCountTextCompleted}>{completedCount}</Text>
-              <Text style={styles.taskLabelTextCompleted}>Completed</Text>
-            </View>
+          <View style={styles.completedBadge}>
+            <MaterialIcons name="check" size={12} color="#FFFFFF" />
           </View>
-          <MaterialIcons name="chevron-right" size={14} color="#16A34A" />
+          <Text style={styles.completedText}>
+            <Text style={styles.countBold}>{completedCount}</Text> Completed
+          </Text>
         </Pressable>
       </View>
     </View>
   );
 }
 
-const useStyles = (colors: any) => StyleSheet.create({
-  cardContainer: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 12,
-    marginBottom: 12,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  titleGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  headerIconChip: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 12.5,
-    fontFamily: FontFamily.bold,
-    color: colors.textPrimary,
-    letterSpacing: -0.1,
-  },
-  walletPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: colors.primary + '10',
-    borderWidth: 1,
-    borderColor: colors.primary + '25',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
-  },
-  pillPressed: {
-    opacity: 0.75,
-  },
-  walletPillText: {
-    fontSize: 10,
-    fontFamily: FontFamily.bold,
-    color: colors.primary,
-  },
-  bentoRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 8,
-  },
-  bentoPod: {
-    flex: 1,
-    borderRadius: 11,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    justifyContent: 'space-between',
-    minHeight: 52,
-  },
-  podPressed: {
-    opacity: 0.8,
-  },
-  earningsPod: {
-    backgroundColor: colors.primary + '08',
-    borderColor: colors.primary + '22',
-  },
-  codPod: {
-    backgroundColor: '#0284C708',
-    borderColor: '#0284C722',
-  },
-  podHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 4,
-    marginBottom: 4,
-  },
-  podIconChip: {
-    width: 19,
-    height: 19,
-    borderRadius: 5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  podIllustration: {
-    width: 26,
-    height: 26,
-  },
-  podLabel: {
-    fontSize: 10.5,
-    fontFamily: FontFamily.semiBold,
-    color: colors.textSecondary,
-    flex: 1,
-    letterSpacing: -0.1,
-  },
-  podValueRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  podAmount: {
-    fontSize: 16.5,
-    fontFamily: FontFamily.bold,
-    color: colors.textPrimary,
-    letterSpacing: -0.3,
-  },
-  tasksRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  taskTile: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 7,
-    paddingHorizontal: 9,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  tilePressed: {
-    opacity: 0.8,
-  },
-  pendingTile: {
-    backgroundColor: '#FFFBEB',
-    borderColor: '#FDE68A',
-  },
-  completedTile: {
-    backgroundColor: '#F0FDF4',
-    borderColor: '#BBF7D0',
-  },
-  taskTileLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-  },
-  taskIconChip: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  taskTextGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  taskCountTextPending: {
-    fontSize: 12,
-    fontFamily: FontFamily.bold,
-    color: '#B45309',
-  },
-  taskLabelTextPending: {
-    fontSize: 10.5,
-    fontFamily: FontFamily.bold,
-    color: '#92400E',
-  },
-  taskCountTextCompleted: {
-    fontSize: 12,
-    fontFamily: FontFamily.bold,
-    color: '#15803D',
-  },
-  taskLabelTextCompleted: {
-    fontSize: 10.5,
-    fontFamily: FontFamily.bold,
-    color: '#166534',
-  },
-});
+const useStyles = (colors: any, palette: OverviewThemePalette) =>
+  StyleSheet.create({
+    container: {
+      marginBottom: 12,
+    },
+
+    /* Header Row */
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 10,
+      paddingHorizontal: 2,
+    },
+    titleGroup: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 7,
+    },
+    titleIconChip: {
+      width: 22,
+      height: 22,
+      borderRadius: 7,
+      backgroundColor: palette.titleChipBg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...Platform.select({
+        ios: {
+          shadowColor: palette.titleChipBg,
+          shadowOffset: { width: 0, height: 1.5 },
+          shadowOpacity: 0.25,
+          shadowRadius: 3,
+        },
+        android: {
+          elevation: 1.5,
+        },
+      }),
+    },
+    titleText: {
+      fontSize: 14,
+      fontFamily: FontFamily.bold,
+      color: palette.titleText,
+      letterSpacing: -0.2,
+    },
+    viewAllPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 2,
+      backgroundColor: palette.viewAllBg,
+      borderRadius: 12,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderWidth: 1,
+      borderColor: palette.viewAllBorder,
+    },
+    viewAllPressed: {
+      opacity: 0.75,
+      backgroundColor: palette.viewAllBorder,
+    },
+    viewAllText: {
+      fontSize: 11,
+      fontFamily: FontFamily.bold,
+      color: palette.viewAllText,
+    },
+
+    /* Pods Row */
+    podsRow: {
+      flexDirection: 'row',
+      gap: 10,
+      marginBottom: 10,
+    },
+    podWrapper: {
+      flex: 1,
+      borderRadius: 16,
+      overflow: 'hidden',
+    },
+    podPressed: {
+      opacity: 0.88,
+      transform: [{ scale: 0.985 }],
+    },
+    podContent: {
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderRadius: 16,
+      minHeight: 74,
+      justifyContent: 'space-between',
+    },
+    earningsBorder: {
+      borderWidth: 1,
+      borderColor: palette.earningsBorder,
+    },
+    codBorder: {
+      borderWidth: 1,
+      borderColor: palette.codBorder,
+    },
+    podLabel: {
+      fontSize: 11,
+      fontFamily: FontFamily.bold,
+      color: palette.earningsLabel,
+      letterSpacing: -0.1,
+    },
+    podDivider: {
+      height: 1,
+      backgroundColor: palette.podDivider,
+      marginTop: 4,
+      marginBottom: 6,
+      width: '100%',
+    },
+    podBottomRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      justifyContent: 'space-between',
+    },
+    podAmount: {
+      fontSize: 19,
+      fontFamily: FontFamily.bold,
+      color: palette.earningsAmount,
+      letterSpacing: -0.4,
+    },
+    podIcon: {
+      width: 34,
+      height: 34,
+    },
+
+    /* Task Pills */
+    tasksRow: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    taskPill: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderRadius: 22,
+      paddingVertical: 7,
+      paddingHorizontal: 10,
+      borderWidth: 1,
+      gap: 7,
+    },
+    pillPressed: {
+      opacity: 0.85,
+      transform: [{ scale: 0.985 }],
+    },
+    pendingPill: {
+      backgroundColor: palette.pendingBg,
+      borderColor: palette.pendingBorder,
+    },
+    completedPill: {
+      backgroundColor: palette.completedBg,
+      borderColor: palette.completedBorder,
+    },
+    pendingBadge: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      backgroundColor: palette.pendingBadge,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    completedBadge: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      backgroundColor: palette.completedBadge,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    countBold: {
+      fontFamily: FontFamily.bold,
+      fontSize: 12.5,
+    },
+    pendingText: {
+      fontSize: 12,
+      fontFamily: FontFamily.medium,
+      color: palette.pendingText,
+    },
+    completedText: {
+      fontSize: 12,
+      fontFamily: FontFamily.medium,
+      color: palette.completedText,
+    },
+  });

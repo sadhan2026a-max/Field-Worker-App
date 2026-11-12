@@ -6,3 +6,4 @@ export * from './DistanceDisplay';
 export * from './BookingCard';
 export * from './ShiftOverviewCard';
 export * from './SearchingOrderRadar';
+export * from './overviewTheme';

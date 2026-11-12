@@ -5,6 +5,7 @@ import { StyleSheet, Text, View, Pressable, BackHandler } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Button } from '@/components/ui/Button';
 import { ScreenLoader } from '@/components/ui/ScreenLoader';
+import { AppStatusBar } from '@/shared/components/ui/AppStatusBar';
 import { spacing, typography, colors, useTheme } from '@/core/theme';
 
 import { useAssignment } from '@/hooks/useAssignments';
@@ -55,6 +56,7 @@ export function CompleteScreen() {
 
   return (
     <View style={styles.container}>
+      <AppStatusBar />
       <Stack.Screen 
         options={{ 
           headerShown: true, 

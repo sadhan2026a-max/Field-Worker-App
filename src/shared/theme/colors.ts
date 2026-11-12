@@ -109,7 +109,7 @@ export const tealLogistics = {
   headerGradient: ['#0F766E', '#0F766E'],
 };
 
-export const colors = lightColors;
+export const colors = tealLogistics;
 
 export type AppColors = {
   [K in keyof typeof lightColors]: any;

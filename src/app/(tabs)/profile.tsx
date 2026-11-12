@@ -1,13 +1,12 @@
 import React from 'react';
 import { StyleSheet, Text, View, ScrollView, RefreshControl, Alert, Pressable, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
+import { AppStatusBar } from '@/shared/components/ui/AppStatusBar';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
 import { Avatar } from '@/shared/components/ui/Avatar';
-import { StatTile } from '@/shared/components/ui/StatTile';
 import { colors, spacing, typography, palette, FontFamily, useTheme } from '@/core/theme';
 import { logoutThunk, selectDriver } from '@/features/auth/redux/authSlice';
 import { selectWorkspaceSummary, fetchWorkspaceSummary, selectAssignments } from '@/features/assignment/redux/assignmentSlice';
@@ -26,21 +25,6 @@ export default function ProfileScreen() {
   const [showThemeModal, setShowThemeModal] = React.useState(false);
   const [showLogoutModal, setShowLogoutModal] = React.useState(false);
   const isFocused = useIsFocused();
-
-  const localCompletedCount = assignments?.filter(a => a.status === 'completed').length ?? 0;
-  const completedCount = Math.max(workspaceSummary?.completedCount ?? 0, localCompletedCount);
-
-  const pendingCount = assignments?.filter(a =>
-    ['pending', 'accepted', 'en_route', 'arrived', 'in_progress'].includes(a.status)
-  ).length ?? (workspaceSummary?.pendingCount ?? 0);
-
-  const localCodCollection = assignments?.reduce((total, a) => {
-    if (a.status === 'completed' && a.paymentMode === 'cash') {
-      return total + (a.receivedAmount ?? a.codAmount ?? 0);
-    }
-    return total;
-  }, 0) ?? 0;
-  const codCollection = Math.max(workspaceSummary?.codCollection ?? 0, localCodCollection);
 
   const logout = () => {
     setShowLogoutModal(true);
@@ -71,7 +55,7 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {isFocused && <StatusBar style={isDark ? "light" : "dark"} />}
+      <AppStatusBar />
       <View style={styles.header}>
         <Text style={styles.title}>My Profile</Text>
       </View>
@@ -98,29 +82,6 @@ export default function ProfileScreen() {
                 <Text style={styles.driverPhone}>{driver.phone}</Text>
               </View>
             </View>
-            <Card style={[styles.sectionCard, { backgroundColor: colors.surface }]}>
-              <Text style={styles.sectionTitle}>Today's Performance</Text>
-              <View style={styles.statsGrid}>
-                <StatTile
-                  value={completedCount.toString()}
-                  label="Completed"
-                  color={palette.green}
-                  icon={<MaterialIcons name="check-circle" size={16} color={palette.green} />}
-                />
-                <StatTile
-                  value={pendingCount.toString()}
-                  label="Pending"
-                  color={palette.orange}
-                  icon={<MaterialIcons name="pending-actions" size={16} color={palette.orange} />}
-                />
-                <StatTile
-                  value={`₹${codCollection.toLocaleString()}`}
-                  label="COD"
-                  color={palette.blue}
-                  icon={<MaterialIcons name="payments" size={16} color={palette.blue} />}
-                />
-              </View>
-            </Card>
             <Card style={[styles.sectionCard, { backgroundColor: colors.surface }]}>
               <Text style={styles.sectionTitle}>Account Details</Text>
 
@@ -245,7 +206,7 @@ export default function ProfileScreen() {
         <Pressable style={styles.modalOverlay} onPress={() => setShowThemeModal(false)}>
           <View style={[styles.themeModalContent, { backgroundColor: colors.surface }]}>
             <Text style={styles.themeModalTitle}>Select Theme</Text>
-            {['royalPurple', 'navyBlue', 'indigoOrange', 'darkTheme', 'tealLogistics'].map((t) => {
+            {['tealLogistics', 'royalPurple', 'navyBlue', 'indigoOrange', 'darkTheme'].map((t) => {
               const label = t.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase());
               const themeColorMap: Record<string, string> = {
                 royalPurple: '#6D28D9',
@@ -398,12 +359,6 @@ const useStyles = (colors: any) => StyleSheet.create({
     ...typography.h3,
     color: colors.textPrimary,
     marginBottom: spacing.md,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 8,
-    marginTop: spacing.xs,
   },
   detailRow: {
     flexDirection: 'row',

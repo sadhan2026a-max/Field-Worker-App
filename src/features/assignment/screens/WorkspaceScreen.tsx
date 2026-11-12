@@ -1,8 +1,10 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { safeRouter } from '@/shared/utils/navigation';
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { ScrollView, StyleSheet, Text, View, RefreshControl } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
+import { ScrollView, StyleSheet, Text, View, RefreshControl, Vibration, Platform } from 'react-native';
+import * as Notifications from 'expo-notifications';
+import { CHANNEL_CANCELLED } from '@/core/services/NotificationService';
+import { AppStatusBar } from '@/shared/components/ui/AppStatusBar';
 import Toast from 'react-native-toast-message';
 import { Skeleton } from '@/shared/components/ui/Skeleton';
 import {
@@ -12,6 +14,7 @@ import {
   ShiftOverviewCard,
   SearchingOrderRadar,
 } from '@/features/assignment/components';
+import { getOverviewTheme } from '@/features/assignment/components/overviewTheme';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   selectDriver,
@@ -23,7 +26,7 @@ import {
 import { FontFamily, useTheme } from '@/core/theme';
 import { useAssignments, useWorkspaceSummary } from '@/hooks/useAssignments';
 import { fetchNotifications, selectUnreadCount } from '@/features/notification/redux/notificationSlice';
-import { syncHistoryFromNotificationsThunk } from '@/features/assignment/redux/assignmentSlice';
+import { syncHistoryFromNotificationsThunk, showCancelledAlert, markOrderCancelled } from '@/features/assignment/redux/assignmentSlice';
 import { useIsFocused } from '@react-navigation/native';
 
 const getQuickActions = (colors: any): {
@@ -44,7 +47,7 @@ const getQuickActions = (colors: any): {
     },
     {
       icon: 'assignment',
-      label: 'All Assignments',
+      label: 'All Tasks',
       subtitle: 'View Active Tasks',
       tint: colors.primaryDark || colors.primary,
       tintLight: (colors.primaryDark || colors.primary) + '15',
@@ -83,25 +86,25 @@ function SectionTitle({
   title,
   count,
   isSearching,
-  colors,
+  palette,
   styles,
 }: {
   icon: keyof typeof MaterialIcons.glyphMap;
   title: string;
   count?: number;
   isSearching?: boolean;
-  colors: any;
+  palette: any;
   styles: any;
 }) {
   return (
     <View style={styles.sectionTitleRow}>
-      <View style={[styles.sectionIconChip, { backgroundColor: colors.primary + '14' }]}>
-        <MaterialIcons name={icon} size={12} color={colors.primary} />
+      <View style={[styles.sectionIconChip, { backgroundColor: palette.titleChipBg }]}>
+        <MaterialIcons name={icon} size={13} color="#FFFFFF" />
       </View>
-      <Text style={styles.sectionTitle}>{title}</Text>
+      <Text style={[styles.sectionTitle, { color: palette.titleText }]}>{title}</Text>
       {count !== undefined && count > 0 && (
-        <View style={styles.sectionCountBadge}>
-          <Text style={styles.sectionCountText}>{count} Active</Text>
+        <View style={[styles.sectionCountBadge, { backgroundColor: palette.viewAllBg, borderColor: palette.viewAllBorder }]}>
+          <Text style={[styles.sectionCountText, { color: palette.viewAllText }]}>{count} Active</Text>
         </View>
       )}
       {isSearching && (
@@ -114,26 +117,29 @@ function SectionTitle({
   );
 }
 
+function TodayOverviewSkeleton() {
+  return (
+    <View style={{ marginBottom: 12, gap: 10 }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 2 }}>
+        <Skeleton width={120} height={16} borderRadius={5} />
+        <Skeleton width={68} height={20} borderRadius={10} />
+      </View>
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        <Skeleton width="48%" height={74} borderRadius={16} />
+        <Skeleton width="48%" height={74} borderRadius={16} />
+      </View>
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        <Skeleton width="48%" height={36} borderRadius={22} />
+        <Skeleton width="48%" height={36} borderRadius={22} />
+      </View>
+    </View>
+  );
+}
+
 function DashboardSkeleton({ colors, styles }: any) {
   return (
     <View style={{ gap: 12, paddingTop: 4 }}>
-      {/* 1. Today Overview Skeleton */}
-      <View style={{ borderRadius: 14, backgroundColor: colors.surface, padding: 11, borderWidth: 1, borderColor: colors.border, gap: 10 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Skeleton width={110} height={14} borderRadius={4} />
-          <Skeleton width={70} height={12} borderRadius={4} />
-        </View>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <Skeleton width="48%" height={52} borderRadius={11} />
-          <Skeleton width="48%" height={52} borderRadius={11} />
-        </View>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <Skeleton width="48%" height={26} borderRadius={6} />
-          <Skeleton width="48%" height={26} borderRadius={6} />
-        </View>
-      </View>
-
-      {/* 2. Section Header Skeleton (Current Live Order) */}
+      {/* 1. Section Header Skeleton (Current Live Order) */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2, marginBottom: -4 }}>
         <Skeleton width={20} height={20} borderRadius={5} />
         <Skeleton width={120} height={13} borderRadius={4} />
@@ -141,13 +147,10 @@ function DashboardSkeleton({ colors, styles }: any) {
 
       {/* 3. Live Order Card Skeleton (Exact shape of NextDeliveryCard) */}
       <View style={{ borderRadius: 14, backgroundColor: colors.surface, padding: 12, borderWidth: 1, borderColor: colors.border, gap: 12 }}>
-        {/* Top Header: Delivery Type + Order Code + Status Badge */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Skeleton width={60} height={20} borderRadius={6} />
-            <Skeleton width={90} height={14} borderRadius={4} />
-          </View>
-          <Skeleton width={110} height={20} borderRadius={10} />
+        {/* Top Header: Delivery Type & Order ID together */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+          <Skeleton width={68} height={20} borderRadius={6} />
+          <Skeleton width={110} height={20} borderRadius={6} />
         </View>
 
         {/* Customer & Route Details */}
@@ -179,8 +182,8 @@ function DashboardSkeleton({ colors, styles }: any) {
 }
 
 export function WorkspaceScreen() {
-  const { colors } = useTheme();
-  const styles = useStyles(colors);
+  const { colors, theme, isDark } = useTheme();
+  const styles = useStyles(colors, isDark);
   const driver = useAppSelector(selectDriver);
   const isAuthLoading = useAppSelector(selectIsLoading);
   const dispatch = useAppDispatch();
@@ -196,57 +199,97 @@ export function WorkspaceScreen() {
     dispatch(syncHistoryFromNotificationsThunk({ onlyToday: true }));
   }, [dispatch]);
 
+  useEffect(() => {
+    if (isFocused) {
+      refetchAssignments();
+      refetchSummary();
+    }
+  }, [isFocused]);
+
+  const hasPendingOrder = Boolean(allAssignments?.some((a) => a.status === 'pending'));
+
+  useEffect(() => {
+    if (!isFocused) return;
+    // Fast polling (4s) when an order offer is waiting on screen to detect admin cancellation immediately
+    // Normal polling (15s) otherwise
+    const pollInterval = hasPendingOrder ? 4000 : 15000;
+    const interval = setInterval(() => {
+      refetchAssignments();
+      dispatch(fetchNotifications());
+      dispatch(syncHistoryFromNotificationsThunk({ onlyToday: true }));
+    }, pollInterval);
+    return () => clearInterval(interval);
+  }, [isFocused, hasPendingOrder, refetchAssignments, dispatch]);
+
   const [refreshing, setRefreshing] = useState(false);
   const [isTogglingAvailability, setIsTogglingAvailability] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  const previousPendingIds = useRef<string[]>([]);
-  const previousActiveIds = useRef<string[]>([]);
+  // Global tracker for cancellation detection on Workspace home screen
+  const previousOrdersRef = useRef<Map<string, { code: string; status: string }>>(new Map());
 
   useEffect(() => {
     if (!driver || isAuthLoading || !allAssignments) {
-      previousPendingIds.current = [];
-      previousActiveIds.current = [];
+      previousOrdersRef.current.clear();
       return;
     }
 
-    const currentPendingIds = allAssignments
-      .filter((a) => a.status === 'pending')
-      .map((a) => a.id);
-
-    if (previousPendingIds.current.length > 0) {
-      const allCurrentIds = new Set(allAssignments.map((a) => a.id));
-      const missedIds = previousPendingIds.current.filter((id) => !allCurrentIds.has(id));
-
-      if (missedIds.length > 0) {
-        Toast.show({
-          type: 'error',
-          text1: 'Sorry! You missed this order',
-        });
+    const currentMap = new Map<string, { code: string; status: string }>();
+    allAssignments.forEach((a) => {
+      currentMap.set(a.id, { code: a.code || a.id, status: a.status });
+      if (a.offerId) {
+        currentMap.set(a.offerId, { code: a.code || a.offerId, status: a.status });
       }
+    });
+
+    if (previousOrdersRef.current.size > 0) {
+      previousOrdersRef.current.forEach((prev, orderId) => {
+        const wasActiveOrPending = ['pending', 'accepted', 'en_route', 'arrived', 'in_progress'].includes(prev.status);
+        if (!wasActiveOrPending) return;
+
+        const current = currentMap.get(orderId);
+        const isNowCancelled = current && current.status === 'cancelled';
+        const isNowRemoved = !current;
+
+        if (isNowCancelled || isNowRemoved) {
+          previousOrdersRef.current.delete(orderId);
+          const orderDisplayCode = prev.code || orderId;
+
+          // 1. Show cancellation modal
+          dispatch(showCancelledAlert(orderDisplayCode));
+
+          // 2. Heavy triple vibration pattern for cancellation
+          if (Platform.OS === 'android') {
+            Vibration.vibrate([0, 500, 200, 500, 200, 500]);
+          }
+
+          // 3. Play cancellation tone via local notification
+          Notifications.scheduleNotificationAsync({
+            content: {
+              title: 'Order Cancelled',
+              body: `Order ${orderDisplayCode} has been cancelled`,
+              sound: 'order_cancelled',
+              ...(Platform.OS === 'android' && { channelId: CHANNEL_CANCELLED }),
+            },
+            trigger: null,
+          }).catch(() => { });
+
+          // 4. Mark cancelled in Redux so the card disappears immediately
+          dispatch(markOrderCancelled(orderId));
+          if (prev.code) dispatch(markOrderCancelled(prev.code));
+        }
+      });
     }
 
-    previousPendingIds.current = currentPendingIds;
-
-    const currentActiveIds = allAssignments
-      .filter((a) => ['accepted', 'en_route', 'in_progress', 'arrived'].includes(a.status))
-      .map((a) => a.id);
-
-    if (previousActiveIds.current.length > 0) {
-      const allCurrentIds = new Set(allAssignments.map((a) => a.id));
-      const cancelledIds = previousActiveIds.current.filter((id) => !allCurrentIds.has(id));
-
-      if (cancelledIds.length > 0) {
-        Toast.show({
-          type: 'error',
-          text1: 'Order Cancelled',
-          text2: 'An active order was removed or cancelled.',
-        });
+    // Retain only currently active or pending orders
+    const nextRefMap = new Map<string, { code: string; status: string }>();
+    allAssignments.forEach((a) => {
+      if (['pending', 'accepted', 'en_route', 'arrived', 'in_progress'].includes(a.status)) {
+        nextRefMap.set(a.id, { code: a.code || a.id, status: a.status });
       }
-    }
-
-    previousActiveIds.current = currentActiveIds;
-  }, [driver, isAuthLoading, allAssignments]);
+    });
+    previousOrdersRef.current = nextRefMap;
+  }, [driver, isAuthLoading, allAssignments, dispatch]);
 
   useEffect(() => {
     if (!isSummaryLoading && !isAssignmentsLoading) {
@@ -314,9 +357,11 @@ export function WorkspaceScreen() {
       return total;
     }, 0) ?? 0;
 
+  const palette = React.useMemo(() => getOverviewTheme(theme, isDark, isAvailable), [theme, isDark, isAvailable]);
+
   return (
     <View style={styles.container}>
-      {isFocused && <StatusBar style="light" />}
+      <AppStatusBar style={palette.statusBarStyle} />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.content}
@@ -370,25 +415,29 @@ export function WorkspaceScreen() {
           }}
         />
 
+        {/* ─── Today Overview Card (standalone white card below header) ─── */}
+        {isInitialLoad ? (
+          <TodayOverviewSkeleton />
+        ) : (
+          <ShiftOverviewCard
+            totalEarnings={summary?.totalEarnings ?? 0}
+            codCollection={codCollection}
+            pendingCount={pendingCount}
+            completedCount={completedCount}
+          />
+        )}
+
         {isInitialLoad ? (
           <DashboardSkeleton colors={colors} styles={styles} />
         ) : (
           <>
-            {/* ─── 1. Shift Performance Hub (Cleaned without progress bar & bonus) ─── */}
-            <ShiftOverviewCard
-              totalEarnings={summary?.totalEarnings ?? 0}
-              codCollection={codCollection}
-              pendingCount={pendingCount}
-              completedCount={completedCount}
-            />
-
-            {/* ─── 2. Current Order Section (Live Order OR Searching for Orders) ─── */}
+            {/* ─── 1. Current Order Section (Live Order OR Searching for Orders) ─── */}
             <SectionTitle
               icon={nextDelivery ? 'local-shipping' : 'search'}
               title={nextDelivery ? 'Current Live Order' : (isAvailable ? 'Searching for Orders...' : 'Offline')}
               count={nextDelivery ? 1 : 0}
               isSearching={!nextDelivery && isAvailable}
-              colors={colors}
+              palette={palette}
               styles={styles}
             />
 
@@ -407,7 +456,7 @@ export function WorkspaceScreen() {
         )}
 
         {/* ─── 3. Quick Operations Toolbox ─── */}
-        <SectionTitle icon="bolt" title="Quick Operations" colors={colors} styles={styles} />
+        <SectionTitle icon="bolt" title="Quick Operations" palette={palette} styles={styles} />
         <View style={styles.quickActionsGrid}>
           {getQuickActions(colors).map((action) => (
             <QuickActionButton
@@ -422,7 +471,7 @@ export function WorkspaceScreen() {
   );
 }
 
-const useStyles = (colors: any) => StyleSheet.create({
+const useStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -438,54 +487,55 @@ const useStyles = (colors: any) => StyleSheet.create({
   sectionTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 7,
     marginTop: 6,
-    marginBottom: 8,
+    marginBottom: 10,
+    paddingHorizontal: 2,
   },
   sectionIconChip: {
-    width: 20,
-    height: 20,
-    borderRadius: 5,
+    width: 22,
+    height: 22,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
   },
   sectionTitle: {
-    fontSize: 12.5,
+    fontSize: 14,
     fontFamily: FontFamily.bold,
-    color: colors.textPrimary,
-    letterSpacing: 0.1,
+    letterSpacing: -0.2,
   },
   sectionCountBadge: {
-    backgroundColor: colors.primary + '16',
-    borderRadius: 6,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderWidth: 1,
     marginLeft: 2,
   },
   sectionCountText: {
-    color: colors.primary,
-    fontSize: 9,
+    fontSize: 10.5,
     fontFamily: FontFamily.bold,
   },
   searchingPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.primary + '16',
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 1.5,
-    marginLeft: 3,
-    gap: 3.5,
+    backgroundColor: isDark ? 'rgba(245, 158, 11, 0.16)' : '#FEF3C7',
+    borderWidth: 1,
+    borderColor: isDark ? 'rgba(245, 158, 11, 0.35)' : '#FDE68A',
+    borderRadius: 12,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    marginLeft: 4,
+    gap: 4,
   },
   searchingDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: colors.primary,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#F59E0B',
   },
   searchingText: {
-    color: colors.primary,
-    fontSize: 8.5,
+    color: isDark ? '#FBBF24' : '#92400E',
+    fontSize: 9.5,
     fontFamily: FontFamily.bold,
     letterSpacing: 0.3,
   },

@@ -4,6 +4,7 @@ import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { ScreenFooter } from '@/components/ui/ScreenFooter';
+import { AppStatusBar } from '@/shared/components/ui/AppStatusBar';
 import { Input } from '@/components/ui/Input';
 import { spacing, typography, radius, colors, useTheme } from '@/core/theme';
 
@@ -62,6 +63,7 @@ export function PickupItemsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <AppStatusBar />
       <Stack.Screen options={{ headerShown: false }} />
       <ScrollView contentContainerStyle={styles.content}>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs }}>
@@ -70,7 +72,7 @@ export function PickupItemsScreen() {
           </Pressable>
           <Text style={[styles.title, { marginBottom: 0 }]}>Pickup Items</Text>
         </View>
-        <Text style={styles.subtitle}>Confirm items to collect for order #{assignment?.code}</Text>
+        <Text style={styles.subtitle}>Confirm items to collect for order {assignment?.code}</Text>
 
         {assignment?.items && assignment.items.length > 0 ? (
           assignment.items.map(item => (

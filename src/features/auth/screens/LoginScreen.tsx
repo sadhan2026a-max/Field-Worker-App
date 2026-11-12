@@ -19,6 +19,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
 import { Button } from '@/components/ui/Button';
+import { AppStatusBar } from '@/shared/components/ui/AppStatusBar';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { loginThunk, selectDriver, selectAuthError } from '@/features/auth/redux/authSlice';
 import { useTheme, spacing, typography, FontSize, FontFamily, palette } from '@/core/theme';
@@ -170,6 +171,7 @@ export function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <AppStatusBar />
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}

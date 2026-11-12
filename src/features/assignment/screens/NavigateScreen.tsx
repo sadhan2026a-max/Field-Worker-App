@@ -7,6 +7,7 @@ import { Linking, StyleSheet, Text, View } from 'react-native';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ScreenLoader } from '@/components/ui/ScreenLoader';
+import { AppStatusBar } from '@/shared/components/ui/AppStatusBar';
 import { ScreenFooter } from '@/components/ui/ScreenFooter';
 import { RouteMapPreview } from '@/components/map/RouteMapPreview';
 import { spacing, typography, FontSize, colors, useTheme } from '@/core/theme';
@@ -54,6 +55,7 @@ export function NavigateScreen() {
 
   return (
     <View style={styles.container}>
+      <AppStatusBar />
       <Stack.Screen options={{ headerShown: true, title: `Deliver Order ${assignment.code}` }} />
       <View style={styles.mapContainer}>
         <RouteMapPreview origin={currentLocation} destination={destination} />

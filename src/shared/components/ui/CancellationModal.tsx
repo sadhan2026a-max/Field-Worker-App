@@ -14,8 +14,9 @@ export function CancellationModal() {
 
   const handleClose = () => {
     dispatch(hideCancelledAlert());
-    // Auto navigate back when dismissing the cancellation modal
-    router.back();
+    if (router.canGoBack()) {
+      router.back();
+    }
   };
 
   if (!visible) return null;
@@ -32,7 +33,7 @@ export function CancellationModal() {
             Order <Text style={{ fontWeight: 'bold' }}>{orderCode}</Text> has been cancelled
           </Text>
           <Pressable style={styles.button} onPress={handleClose}>
-            <Text style={styles.buttonText}>Go Back</Text>
+            <Text style={styles.buttonText}>OK</Text>
           </Pressable>
         </View>
       </View>

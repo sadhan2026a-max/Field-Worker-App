@@ -5,6 +5,7 @@ import { safeRouter } from '@/shared/utils/navigation';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { ScreenFooter } from '@/components/ui/ScreenFooter';
+import { AppStatusBar } from '@/shared/components/ui/AppStatusBar';
 import { spacing, typography, palette, colors, useTheme } from '@/core/theme';
 
 import { useAssignment } from '@/features/assignment/hooks/useAssignments';
@@ -120,6 +121,7 @@ export function ServiceDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <AppStatusBar />
       <Stack.Screen options={{ headerShown: false }} />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -137,7 +139,7 @@ export function ServiceDetailScreen() {
             </Pressable>
             <Text style={[styles.title, { marginBottom: 0 }]}>Service Visit</Text>
           </View>
-          <Text style={styles.subtitle}>Order #{assignment?.code}</Text>
+          <Text style={styles.subtitle}>Order {assignment?.code}</Text>
 
           <Text style={styles.sectionTitle}>1. Diagnosis</Text>
           <View style={styles.infoBox}>

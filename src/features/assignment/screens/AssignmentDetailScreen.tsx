@@ -23,6 +23,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/shared/components/ui/Skeleton';
+import { AppStatusBar } from '@/shared/components/ui/AppStatusBar';
 import { ScreenFooter } from '@/components/ui/ScreenFooter';
 import { spacing, typography, palette, FontFamily, useTheme } from '@/core/theme';
 import {
@@ -108,7 +109,7 @@ export function AssignmentDetailScreen() {
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
-        <StatusBar backgroundColor={colors.primary} barStyle="light-content" />
+        <AppStatusBar style="light" backgroundColor={colors.primary} translucent={false} />
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.headerBar}>
           <Pressable style={styles.backButton} onPress={() => router.back()}>
@@ -130,7 +131,7 @@ export function AssignmentDetailScreen() {
   if (!assignment) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
-        <StatusBar backgroundColor={colors.primary} barStyle="light-content" />
+        <AppStatusBar style="light" backgroundColor={colors.primary} translucent={false} />
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.headerBar}>
           <Pressable style={styles.backButton} onPress={() => router.back()}>
@@ -270,7 +271,15 @@ export function AssignmentDetailScreen() {
       setCancelModalVisible(false);
       router.back();
     } catch (error: any) {
-      Toast.show({ type: 'error', text1: error?.message || 'Failed to release order' });
+      const errMsg = String(error?.message || '');
+      if (errMsg.includes('not assigned') || errMsg.includes('403')) {
+        Toast.show({ type: 'info', text1: 'Order already cancelled or reassigned by admin' });
+        setCancelReasonText('');
+        setCancelModalVisible(false);
+        router.back();
+      } else {
+        Toast.show({ type: 'error', text1: errMsg || 'Failed to release order' });
+      }
     } finally {
       setIsCancelling(false);
     }
@@ -332,7 +341,17 @@ export function AssignmentDetailScreen() {
         default:
           safeRouter.push({ pathname: '/assignment/[id]/proof', params: { id: assignment.id } });
       }
-    } catch (error) {
+    } catch (error: any) {
+      const errMsg = String(error?.message || error?.response?.data?.error || '');
+      if (errMsg.includes('not assigned') || errMsg.includes('403')) {
+        Toast.show({
+          type: 'error',
+          text1: 'Order Cancelled',
+          text2: 'This order was cancelled or reassigned by admin.',
+        });
+        refetch();
+        return;
+      }
       Toast.show({ type: 'error', text1: 'Action failed. Please try again.' });
     }
   };
@@ -362,11 +381,13 @@ export function AssignmentDetailScreen() {
       ? 'Completed Bookings'
       : assignment.status === 'pending'
       ? 'Pending Bookings'
+      : assignment.status === 'cancelled'
+      ? 'Cancelled Booking'
       : 'Order Details';
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar backgroundColor={colors.primary} barStyle="light-content" />
+      <AppStatusBar style="light" backgroundColor={colors.primary} translucent={false} />
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* ─── DYNAMIC THEMED APP BAR ─── */}
@@ -406,6 +427,18 @@ export function AssignmentDetailScreen() {
               <Text style={styles.warningText}>
                 This order is currently assigned to {assignment.assignedDriverName || 'another driver'}.
               </Text>
+            </View>
+          )}
+
+          {assignment.status === 'cancelled' && (
+            <View style={styles.cancelledBanner}>
+              <MaterialIcons name="cancel" size={22} color="#DC2626" />
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={styles.cancelledBannerTitle}>Order Cancelled</Text>
+                <Text style={styles.cancelledBannerText}>
+                  This booking has been cancelled or reassigned by admin.
+                </Text>
+              </View>
             </View>
           )}
 
@@ -551,6 +584,16 @@ export function AssignmentDetailScreen() {
                 />
               </View>
             )}
+          </ScreenFooter>
+        )}
+
+        {assignment.status === 'cancelled' && (
+          <ScreenFooter>
+            <Button
+              label="Back to Workspace"
+              onPress={() => router.back()}
+              style={{ width: '100%', backgroundColor: colors.primary, borderColor: colors.primary }}
+            />
           </ScreenFooter>
         )}
       </View>
@@ -753,6 +796,27 @@ const useStyles = (colors: any, isDark: boolean) =>
       ...typography.bodyMedium,
       color: colors.danger,
       flex: 1,
+    },
+    cancelledBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEF2F2',
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(239, 68, 68, 0.35)' : '#FECACA',
+      padding: spacing.md,
+      margin: 14,
+      borderRadius: 12,
+      gap: spacing.sm,
+    },
+    cancelledBannerTitle: {
+      fontSize: 13.5,
+      fontWeight: '700',
+      color: isDark ? '#F87171' : '#DC2626',
+    },
+    cancelledBannerText: {
+      fontSize: 11.5,
+      color: isDark ? '#FCA5A5' : '#B91C1C',
+      lineHeight: 16,
     },
     actionsSection: {
       paddingHorizontal: 16,

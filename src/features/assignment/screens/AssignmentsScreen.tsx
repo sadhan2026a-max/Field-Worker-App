@@ -3,6 +3,7 @@ import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { FlatList, Pressable, StyleSheet, Text, View, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
+import { AppStatusBar } from '@/shared/components/ui/AppStatusBar';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Skeleton } from '@/shared/components/ui/Skeleton';
@@ -45,8 +46,8 @@ function formatAssignmentType(type: string) {
 }
 
 export function AssignmentsScreen() {
-  const { colors } = useTheme();
-  const styles = React.useMemo(() => useStyles(colors), [colors]);
+  const { colors, isDark } = useTheme();
+  const styles = React.useMemo(() => useStyles(colors, isDark), [colors, isDark]);
   const driver = useAppSelector(selectDriver);
   const dispatch = useAppDispatch();
   const { data: assignments, isLoading, refetch } = useAssignments();
@@ -170,6 +171,7 @@ export function AssignmentsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <AppStatusBar />
       {/* Title Header */}
       <View style={[styles.header, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
         <Text style={styles.title}>Today's Orders</Text>
@@ -224,13 +226,19 @@ export function AssignmentsScreen() {
         <Pressable
           style={[
             styles.tab,
-            activeTab === 'cancelled' && [styles.activeTab, { backgroundColor: colors.danger }]
+            activeTab === 'cancelled' && [
+              styles.activeTab,
+              {
+                backgroundColor: isDark ? 'rgba(239, 68, 68, 0.18)' : '#FEF2F2',
+                borderColor: isDark ? '#EF4444' : '#FECACA',
+              }
+            ]
           ]}
           onPress={() => setActiveTab('cancelled')}
         >
           <Text style={[
             styles.tabLabel,
-            activeTab === 'cancelled' && [styles.activeTabLabel, { color: '#FFFFFF' }]
+            activeTab === 'cancelled' && [styles.activeTabLabel, { color: isDark ? '#FCA5A5' : '#DC2626' }]
           ]}>
             Cancelled <Text style={styles.tabCount}>{displayCancelledCount}</Text>
           </Text>
@@ -380,10 +388,10 @@ export function AssignmentsScreen() {
   );
 }
 
-const useStyles = (colors: any) => StyleSheet.create({
+const useStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -401,13 +409,16 @@ const useStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    backgroundColor: colors.primary + '20',
+    backgroundColor: isDark ? 'rgba(31, 168, 85, 0.2)' : colors.primary + '18',
+    borderColor: isDark ? '#1FA855' : colors.primary,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderRadius: 999,
   },
   onlineBadgeOffline: {
-    backgroundColor: colors.border,
+    backgroundColor: isDark ? '#1E1E24' : '#F1F5F9',
+    borderWidth: 1,
+    borderColor: isDark ? '#333338' : '#E2E8F0',
   },
   onlineDot: {
     width: 8,
@@ -419,12 +430,12 @@ const useStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.textSecondary,
   },
   onlineText: {
-    color: colors.primary,
+    color: isDark ? '#4ADE80' : colors.primary,
     fontSize: FontSize.extraSmall,
     fontFamily: FontFamily.bold,
   },
   onlineTextOffline: {
-    color: colors.textSecondary,
+    color: isDark ? '#94A3B8' : colors.textSecondary,
   },
   tabBar: {
     flexDirection: 'row',
@@ -437,18 +448,21 @@ const useStyles = (colors: any) => StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: 20,
-    backgroundColor: colors.border,
+    backgroundColor: isDark ? '#1E1E24' : '#F1F5F9',
+    borderWidth: 1,
+    borderColor: isDark ? '#333338' : '#E2E8F0',
   },
   activeTab: {
-    backgroundColor: colors.primary + '20',
+    backgroundColor: isDark ? 'rgba(31, 168, 85, 0.2)' : colors.primary + '18',
+    borderColor: isDark ? '#1FA855' : colors.primary,
   },
   tabLabel: {
     ...typography.bodyMedium,
-    color: colors.textSecondary,
+    color: isDark ? '#94A3B8' : colors.textSecondary,
     fontSize: FontSize.regular,
   },
   activeTabLabel: {
-    color: colors.primary,
+    color: isDark ? '#4ADE80' : colors.primary,
     fontFamily: FontFamily.bold,
   },
   tabCount: {
@@ -498,7 +512,9 @@ const useStyles = (colors: any) => StyleSheet.create({
     flexShrink: 1,
   },
   typeBadge: {
-    backgroundColor: colors.border,
+    backgroundColor: isDark ? '#1E1E24' : '#F1F5F9',
+    borderWidth: 1,
+    borderColor: isDark ? '#333338' : '#E2E8F0',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 999,
@@ -507,7 +523,7 @@ const useStyles = (colors: any) => StyleSheet.create({
     fontSize: FontSize.extraSmall,
     fontFamily: FontFamily.bold,
     letterSpacing: 0.3,
-    color: colors.textSecondary,
+    color: isDark ? '#94A3B8' : colors.textSecondary,
   },
   customerName: {
     ...typography.bodyMedium,
@@ -524,7 +540,7 @@ const useStyles = (colors: any) => StyleSheet.create({
     ...typography.caption,
     lineHeight: 14,
     marginTop: 2,
-    color: colors.textSecondary,
+    color: isDark ? '#94A3B8' : colors.textSecondary,
   },
   cardTopRow: {
     flexDirection: 'row',
@@ -540,12 +556,14 @@ const useStyles = (colors: any) => StyleSheet.create({
   },
   actionHint: {
     fontSize: 10,
-    color: colors.primary,
+    color: isDark ? '#4ADE80' : colors.primary,
     fontFamily: FontFamily.semiBold,
     flex: 1,
   },
   codContainer: {
-    backgroundColor: colors.border,
+    backgroundColor: isDark ? '#1E1E24' : '#F1F5F9',
+    borderWidth: 1,
+    borderColor: isDark ? '#333338' : '#E2E8F0',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,

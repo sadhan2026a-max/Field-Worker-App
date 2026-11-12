@@ -21,6 +21,7 @@ interface AssignmentState {
   completionRequirements: Record<string, OrderCompletionRequirementDto> | null;
   isHydrated: boolean;
   cancelledAlert: { visible: boolean; orderCode: string | null };
+  dismissedCancelledAlerts: string[];
 }
 
 const initialState: AssignmentState = {
@@ -34,6 +35,7 @@ const initialState: AssignmentState = {
   completionRequirements: null,
   isHydrated: false,
   cancelledAlert: { visible: false, orderCode: null },
+  dismissedCancelledAlerts: [],
 };
 
 function upsertAssignment(state: AssignmentState, assignment: Assignment) {
@@ -42,20 +44,49 @@ function upsertAssignment(state: AssignmentState, assignment: Assignment) {
     return;
   }
 
-  const index = state.items.findIndex((item) => item.id === assignment.id);
+  const index = state.items.findIndex(
+    (item) => item.id === assignment.id || (item.offerId && item.offerId === assignment.id) || (assignment.offerId && item.id === assignment.offerId)
+  );
+
   if (index >= 0) {
     const currentItem = state.items[index];
     const currentStatus = currentItem.status;
+    const incomingStatus = assignment.status;
 
-    // Prevent downgrading an active status to 'pending' if the backend returned stale offer data
-    let newStatus = assignment.status;
-    if (newStatus === 'pending' && currentStatus !== 'pending' && currentStatus !== 'cancelled') {
+    // ── RULE 1: If we locally already know this order is cancelled,
+    //   NEVER let any API response (pending/accepted/en_route etc.) revive it.
+    //   This prevents the "re-appearing cancelled order" bug when app comes to foreground.
+    if (currentStatus === 'cancelled') {
+      return;
+    }
+
+    // ── RULE 2: If the API says the order is cancelled/completed,
+    //   always honour that (ground truth from server).
+    if (incomingStatus === 'cancelled' || incomingStatus === 'completed') {
+      state.items[index] = { ...currentItem, ...assignment, status: incomingStatus };
+      return;
+    }
+
+    // ── RULE 3: Prevent downgrading an active status to 'pending'
+    //   (stale offer data from bulk API endpoint).
+    let newStatus: Assignment['status'] = incomingStatus;
+    if (newStatus === 'pending' && currentStatus !== 'pending') {
       newStatus = currentStatus;
     }
 
-    // Normal merge (not replace)
-    state.items[index] = { ...currentItem, ...assignment, status: newStatus };
+    // Normal merge (not replace) — keep more-specific type
+    let newType = assignment.type;
+    const isSpecificType = (t?: string) => Boolean(t && !['delivery', 'other'].includes(t.toLowerCase()));
+    if (isSpecificType(currentItem.type) && !isSpecificType(assignment.type)) {
+      newType = currentItem.type;
+    }
+
+    state.items[index] = { ...currentItem, ...assignment, status: newStatus, type: newType };
   } else {
+    // ── RULE 4: Don't add a new item if it's already cancelled — no point showing it.
+    if (assignment.status === 'cancelled') {
+      return;
+    }
     state.items.push(assignment);
   }
 }
@@ -137,8 +168,42 @@ export const syncHistoryFromNotificationsThunk = createAsyncThunk<void, { onlyTo
         ? notifications.filter(n => new Date(n.createdAt) >= todayStart)
         : notifications;
 
-      // Extract unique related order IDs
+      // Extract unique related order IDs and detect cancellations
+      const orderTypeByNotification = new Map<string, any>();
       const uniqueOrderIds = new Set<string>();
+      const cancelledOrderIds = new Set<string>();
+
+      filteredNotifications.forEach(n => {
+        const orderId = n.relatedOrderId || (n as any).orderId || (n as any).assignmentId;
+        const msg = `${n.title || ''} ${n.message || ''}`.toLowerCase();
+        const isCancel = msg.includes('cancel') || String(n.type || '').toLowerCase().includes('cancel');
+
+        if (isCancel) {
+          if (orderId) cancelledOrderIds.add(String(orderId));
+          const match = (n.message || '').match(/ORD-[\w-]+/i);
+          if (match && match[0]) cancelledOrderIds.add(match[0]);
+        }
+
+        let detected: string | null = null;
+        if (msg.includes('inspect')) detected = 'inspection';
+        else if (msg.includes('install')) detected = 'installation';
+        else if (msg.includes('pickup')) detected = 'pickup';
+        else if (msg.includes('return')) detected = 'return';
+        else if (msg.includes('service')) detected = 'service_visit';
+        else if (msg.includes('sales')) detected = 'sales_visit';
+
+        if (detected) {
+          if (orderId) orderTypeByNotification.set(orderId, detected);
+          const match = (n.message || '').match(/ORD-[\w-]+/i);
+          if (match && match[0]) orderTypeByNotification.set(match[0], detected);
+        }
+      });
+
+      // Mark all detected cancellations in Redux state immediately
+      cancelledOrderIds.forEach(idOrCode => {
+        dispatch(markOrderCancelled(idOrCode));
+      });
+
       filteredNotifications.forEach(n => {
         const orderId = n.relatedOrderId || (n as any).orderId || (n as any).assignmentId;
         if (orderId && typeof orderId === 'string') {
@@ -170,7 +235,12 @@ export const syncHistoryFromNotificationsThunk = createAsyncThunk<void, { onlyTo
 
       results.forEach(result => {
         if (result.status === 'fulfilled' && result.value) {
-          fetchedAssignments.push(result.value);
+          let a = result.value;
+          const notifType = orderTypeByNotification.get(a.id) || (a.code ? orderTypeByNotification.get(a.code) : undefined);
+          if (notifType && (!a.type || a.type === 'delivery' || a.type === 'other')) {
+            a = { ...a, type: notifType };
+          }
+          fetchedAssignments.push(a);
         }
       });
 
@@ -187,6 +257,9 @@ export const syncHistoryFromNotificationsThunk = createAsyncThunk<void, { onlyTo
         // (saveLifetimeHistory only persists terminal states), so logging out
         // and back in would show an empty "Active Orders" card.
         const activeOrNonTerminal = fetchedAssignments.filter(a =>
+          !cancelledOrderIds.has(a.id) &&
+          !cancelledOrderIds.has(a.code ?? '') &&
+          a.status !== 'cancelled' &&
           ['pending', 'accepted', 'en_route', 'arrived', 'in_progress'].includes(a.status)
         );
         for (const order of activeOrNonTerminal) {
@@ -382,11 +455,42 @@ const assignmentSlice = createSlice({
       state.workspaceSummary = null;
     },
     showCancelledAlert: (state, action: PayloadAction<string>) => {
-      state.cancelledAlert = { visible: true, orderCode: action.payload };
+      const code = action.payload;
+      if (!code) return;
+      if (state.dismissedCancelledAlerts?.includes(code)) {
+        return;
+      }
+      if (state.cancelledAlert.visible && state.cancelledAlert.orderCode === code) {
+        return;
+      }
+      state.cancelledAlert = { visible: true, orderCode: code };
     },
     hideCancelledAlert: (state) => {
+      const currentCode = state.cancelledAlert.orderCode;
+      if (currentCode) {
+        if (!state.dismissedCancelledAlerts) {
+          state.dismissedCancelledAlerts = [];
+        }
+        if (!state.dismissedCancelledAlerts.includes(currentCode)) {
+          state.dismissedCancelledAlerts.push(currentCode);
+        }
+      }
       state.cancelledAlert = { visible: false, orderCode: null };
-    }
+    },
+    // Immediately mark an order as cancelled in Redux (used when cancel notification arrives
+    // so the card disappears instantly without waiting for API round-trip).
+    markOrderCancelled: (state, action: PayloadAction<string>) => {
+      const idOrCode = action.payload;
+      const idx = state.items.findIndex(
+        (item) =>
+          item.id === idOrCode ||
+          item.offerId === idOrCode ||
+          item.code === idOrCode
+      );
+      if (idx >= 0) {
+        state.items[idx] = { ...state.items[idx], status: 'cancelled' };
+      }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -421,6 +525,12 @@ const assignmentSlice = createSlice({
       })
       .addCase(startNavigation.rejected, (state, action) => {
         state.isMutating = false;
+        const targetId = action.meta.arg;
+        const errMsg = String(action.error.message || '');
+        if (targetId && (errMsg.includes('403') || errMsg.includes('not assigned'))) {
+          const idx = state.items.findIndex((i) => i.id === targetId || i.offerId === targetId);
+          if (idx >= 0) state.items[idx] = { ...state.items[idx], status: 'cancelled' };
+        }
         state.error = action.error.message || 'Failed to start navigation';
       })
       .addCase(markArrived.pending, (state) => {
@@ -458,6 +568,10 @@ const assignmentSlice = createSlice({
       })
       .addCase(releaseAssignment.rejected, (state, action) => {
         state.isMutating = false;
+        const targetId = (action.meta.arg as any)?.id;
+        if (targetId) {
+          state.items = state.items.filter((i) => i.id !== targetId && i.offerId !== targetId);
+        }
         state.error = action.error.message || 'Failed to release assignment';
       });
 
@@ -466,13 +580,25 @@ const assignmentSlice = createSlice({
         state.listStatus = 'loading';
       })
       .addCase(fetchAssignments.fulfilled, (state, action) => {
-        // Upsert all assignments returned by API.
-        // DO NOT filter out or delete existing pending/active items!
-        // The bulk API endpoint does not reliably return all active/pending orders,
-        // and deleting locally tracked orders causes active cards to disappear on refresh.
+        // Upsert all assignments returned by API (upsertAssignment now has
+        // cancellation-protection built in, so cancelled items won't re-appear).
         for (const item of action.payload) {
           upsertAssignment(state, item);
         }
+
+        // ── STALE PENDING OFFER CLEANUP ────────────────────────────────────────
+        // If we have a locally-tracked PENDING order that the API did NOT return
+        // at all, it means the offer was cancelled/expired on the server.
+        // Remove it so it doesn't keep showing on the home screen.
+        const apiIds = new Set(action.payload.map((a) => a.id));
+        state.items = state.items.filter((item) => {
+          if (item.status === 'pending') {
+            // Keep it only if the API explicitly returned it (still a live offer)
+            return apiIds.has(item.id) || apiIds.has(item.offerId ?? '');
+          }
+          return true; // Keep all non-pending items (active/completed/cancelled history)
+        });
+
         state.listStatus = 'succeeded';
       })
       .addCase(fetchAssignments.rejected, (state, action) => {
@@ -489,11 +615,27 @@ const assignmentSlice = createSlice({
           upsertAssignment(state, action.payload);
         } else {
           logger.warn('assignment', `fetchAssignmentById: not found ${action.meta.arg}`);
+          const targetId = action.meta.arg;
+          const existingIndex = state.items.findIndex((item) => item.id === targetId || item.offerId === targetId);
+          if (existingIndex >= 0) {
+            const existing = state.items[existingIndex];
+            if (['accepted', 'en_route', 'arrived', 'in_progress', 'pending'].includes(existing.status)) {
+              state.items[existingIndex] = { ...existing, status: 'cancelled' };
+            }
+          }
         }
         state.detailStatus = 'succeeded';
       })
       .addCase(fetchAssignmentById.rejected, (state, action) => {
         state.detailStatus = 'failed';
+        const targetId = action.meta.arg;
+        const existingIndex = state.items.findIndex((item) => item.id === targetId || item.offerId === targetId);
+        if (existingIndex >= 0) {
+          const existing = state.items[existingIndex];
+          if (['accepted', 'en_route', 'arrived', 'in_progress'].includes(existing.status)) {
+            state.items[existingIndex] = { ...existing, status: 'cancelled' };
+          }
+        }
         state.error = action.error.message ?? 'Failed to load assignment';
       });
 
@@ -576,7 +718,7 @@ const assignmentSlice = createSlice({
 });
 
 export const assignmentReducer = assignmentSlice.reducer;
-export const { addAssignment, clearError, restoreAssignments, restoreWorkspaceSummary, setHydrated, clearAssignments, showCancelledAlert, hideCancelledAlert } = assignmentSlice.actions;
+export const { addAssignment, clearError, restoreAssignments, restoreWorkspaceSummary, setHydrated, clearAssignments, showCancelledAlert, hideCancelledAlert, markOrderCancelled } = assignmentSlice.actions;
 
 // ─── Selectors ────────────────────────────────────────────────────────────────
 

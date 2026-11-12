@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { ScreenLoader } from '@/components/ui/ScreenLoader';
+import { AppStatusBar } from '@/shared/components/ui/AppStatusBar';
 import { ScreenFooter } from '@/components/ui/ScreenFooter';
 import { radius, spacing, typography, colors, useTheme } from '@/core/theme';
 
@@ -54,6 +55,7 @@ export function PaymentScreen() {
 
   return (
     <View style={styles.container}>
+      <AppStatusBar />
       <Stack.Screen options={{ headerShown: true, title: `${assignment.code} · ${assignment.customer.name}` }} />
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.sectionTitle}>Payment Collection</Text>

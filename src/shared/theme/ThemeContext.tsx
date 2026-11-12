@@ -13,9 +13,9 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType>({
-  theme: 'royalPurple',
+  theme: 'tealLogistics',
   isDark: false,
-  colors: royalPurple,
+  colors: tealLogistics,
   setTheme: () => {},
 });
 
@@ -25,14 +25,14 @@ const THEME_STORAGE_KEY = '@app_theme';
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const systemColorScheme = useColorScheme();
-  const [theme, setThemeState] = useState<ThemeType>('royalPurple');
+  const [theme, setThemeState] = useState<ThemeType>('tealLogistics');
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     const loadTheme = async () => {
       try {
         const storedTheme = await AsyncStorage.getItem(THEME_STORAGE_KEY);
-        if (storedTheme && ['royalPurple', 'navyBlue', 'indigoOrange', 'darkTheme', 'tealLogistics'].includes(storedTheme)) {
+        if (storedTheme && ['tealLogistics', 'royalPurple', 'navyBlue', 'indigoOrange', 'darkTheme'].includes(storedTheme)) {
           setThemeState(storedTheme as ThemeType);
         }
       } catch (e) {
@@ -58,8 +58,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     theme === 'navyBlue' ? navyBlue :
     theme === 'indigoOrange' ? indigoOrange :
     theme === 'darkTheme' ? darkTheme :
-    theme === 'tealLogistics' ? tealLogistics :
-    royalPurple;
+    theme === 'royalPurple' ? royalPurple :
+    tealLogistics;
 
   if (!isReady) return null;
 

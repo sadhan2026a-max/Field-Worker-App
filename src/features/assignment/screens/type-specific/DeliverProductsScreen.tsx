@@ -6,6 +6,7 @@ import { safeRouter } from '@/shared/utils/navigation';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { ScreenFooter } from '@/components/ui/ScreenFooter';
+import { AppStatusBar } from '@/shared/components/ui/AppStatusBar';
 
 import { spacing, typography, palette, colors, useTheme } from '@/core/theme';
 
@@ -23,6 +24,7 @@ export function DeliverProductsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <AppStatusBar />
       <Stack.Screen options={{ headerShown: false }} />
       <ScrollView contentContainerStyle={styles.content}>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs }}>
@@ -31,7 +33,7 @@ export function DeliverProductsScreen() {
           </Pressable>
           <Text style={[styles.title, { marginBottom: 0 }]}>Deliver Products</Text>
         </View>
-        <Text style={styles.subtitle}>Confirm items to handover for order #{assignment?.code}</Text>
+        <Text style={styles.subtitle}>Confirm items to handover for order {assignment?.code}</Text>
 
         {assignment?.items && assignment.items.length > 0 ? (
           <View style={styles.itemsList}>

@@ -8,6 +8,7 @@ import { fetchNotifications, markAsRead, selectNotifications, selectIsLoadingNot
 import { spacing, FontFamily, palette, typography } from '@/core/theme';
 import { useTheme } from '@/core/theme';
 import { NotificationDto } from '../types/Notification';
+import { AppStatusBar } from '@/shared/components/ui/AppStatusBar';
 
 const timeAgo = (dateString: string) => {
   const date = new Date(dateString);
@@ -94,6 +95,7 @@ export function NotificationsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <AppStatusBar />
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>

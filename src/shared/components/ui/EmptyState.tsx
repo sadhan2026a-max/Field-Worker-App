@@ -28,7 +28,7 @@ export function EmptyState({
   const actualTintLight = tintLight || defaultTintLight;
   
 
-  const styles = React.useMemo(() => useStyles(colors), [colors]);
+  const styles = React.useMemo(() => useStyles(colors, isDark), [colors, isDark]);
   
   return (
     <View style={[styles.card, style]}>
@@ -41,10 +41,12 @@ export function EmptyState({
   );
 }
 
-const useStyles = (colors: any) => StyleSheet.create({
+const useStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: isDark ? '#1E1E24' : '#FFFFFF',
     borderRadius: Borders.radius2,
+    borderWidth: 1,
+    borderColor: isDark ? '#333338' : '#E2E8F0',
     padding: spacing.xl,
     alignItems: 'center',
     justifyContent: 'center',
@@ -64,7 +66,7 @@ const useStyles = (colors: any) => StyleSheet.create({
   },
   description: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: isDark ? '#94A3B8' : colors.textSecondary,
     textAlign: 'center',
   },
 });

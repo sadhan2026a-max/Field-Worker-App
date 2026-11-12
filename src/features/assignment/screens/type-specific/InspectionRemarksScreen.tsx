@@ -5,6 +5,7 @@ import { safeRouter } from '@/shared/utils/navigation';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { ScreenFooter } from '@/components/ui/ScreenFooter';
+import { AppStatusBar } from '@/shared/components/ui/AppStatusBar';
 import { Input } from '@/components/ui/Input';
 import { spacing, typography, colors, useTheme } from '@/core/theme';
 
@@ -24,6 +25,7 @@ export function InspectionRemarksScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <AppStatusBar />
       <View style={styles.content}>
         <Text style={styles.title}>Inspection Remarks</Text>
         <Text style={styles.subtitle}>Enter any final remarks before completing</Text>

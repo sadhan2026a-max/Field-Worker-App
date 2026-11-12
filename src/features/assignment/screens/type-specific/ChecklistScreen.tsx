@@ -8,6 +8,7 @@ import Toast from 'react-native-toast-message';
 
 import { Button } from '@/components/ui/Button';
 import { ScreenFooter } from '@/components/ui/ScreenFooter';
+import { AppStatusBar } from '@/shared/components/ui/AppStatusBar';
 import { spacing, typography, palette, useTheme } from '@/core/theme';
 import { useAssignment } from '@/features/assignment/hooks/useAssignments';
 import { getChecklistTemplates, saveChecklist } from '@/features/assignment/api/assignmentService';
@@ -200,6 +201,7 @@ export function ChecklistScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <AppStatusBar />
       <Stack.Screen options={{ headerShown: false }} />
       <ScrollView contentContainerStyle={styles.content}>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs }}>
@@ -208,7 +210,7 @@ export function ChecklistScreen() {
           </Pressable>
           <Text style={[styles.title, { marginBottom: 0 }]}>Checklist</Text>
         </View>
-        <Text style={styles.subtitle}>Order #{assignment?.code}</Text>
+        <Text style={styles.subtitle}>Order {assignment?.code}</Text>
 
         {templates.length === 0 ? (
           <View style={styles.emptyState}>

@@ -125,8 +125,14 @@ export function BookingCard({ assignment }: BookingCardProps) {
   return (
     <View style={styles.cardWrapper}>
       {/* ─── 1. TOP HEADER BANNER (THEMED) ─── */}
-      <View style={styles.headerBanner}>
+      <View style={[styles.headerBanner, assignment.status === 'cancelled' && styles.headerBannerCancelled]}>
         <Text style={styles.headerBannerText}>Booking ID : {orderId}</Text>
+        {assignment.status === 'cancelled' && (
+          <View style={styles.cancelledBadge}>
+            <MaterialIcons name="cancel" size={12} color="#FFFFFF" />
+            <Text style={styles.cancelledBadgeText}>CANCELLED</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.cardBody}>
@@ -355,22 +361,32 @@ const useStyles = (colors: any, isDark: boolean) =>
       borderWidth: 1,
       borderColor: colors.border || '#E5E7EB',
       overflow: 'hidden',
-      ...Platform.select({
-        ios: {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: isDark ? 0.3 : 0.08,
-          shadowRadius: 6,
-        },
-        android: {
-          elevation: 3,
-        },
-      }),
     },
     headerBanner: {
       backgroundColor: colors.primary,
       paddingVertical: 13,
       paddingHorizontal: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    headerBannerCancelled: {
+      backgroundColor: '#DC2626',
+    },
+    cancelledBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: 'rgba(255, 255, 255, 0.25)',
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 6,
+    },
+    cancelledBadgeText: {
+      color: '#FFFFFF',
+      fontSize: 10.5,
+      fontWeight: '800',
+      letterSpacing: 0.5,
     },
     headerBannerText: {
       color: colors.textInverse || '#FFFFFF',

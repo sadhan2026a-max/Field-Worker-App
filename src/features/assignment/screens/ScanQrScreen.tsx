@@ -9,6 +9,7 @@ import Toast from 'react-native-toast-message';
 
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { AppStatusBar } from '@/shared/components/ui/AppStatusBar';
 import { spacing, typography, palette, FontFamily, FontSize, colors, useTheme } from '@/core/theme';
 
 import { useAssignments } from '@/hooks/useAssignments';
@@ -143,6 +144,7 @@ export function ScanQrScreen() {
 
   return (
     <View style={styles.container}>
+      <AppStatusBar style="light" />
       {isCameraReady && (
         <CameraView
           style={StyleSheet.absoluteFill}

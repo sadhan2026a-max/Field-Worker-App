@@ -533,24 +533,13 @@ const styles = StyleSheet.create({
 const useStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   cardContainer: {
     height: 155,
-    borderRadius: 14,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: isDark ? '#333338' : '#E2E8F0',
     marginBottom: 12,
     overflow: 'hidden',
     position: 'relative',
     backgroundColor: isDark ? '#0F172A' : '#F1F5F9',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 6,
-      },
-      android: {
-        elevation: 2.5,
-      },
-    }),
   },
   mapOverlay: {
     ...StyleSheet.absoluteFillObject,

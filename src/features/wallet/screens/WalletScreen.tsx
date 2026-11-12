@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
+import { AppStatusBar } from '@/shared/components/ui/AppStatusBar';
 import { MaterialIcons } from '@expo/vector-icons';
 import { spacing, typography, palette, FontFamily, colors, useTheme } from '@/core/theme';
 
@@ -64,7 +64,7 @@ export default function WalletScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar style="dark" />
+      <AppStatusBar />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <MaterialIcons name="arrow-back" size={24} color={colors.textPrimary} />
