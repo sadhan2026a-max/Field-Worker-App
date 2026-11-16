@@ -57,6 +57,11 @@ function upsertAssignment(state: AssignmentState, assignment: Assignment) {
     //   NEVER let any API response (pending/accepted/en_route etc.) revive it.
     //   This prevents the "re-appearing cancelled order" bug when app comes to foreground.
     if (currentStatus === 'cancelled') {
+      // A fresh active offer from the API is stronger evidence than a stale
+      // local cancellation (for example, a previously declined offer).
+      if (incomingStatus === 'pending') {
+        state.items[index] = { ...currentItem, ...assignment, status: 'pending' };
+      }
       return;
     }
 
@@ -176,7 +181,10 @@ export const syncHistoryFromNotificationsThunk = createAsyncThunk<void, { onlyTo
       filteredNotifications.forEach(n => {
         const orderId = n.relatedOrderId || (n as any).orderId || (n as any).assignmentId;
         const msg = `${n.title || ''} ${n.message || ''}`.toLowerCase();
-        const isCancel = msg.includes('cancel') || String(n.type || '').toLowerCase().includes('cancel');
+        // Notification text is not a reliable status source: old/stale messages
+        // can mention cancellation after an order has since been assigned.
+        const notificationType = String(n.type || '').toLowerCase();
+        const isCancel = /(^|[._-])cancel(?:led|ed|lation)?($|[._-])/.test(notificationType);
 
         if (isCancel) {
           if (orderId) cancelledOrderIds.add(String(orderId));
@@ -199,11 +207,6 @@ export const syncHistoryFromNotificationsThunk = createAsyncThunk<void, { onlyTo
         }
       });
 
-      // Mark all detected cancellations in Redux state immediately
-      cancelledOrderIds.forEach(idOrCode => {
-        dispatch(markOrderCancelled(idOrCode));
-      });
-
       filteredNotifications.forEach(n => {
         const orderId = n.relatedOrderId || (n as any).orderId || (n as any).assignmentId;
         if (orderId && typeof orderId === 'string') {
@@ -217,11 +220,10 @@ export const syncHistoryFromNotificationsThunk = createAsyncThunk<void, { onlyTo
       const existingHistory = await assignmentService.getLifetimeHistory(driverId);
       const existingIds = new Set(existingHistory.map(a => a.id));
 
-      // For today sync: always re-fetch today's orders to get latest status (pending/active)
-      // For full sync: skip already-saved ones
-      const idsToFetch = onlyToday
-        ? Array.from(uniqueOrderIds) // Always re-fetch today's
-        : Array.from(uniqueOrderIds).filter(id => !existingIds.has(id));
+      // The active assignment list is refreshed separately on foreground.
+      // History sync should only enrich orders we have never saved; fetching
+      // every notification-linked order on each resume creates a request storm.
+      const idsToFetch = Array.from(uniqueOrderIds).filter(id => !existingIds.has(id));
 
       if (idsToFetch.length === 0) return;
 
@@ -615,27 +617,12 @@ const assignmentSlice = createSlice({
           upsertAssignment(state, action.payload);
         } else {
           logger.warn('assignment', `fetchAssignmentById: not found ${action.meta.arg}`);
-          const targetId = action.meta.arg;
-          const existingIndex = state.items.findIndex((item) => item.id === targetId || item.offerId === targetId);
-          if (existingIndex >= 0) {
-            const existing = state.items[existingIndex];
-            if (['accepted', 'en_route', 'arrived', 'in_progress', 'pending'].includes(existing.status)) {
-              state.items[existingIndex] = { ...existing, status: 'cancelled' };
-            }
-          }
         }
         state.detailStatus = 'succeeded';
       })
       .addCase(fetchAssignmentById.rejected, (state, action) => {
         state.detailStatus = 'failed';
-        const targetId = action.meta.arg;
-        const existingIndex = state.items.findIndex((item) => item.id === targetId || item.offerId === targetId);
-        if (existingIndex >= 0) {
-          const existing = state.items[existingIndex];
-          if (['accepted', 'en_route', 'arrived', 'in_progress'].includes(existing.status)) {
-            state.items[existingIndex] = { ...existing, status: 'cancelled' };
-          }
-        }
+        // A network/permission error is not proof that the order was cancelled.
         state.error = action.error.message ?? 'Failed to load assignment';
       });
 
@@ -685,7 +672,7 @@ const assignmentSlice = createSlice({
       .addCase(acceptOffer.rejected, (state, action) => {
         state.isMutating = false;
         state.error = (action.payload as any)?.message ?? action.error.message ?? 'Failed to accept offer';
-        if (state.error?.includes('processed or expired') || (action.payload as any)?.status === 409 || state.error?.includes('no longer available')) {
+        if (state.error?.includes('cancelled by the admin') || state.error?.includes('processed or expired') || (action.payload as any)?.status === 409 || state.error?.includes('no longer available')) {
           const offerId = action.meta.arg;
           state.items = state.items.filter((i) => i.offerId !== offerId && i.id !== offerId);
         }
@@ -702,7 +689,7 @@ const assignmentSlice = createSlice({
       .addCase(declineOffer.rejected, (state, action) => {
         state.isMutating = false;
         state.error = action.error.message ?? 'Failed to decline offer';
-        if (state.error?.includes('processed or expired') || (action.payload as any)?.status === 409 || state.error?.includes('no longer available')) {
+        if (state.error?.includes('cancelled by the admin') || state.error?.includes('processed or expired') || (action.payload as any)?.status === 409 || state.error?.includes('no longer available')) {
           const targetId = action.meta.arg;
           state.items = state.items.filter((i) => i.offerId !== targetId && i.id !== targetId);
         }

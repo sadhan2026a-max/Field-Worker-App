@@ -277,7 +277,7 @@ const useStyles = (themeColors: any, palette: OverviewThemePalette, isAvailable:
       width: 10,
       height: 10,
       borderRadius: 5,
-      backgroundColor: '#10B981',
+      backgroundColor: palette.headerPrimary,
       borderWidth: 1.5,
       borderColor: isDark ? '#1E1E24' : '#FFFFFF',
     },

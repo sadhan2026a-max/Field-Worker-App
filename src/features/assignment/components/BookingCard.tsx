@@ -28,8 +28,9 @@ export function BookingCard({ assignment }: BookingCardProps) {
 
   const [showItemsModal, setShowItemsModal] = useState(false);
 
-  // 1. Order / Booking ID
+  // Display a concise order ID in the card header.
   const orderId = assignment.code && assignment.code !== 'N/A' ? assignment.code : assignment.id || 'N/A';
+  const displayOrderId = orderId.replace(/^ORD-?/i, '');
 
   // 2. Date Formatting (DD/MM/YY)
   const formattedDate = (() => {
@@ -126,7 +127,9 @@ export function BookingCard({ assignment }: BookingCardProps) {
     <View style={styles.cardWrapper}>
       {/* ─── 1. TOP HEADER BANNER (THEMED) ─── */}
       <View style={[styles.headerBanner, assignment.status === 'cancelled' && styles.headerBannerCancelled]}>
-        <Text style={styles.headerBannerText}>Booking ID : {orderId}</Text>
+        <Text style={styles.headerBannerText} numberOfLines={1} ellipsizeMode="middle">
+          Order ID : {displayOrderId}
+        </Text>
         {assignment.status === 'cancelled' && (
           <View style={styles.cancelledBadge}>
             <MaterialIcons name="cancel" size={12} color="#FFFFFF" />

@@ -42,7 +42,9 @@
         "POST_NOTIFICATIONS"
       ],
       "notification": {
-        "defaultChannel": "default"
+        "icon": "./assets/notification-icon.png",
+        "color": "#10B981",
+        "defaultChannel": "order_alerts_v5"
       },
       "config": {
         "googleMaps": {
@@ -88,7 +90,18 @@
         }
       ],
       "expo-asset",
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#10B981",
+          "defaultChannel": "order_alerts_v5",
+          "sounds": [
+            "./assets/sounds/new_order.wav",
+            "./assets/sounds/order_cancelled.wav"
+          ]
+        }
+      ],
       "@react-native-community/datetimepicker"
     ],
     "experiments": {

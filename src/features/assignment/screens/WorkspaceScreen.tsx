@@ -210,13 +210,11 @@ export function WorkspaceScreen() {
 
   useEffect(() => {
     if (!isFocused) return;
-    // Fast polling (4s) when an order offer is waiting on screen to detect admin cancellation immediately
-    // Normal polling (15s) otherwise
-    const pollInterval = hasPendingOrder ? 4000 : 15000;
+    // Poll at a measured interval; rapid refreshes fan out into many order and
+    // history requests and flood the Metro terminal without improving delivery.
+    const pollInterval = hasPendingOrder ? 15000 : 60000;
     const interval = setInterval(() => {
       refetchAssignments();
-      dispatch(fetchNotifications());
-      dispatch(syncHistoryFromNotificationsThunk({ onlyToday: true }));
     }, pollInterval);
     return () => clearInterval(interval);
   }, [isFocused, hasPendingOrder, refetchAssignments, dispatch]);
@@ -227,6 +225,7 @@ export function WorkspaceScreen() {
 
   // Global tracker for cancellation detection on Workspace home screen
   const previousOrdersRef = useRef<Map<string, { code: string; status: string }>>(new Map());
+  const notifiedCancelledOrdersRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!driver || isAuthLoading || !allAssignments) {
@@ -237,9 +236,6 @@ export function WorkspaceScreen() {
     const currentMap = new Map<string, { code: string; status: string }>();
     allAssignments.forEach((a) => {
       currentMap.set(a.id, { code: a.code || a.id, status: a.status });
-      if (a.offerId) {
-        currentMap.set(a.offerId, { code: a.code || a.offerId, status: a.status });
-      }
     });
 
     if (previousOrdersRef.current.size > 0) {
@@ -249,32 +245,29 @@ export function WorkspaceScreen() {
 
         const current = currentMap.get(orderId);
         const isNowCancelled = current && current.status === 'cancelled';
-        const isNowRemoved = !current;
 
-        if (isNowCancelled || isNowRemoved) {
+        // Orders can temporarily disappear from a refresh during reassignment
+        // or while the offers endpoint catches up. Absence is not cancellation.
+        if (isNowCancelled) {
           previousOrdersRef.current.delete(orderId);
           const orderDisplayCode = prev.code || orderId;
+
+          // Prevent duplicate alert triggers for the same order
+          if (notifiedCancelledOrdersRef.current.has(orderDisplayCode)) {
+            return;
+          }
+          notifiedCancelledOrdersRef.current.add(orderDisplayCode);
 
           // 1. Show cancellation modal
           dispatch(showCancelledAlert(orderDisplayCode));
 
-          // 2. Heavy triple vibration pattern for cancellation
+          // 2. Exactly ONE clean vibration (user requested: only one vibration)
           if (Platform.OS === 'android') {
-            Vibration.vibrate([0, 500, 200, 500, 200, 500]);
+            Vibration.cancel();
+            Vibration.vibrate(400);
           }
 
-          // 3. Play cancellation tone via local notification
-          Notifications.scheduleNotificationAsync({
-            content: {
-              title: 'Order Cancelled',
-              body: `Order ${orderDisplayCode} has been cancelled`,
-              sound: 'order_cancelled',
-              ...(Platform.OS === 'android' && { channelId: CHANNEL_CANCELLED }),
-            },
-            trigger: null,
-          }).catch(() => { });
-
-          // 4. Mark cancelled in Redux so the card disappears immediately
+          // 3. Mark cancelled in Redux so the card disappears immediately
           dispatch(markOrderCancelled(orderId));
           if (prev.code) dispatch(markOrderCancelled(prev.code));
         }

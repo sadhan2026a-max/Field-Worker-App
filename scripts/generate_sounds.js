@@ -6,7 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const RAW_DIR = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'res', 'raw');
+const RAW_DIR = path.join(__dirname, '..', 'assets', 'sounds');
 fs.mkdirSync(RAW_DIR, { recursive: true });
 
 const SAMPLE_RATE = 44100;

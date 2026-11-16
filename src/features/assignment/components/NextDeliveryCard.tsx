@@ -326,7 +326,6 @@ export function NextDeliveryCard({ assignment, onStart }: NextDeliveryCardProps)
               style={styles.primaryCtaGradient}
             >
               <Text style={styles.primaryCtaText}>{getActionLabel()}</Text>
-              <MaterialIcons name="arrow-forward" size={15} color="#FFFFFF" />
             </LinearGradient>
           </Pressable>
         )}

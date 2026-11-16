@@ -5,7 +5,7 @@ Generate two WAV notification sounds:
 """
 import wave, struct, math, os
 
-RAW_DIR = os.path.join(os.path.dirname(__file__), '..', 'android', 'app', 'src', 'main', 'res', 'raw')
+RAW_DIR = os.path.join(os.path.dirname(__file__), '..', 'assets', 'sounds')
 os.makedirs(RAW_DIR, exist_ok=True)
 
 SAMPLE_RATE = 44100

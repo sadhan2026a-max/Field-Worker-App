@@ -385,6 +385,15 @@ export function AssignmentDetailScreen() {
       ? 'Cancelled Booking'
       : 'Order Details';
 
+  const timelineItems = [...(assignment.timeline || [])];
+  if (assignment.status === 'cancelled' && !timelineItems.some((item) => item.status.toLowerCase().includes('cancel'))) {
+    timelineItems.push({
+      status: 'Cancelled',
+      timestamp: assignment.cancelledAt || new Date().toISOString(),
+      notes: 'Order cancelled',
+    });
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <AppStatusBar style="light" backgroundColor={colors.primary} translucent={false} />
@@ -430,18 +439,6 @@ export function AssignmentDetailScreen() {
             </View>
           )}
 
-          {assignment.status === 'cancelled' && (
-            <View style={styles.cancelledBanner}>
-              <MaterialIcons name="cancel" size={22} color="#DC2626" />
-              <View style={{ flex: 1, gap: 2 }}>
-                <Text style={styles.cancelledBannerTitle}>Order Cancelled</Text>
-                <Text style={styles.cancelledBannerText}>
-                  This booking has been cancelled or reassigned by admin.
-                </Text>
-              </View>
-            </View>
-          )}
-
           {/* ─── CLIENT BOOKING CARD (Themed) ─── */}
           <BookingCard assignment={assignment} />
 
@@ -463,12 +460,12 @@ export function AssignmentDetailScreen() {
           )}
 
           {/* ─── ORDER TRACKING / TIMELINE ─── */}
-          {assignment.timeline && assignment.timeline.length > 0 && (
+          {timelineItems.length > 0 && (
             <View style={styles.timelineCard}>
               <Text style={[styles.sectionTitle, { marginBottom: 16 }]}>Order Tracking</Text>
               <View style={styles.timelineContainer}>
-                {assignment.timeline.map((item, index) => {
-                  const isLast = index === assignment.timeline!.length - 1;
+                {timelineItems.map((item, index) => {
+                  const isLast = index === timelineItems.length - 1;
 
                   const getTimelineIcon = (status: string) => {
                     const s = status.toLowerCase();

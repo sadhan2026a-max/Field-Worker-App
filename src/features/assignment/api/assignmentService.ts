@@ -149,6 +149,7 @@ function mapOrderDtoToAssignment(order: OrderDto, offerId?: string): Assignment 
     deliveryInstructions: order.instructions || undefined,
     createdAt: order.createdAt,
     completedAt: order.completedAt || undefined,
+    cancelledAt: order.cancelledAt || undefined,
     assignedDriverId: order.assignedDriverId,
     assignedDriverName: order.assignedDriverName,
     checklist: order.checklist?.map((item) => ({
@@ -292,7 +293,14 @@ export async function getAssignments(status?: Assignment['status'] | string): Pr
     logger.warn('assignment', `Failed to fetch driver assignments. Status code: ${e?.response?.status}`, e);
   }
 
-  const validOffers = Array.isArray(offers) ? offers.filter((i) => i && (i.id || i.orderId)) : [];
+  const validOffers = Array.isArray(offers) ? offers.filter((i) => {
+    if (!i || !(i.id || i.orderId)) return false;
+    // A declined offer means the driver declined this offer, not that the order
+    // itself was cancelled. Ignore stale terminal offers; a later re-offer for
+    // the same order will still be included here.
+    const offerStatus = String(i.status || '').toLowerCase();
+    return !['declined', 'expired', 'rejected', 'cancelled', 'canceled'].includes(offerStatus);
+  }) : [];
 
   // Dedupe by orderId — the same order can have more than one offer in its history
   // (e.g. re-offered after expiry), and only the underlying order is what we display.
@@ -366,7 +374,7 @@ export async function getAssignments(status?: Assignment['status'] | string): Pr
     const os = offer.status?.toLowerCase() || '';
 
     const isCompletedStatus = ['completed', 'delivered', 'finished', 'done', 'closed'].includes(os);
-    const isCancelledStatus = ['cancelled', 'declined', 'expired', 'failed', 'rejected'].includes(os);
+    const isCancelledStatus = ['cancelled', 'canceled'].includes(os);
 
     if (os === 'accepted' || os === 'assigned') mappedStatus = 'accepted';
     if (isCancelledStatus) mappedStatus = 'cancelled';
@@ -449,69 +457,65 @@ export async function getAssignments(status?: Assignment['status'] | string): Pr
 export async function acceptOffer(offerId: string): Promise<Assignment> {
   logger.info('assignment', 'Accepting assignment offer', { offerId });
 
-  // ── Pre-flight check ────────────────────────────────────────────────────────
-  // Before calling accept, verify the offer still exists and hasn't been
-  // cancelled by the admin. This guards against the backend bug where a
-  // cancelled order can still be "accepted" by the driver.
-  let targetOrderId: string | undefined;
-  try {
-    const currentAssignments = await getAssignments();
-    const offer = currentAssignments.find((a) => a.id === offerId || a.offerId === offerId);
-    if (!offer) {
-      logger.warn('assignment', `Pre-flight: offer ${offerId} not found in pending list, blocking accept`);
-      throw new Error('This order has been cancelled by the admin.');
-    }
-    if (offer.status === 'cancelled') {
-      logger.warn('assignment', `Pre-flight: offer ${offerId} is cancelled, blocking accept`);
-      throw new Error('This order has been cancelled by the admin.');
-    }
-    targetOrderId = offer.id;
+  const targetOfferId = offerId;
 
-    // Verify directly with the backend order endpoint if orderId is known
-    if (targetOrderId) {
-      try {
-        const orderCheck = await api.get<OrderDto>(`/api/v1/orders/${targetOrderId}`, { _suppressLog: true } as any);
-        if (orderCheck.data?.status?.toLowerCase() === 'cancelled') {
-          logger.warn('assignment', `Pre-flight: order ${targetOrderId} is Cancelled on backend, blocking accept`);
-          throw new Error('This order has been cancelled by the admin.');
-        }
-      } catch (checkErr: any) {
-        if (checkErr.message?.includes('cancelled by the admin')) {
-          throw checkErr;
-        }
-        const status = checkErr?.response?.status;
-        if (status === 403 || status === 404) {
-          logger.warn('assignment', `Pre-flight: order check returned ${status}, order is cancelled or reassigned`);
-          throw new Error('This order has been cancelled by the admin.');
-        }
-      }
-    }
-  } catch (preflightError: any) {
-    if (preflightError.message?.includes('cancelled by the admin') || preflightError.message?.includes('processed or expired')) {
-      throw preflightError;
-    }
-    logger.warn('assignment', 'Pre-flight check failed, proceeding cautiously', preflightError);
-  }
+  // ── Pre-flight check ────────────────────────────────────────────────────────
+  // Check if this offer is already known to be cancelled in the local/cached list.
+  // Note: We DO NOT call GET /api/v1/orders/{id} here because unassigned offers return
+  // 403 Forbidden before acceptance, which would wrongly block valid offers.
+  // Skip the full assignments refresh here; it waits on unrelated API calls
+  // before the accept request can even start. The accept endpoint validates
+  // whether this offer is still available.
   // ────────────────────────────────────────────────────────────────────────────
 
   let response;
   try {
-    response = await api.post(`/api/v1/assignment-offers/${offerId}/accept`, {});
+    response = await api.post(`/api/v1/assignment-offers/${targetOfferId}/accept`, {});
   } catch (error: any) {
-    const status = error.response?.status;
-    const msg = error.response?.data?.message || error.response?.data?.error || '';
+    // If targetOfferId returned 404 and is different from the original offerId, try the original ID
+    if (error.response?.status === 404 && targetOfferId !== offerId) {
+      try {
+        response = await api.post(`/api/v1/assignment-offers/${offerId}/accept`, {});
+      } catch (fallbackErr: any) {
+        const status = fallbackErr.response?.status;
+        const msg = fallbackErr.response?.data?.message || fallbackErr.response?.data?.error || '';
+        if (msg) {
+          if (msg.toLowerCase().includes('cancel')) {
+            throw new Error('This order has been cancelled by the admin.');
+          }
+          throw new Error(msg);
+        }
+        if (status === 409) {
+          throw new Error('This offer is no longer available or already assigned.');
+        }
+        if (status === 404) {
+          throw new Error('This offer is no longer available.');
+        }
+        throw new Error('Failed to accept offer');
+      }
+    } else {
+      const status = error.response?.status;
+      const msg = error.response?.data?.message || error.response?.data?.error || '';
 
-    if (msg) {
-      throw new Error(msg);
+      if (msg) {
+        if (msg.toLowerCase().includes('cancel')) {
+          throw new Error('This order has been cancelled by the admin.');
+        }
+        throw new Error(msg);
+      }
+
+      if (status === 409) {
+        throw new Error('This offer is no longer available or already assigned.');
+      }
+
+      if (status === 404) {
+        throw new Error('This offer is no longer available.');
+      }
+
+      throw new Error('Failed to accept offer');
     }
-
-    if (status === 409) {
-      throw new Error('This offer is no longer available or already assigned.');
-    }
-
-    throw new Error('Failed to accept offer');
   }
-  const orderId: string | undefined = response.data?.orderId;
+  const orderId: string | undefined = response.data?.orderId || response.data?.id;
 
   if (!orderId) {
     throw new Error('Accept response did not include an order id');
@@ -520,8 +524,16 @@ export async function acceptOffer(offerId: string): Promise<Assignment> {
   try {
     // Fetch the full order right away so the UI has real customer/address data
     // immediately, instead of the offer's placeholder text until the next refresh.
-    return await fetchOrderAsAssignment(orderId, offerId);
-  } catch (e) {
+    const assignment = await fetchOrderAsAssignment(orderId, targetOfferId);
+    if (assignment.status === 'cancelled') {
+      logger.warn('assignment', `Accepted order ${orderId} but backend returned Cancelled status`);
+      throw new Error('This order has been cancelled by the admin.');
+    }
+    return assignment;
+  } catch (e: any) {
+    if (e.message?.includes('cancelled by the admin')) {
+      throw e;
+    }
     logger.warn('assignment', `Accepted order ${orderId} but failed to enrich it immediately`, e);
 
     const rawOrderType = response.data?.orderType || response.data?.type || 'Delivery';
@@ -530,7 +542,7 @@ export async function acceptOffer(offerId: string): Promise<Assignment> {
     const resData = (response.data as any) || {};
     return {
       id: orderId,
-      offerId,
+      offerId: targetOfferId,
       code: response.data.orderNumber,
       type: mappedType,
       status: 'accepted',

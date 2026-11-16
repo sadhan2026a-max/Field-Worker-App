@@ -82,6 +82,7 @@ function AppBootstrap({ children }: { children: React.ReactNode }) {
   const dispatch = useAppDispatch();
   const driver = useAppSelector(selectDriver);
   const isLoading = useAppSelector(selectIsLoading);
+  const handledNotifKeysRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     logger.info('bootstrap', '👋 SidhaHisab Rider starting up — dispatching initAuth');
@@ -127,6 +128,12 @@ function AppBootstrap({ children }: { children: React.ReactNode }) {
 
     // Set up push notification listeners
     const notificationListener = NotificationService.addNotificationReceivedListener(async (notification) => {
+      // Ignore locally scheduled notifications from triggering this listener (prevents recursion)
+      const data = notification.request.content.data;
+      if (data?._isLocal || (notification.request.trigger as any)?.type === 'timeInterval') {
+        return;
+      }
+
       logger.info('notification', 'Foreground notification received', {
         title: notification.request.content.title,
         body: notification.request.content.body
@@ -135,78 +142,87 @@ function AppBootstrap({ children }: { children: React.ReactNode }) {
       const currentDriver = store.getState().auth.driver;
       if (!currentDriver?.id) return;
 
-      const data = notification.request.content.data;
       const notifType = String(data?.type || '').toLowerCase();
       const titleStr = String(notification.request.content.title || '');
       const bodyStr = String(notification.request.content.body || '');
       const orderId = data?.relatedOrderId || data?.orderId || data?.assignmentId || data?.id;
 
-      const isCancellation = notifType.includes('cancel') ||
+      const isCancellation =
+        notifType.includes('cancel') ||
         titleStr.toLowerCase().includes('cancel') ||
         bodyStr.toLowerCase().includes('cancel');
+
+      // Deduplication: prevent processing the exact same order alert multiple times
+      const orderCodeMatch = bodyStr.match(/ORD-[\w-]+/i);
+      const orderCode = orderCodeMatch ? orderCodeMatch[0] : (orderId ? String(orderId) : '');
+      const dedupKey = `${isCancellation ? 'cancel' : 'new'}_${orderCode || orderId || titleStr}`;
+
+      if (handledNotifKeysRef.current.has(dedupKey)) {
+        return;
+      }
+      handledNotifKeysRef.current.add(dedupKey);
+      setTimeout(() => {
+        handledNotifKeysRef.current.delete(dedupKey);
+      }, 15000);
 
       dispatch(fetchNotifications());
 
       if (isCancellation) {
-        // ── CANCEL: mark order as cancelled in Redux IMMEDIATELY ───────────────
-        const orderCodeMatch = bodyStr.match(/ORD-[\w-]+/i);
-        const orderCode = orderCodeMatch ? orderCodeMatch[0] : (orderId ? String(orderId) : '');
-
-        // 1. Remove/cancel the order from local Redux state right away
         if (orderId) dispatch(markOrderCancelled(String(orderId)));
         if (orderCode) dispatch(markOrderCancelled(orderCode));
-        if (orderId) dispatch(fetchAssignmentById(String(orderId)));
-
-        // 2. Show cancellation popup
         dispatch(showCancelledAlert(orderCode));
 
-        // 3. Vibrate with a "triple heavy" pattern for cancellation (long-short-long)
-        //    Works even when app is in foreground on Android.
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
         if (Platform.OS === 'android') {
-          Vibration.vibrate([0, 500, 200, 500, 200, 500]);
+          Notifications.scheduleNotificationAsync({
+            content: {
+              title: titleStr || 'Order Cancelled',
+              body: bodyStr || `Order ${orderCode} has been cancelled`,
+              sound: 'order_cancelled.wav',
+              data: { ...data, _isLocal: true },
+              priority: Notifications.AndroidNotificationPriority.MAX,
+              color: '#EF4444',
+            },
+            trigger: { channelId: CHANNEL_CANCELLED },
+          }).catch((error) => logger.warn('notification', 'Failed to show cancellation notification', error));
         }
 
-        // 4. Schedule a local notification on the cancelled channel so the
-        //    custom sound (order_cancelled) plays regardless of FCM channelId
-        Notifications.scheduleNotificationAsync({
-          content: {
-            title: notification.request.content.title || 'Order Cancelled',
-            body: notification.request.content.body || orderCode,
-            sound: 'order_cancelled',
-            ...(Platform.OS === 'android' && { channelId: CHANNEL_CANCELLED }),
-          },
-          trigger: null,
-        }).catch(() => {});
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+        if (Platform.OS === 'android') {
+          Vibration.cancel();
+          Vibration.vibrate(400);
+        }
 
-        // 5. Delay full refresh so it doesn't race with fetchAssignmentById
         setTimeout(() => {
           dispatch(fetchAssignments());
           dispatch(fetchWorkspaceSummary(currentDriver.id));
-        }, 3000);
+        }, 2000);
 
       } else if (orderId) {
         // ── NEW ORDER: show card on home screen INSTANTLY ────────────────────
-        // 1. Vibrate with a cheerful short double-buzz for new order
+        // Single clean short buzz for new order
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         if (Platform.OS === 'android') {
-          Vibration.vibrate([0, 200, 100, 200]);
+          Vibration.cancel();
+          Vibration.vibrate(250);
         }
-
-        // 2. Play new order chime sound via local notification
-        Notifications.scheduleNotificationAsync({
-          content: {
-            title: notification.request.content.title || 'New Delivery Order',
-            body: notification.request.content.body || (orderId ? `Order #${orderId}` : 'New order assigned'),
-            sound: 'new_order',
-            ...(Platform.OS === 'android' && { channelId: CHANNEL_NEW_ORDER }),
-          },
-          trigger: null,
-        }).catch(() => {});
 
         // 3. Extract order code & type from notification text
         const orderCodeMatch = bodyStr.match(/ORD-[\w-]+/i);
         const extractedCode = orderCodeMatch ? orderCodeMatch[0] : String(orderId);
+
+        if (Platform.OS === 'android') {
+          Notifications.scheduleNotificationAsync({
+            content: {
+              title: titleStr || 'New order assigned',
+              body: bodyStr || `Order ${extractedCode} is ready to accept`,
+              sound: 'new_order.wav',
+              data: { ...data, _isLocal: true },
+              priority: Notifications.AndroidNotificationPriority.MAX,
+              color: '#10B981',
+            },
+            trigger: { channelId: CHANNEL_NEW_ORDER },
+          }).catch((error) => logger.warn('notification', 'Failed to show new order notification', error));
+        }
 
         // Detect order type from notification title/body text
         const bodyLower = bodyStr.toLowerCase();

@@ -274,7 +274,7 @@ export function getOverviewTheme(themeName?: string, isDark?: boolean, isAvailab
     statusBarStyle: isAvailable ? 'dark' : 'light',
 
     titleText: '#0F172A',
-    titleChipBg: '#10B981',
+    titleChipBg: '#059669',
     viewAllBg: '#ECFDF5',
     viewAllBorder: '#D1FAE5',
     viewAllText: '#059669',
@@ -299,7 +299,7 @@ export function getOverviewTheme(themeName?: string, isDark?: boolean, isAvailab
 
     completedBg: '#EBF9F5',
     completedBorder: '#C6F3E6',
-    completedBadge: '#10B981',
+    completedBadge: '#059669',
     completedText: '#065F46',
   };
 }

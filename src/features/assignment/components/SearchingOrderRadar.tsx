@@ -22,7 +22,7 @@ interface SearchingOrderRadarProps {
 const RADAR_SIZE = 26;
 const RADAR_RADIUS = RADAR_SIZE / 2;
 const TILE_SIZE = 256;
-const MAP_ZOOM = 16; // Level 16 is the maximum native detail level with 100% reliable street coverage
+const MAP_ZOOM = 16; // ArcGIS Canvas tiles provide reliable street coverage up to zoom 16.
 
 // Fixed Precision Coordinates for Blip Targets inside 26px Micro-Radar (Radius 13px)
 const BLIP_POSITIONS = [
@@ -613,17 +613,6 @@ const useStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
     overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: colors.primary,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.35,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
   },
   gridCircle: {
     position: 'absolute',
@@ -722,17 +711,6 @@ const useStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     backgroundColor: colors.primary,
     borderWidth: 0.5,
     borderColor: '#FFFFFF',
-    ...Platform.select({
-      ios: {
-        shadowColor: colors.primary,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.9,
-        shadowRadius: 1.5,
-      },
-      android: {
-        elevation: 1.5,
-      },
-    }),
   },
   centerPipRing: {
     width: 4.5,

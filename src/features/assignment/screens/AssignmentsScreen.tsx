@@ -12,7 +12,7 @@ import { spacing, typography, palette, FontFamily, FontSize, useTheme } from '@/
 import { useAssignments, useWorkspaceSummary } from '@/hooks/useAssignments';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { selectDriver } from '@/features/auth/redux/authSlice';
-import { fetchAssignments, syncHistoryFromNotificationsThunk } from '@/features/assignment/redux/assignmentSlice';
+import { addAssignment, fetchAssignments, syncHistoryFromNotificationsThunk } from '@/features/assignment/redux/assignmentSlice';
 import * as assignmentService from '@/features/assignment/api/assignmentService';
 import { useCurrentLocation, calculateDistanceKm } from '@/shared/utils/location';
 import { DistanceDisplay } from '@/features/assignment/components';
@@ -303,7 +303,10 @@ export function AssignmentsScreen() {
                     <Text style={styles.dateHeaderText}>{currentItemDate}</Text>
                   </View>
                 )}
-                <Pressable onPress={() => router.push({ pathname: '/assignment/[id]', params: { id: item.id } })}>
+                <Pressable onPress={() => {
+                  dispatch(addAssignment(item));
+                  router.push({ pathname: '/assignment/[id]', params: { id: item.id } });
+                }}>
                   <Card style={styles.card}>
                     {/* Left Side: Icon Circle */}
                     <View style={styles.cardIconContainer}>

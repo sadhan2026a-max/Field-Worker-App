@@ -104,9 +104,10 @@ export const indigoOrange = {
 export const tealLogistics = {
   ...lightColors,
   name: 'tealLogistics',
-  primary: '#0F766E',
-  primaryDark: '#0D9488',
-  headerGradient: ['#0F766E', '#0F766E'],
+  primary: '#059669',
+  primaryDark: '#047857',
+  primaryLight: '#D1FAE5',
+  headerGradient: ['#059669', '#047857'],
 };
 
 export const colors = tealLogistics;
